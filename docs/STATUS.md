@@ -34,9 +34,11 @@ Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/trace
 | OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
 | CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
 | Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
-| History module | core merged (#5); steps 7-11 in progress | Traces History | steps 1-6 (gitcmd, ingest/cache, filters, records/verify, facts, lifecycle, churn, hotspots, co-change); 7-11 (milestones, snapshot diffs, reverts, manifests, aliases, impact, PR context, HistoryRunner) pending. Deviations: see note below |
+| History module | core merged (#5); analysis merged (#11) | Traces History | steps 1-11 done: gitcmd, ingest/cache, filters, records/verify, facts, lifecycle, churn, hotspots, co-change (#5); manifests, reverts and quick deletes, milestones, snapshot compare, evidence-set diff, history impact, PR context (#11). Test gaps HT4, HT12, HT21 closed (#11). Next: HistoryRunner (`run()`), so the INDEX history step can call it. Deferred: `alias_suggestions`, component-level snapshot compare, `component_removed` / `continues_as`. Deviations: see note below and the PR #11 body |
 
-## History core deviations (PR #5)
+## History deviations (PR #5, PR #11)
+
+PR #11 lists its own deviations under "Deviations for review" in [PR #11](https://github.com/ShaileshRawat1403/traces/pull/11); see also D-019 and D-020. PR #5's list:
 
 Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/pull/5) ("Deviations from the contract"); the PR body is authoritative. In short:
 1. Ingest uses `diff-tree --stdin` (raw and numstat) over a rev-list instead of one log stream; independent checks use separate plumbing.
@@ -46,7 +48,7 @@ Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/
 5. Recount mismatches give an inconclusive check; the record stays unvalidated with the reason; nothing is marked rejected.
 6. Added `HistoryConfig.verify` (default True); with it off nothing reaches observed.
 7. Hotspot records use node_kind `file_history_metrics` and differ from churn records by parameters, so their claim_ids differ.
-8. Test gaps against section 18: HT4 separate id-recompute test, HT21 rename_limit synthetic test, HT12 combined synthetic repo.
+8. Test gaps against section 18: HT4 separate id-recompute test, HT21 rename_limit synthetic test, HT12 combined synthetic repo. Closed in #11.
 
 ## Open items
 

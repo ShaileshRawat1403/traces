@@ -140,6 +140,7 @@ def churn(log: HistoryLog, *, components: ComponentMap | None = None, ctx: RunCo
             out += _component_metrics(log, validate_component_map(components, log.repo.sha, "churn"), stats, ctx, params, times)
     recs = finalize(out)
     report = {"stage": "churn", "records": len(recs), "files": len(stats), "skipped_commits": skipped,
+              "filter_removals": flt.removals(log.commits),
               "parameters": params, "filters": flt.criteria(),
               "observed": sum(1 for r in recs if r["status"] == "observed")}
     return HistoryResult(recs, report)
@@ -281,6 +282,7 @@ def hotspots(log: HistoryLog, *, ctx: RunContext | None = None, recounter: Recou
     recs = finalize(out)
     recs_sorted = sorted(recs, key=lambda r: (-r["metrics"]["hotspot_score"], r["from"]["file"]))
     report = {"stage": "hotspots", "records": len(recs), "skipped_commits": skipped, "parameters": params,
+              "filter_removals": flt.removals(log.commits),
               "filters": flt.criteria(), "warnings": warnings,
               "top": [{"path": r["from"]["file"], "score": r["metrics"]["hotspot_score"]} for r in recs_sorted[:10]]}
     return HistoryResult(recs, report)
