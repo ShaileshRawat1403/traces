@@ -20,6 +20,7 @@ from traces.history import (
     ingest,
     lifecycle,
 )
+from traces.history.records import recompute_claim_id
 
 from ._schema import assert_valid
 from .conftest import NO_FILTERS
@@ -128,6 +129,7 @@ def test_zero_collisions_and_regenerable(fsft_repo: RepoRef, tmp_path_factory: p
 
     a = run(CTX)
     ids = [r["claim_id"] for r in a]
+    assert sum(recompute_claim_id(r) != r["claim_id"] for r in a) == 0
     assert len(ids) == len(set(ids)) == 6460 + 9 + 235 + 145 + 144
     b = run(RunContext("h-again", "2026-10-23T09:00:00+05:30", CTX.repo, CTX.repo_sha))
     assert canonical_hash(sorted(a, key=lambda r: r["claim_id"])) == canonical_hash(sorted(b, key=lambda r: r["claim_id"]))
