@@ -10,6 +10,7 @@ import pytest
 from traces.history import (
     FilterSpec,
     HistoryConfig,
+    HistoryError,
     HistoryLog,
     RepoRef,
     RunContext,
@@ -22,6 +23,7 @@ from traces.history import (
     lifecycle,
 )
 from traces.history.manifests import manifest_changes
+from traces.history.milestones import milestone_records, select_milestones, snapshot_compare
 from traces.history.records import recompute_claim_id
 from traces.history.reverts import reverts
 
@@ -166,3 +168,22 @@ def test_reverts_and_quick_deletes(log_default: HistoryLog, fsft_repo: RepoRef) 
     # Lab C false revert: the Dependabot body quoting an upstream changelog resolves to nothing when bots are kept
     off = reverts(ingest(fsft_repo, HistoryConfig(filters=FilterSpec(exclude_bots_from_patterns=False))), ctx=CTX)
     assert [u["commit"][:8] for u in off.report["unresolved"]] == ["eb0b2c2f"]
+
+
+def test_ht22_milestones(log_default: HistoryLog) -> None:
+    a = select_milestones(log_default)
+    assert a == select_milestones(log_default)
+    shas = [m.sha for m in a]
+    assert len(a) == 8 and shas[0].startswith("7f8bfc8f") and shas[-1] == CTX.repo_sha
+    assert all(m.sha in set(log_default.first_parent) and m.reasons for m in a)
+    assert any(s.startswith("8558cf00") for s in shas) and any(s.startswith("455de4d9") for s in shas)
+    assert len(select_milestones(log_default, max_milestones=20)) == 20
+    with pytest.raises(HistoryError):
+        select_milestones(log_default, max_milestones=21)
+    recs = milestone_records(log_default, a, ctx=CTX)
+    assert_valid(recs.records)
+    assert all(r["status"] == "observed" for r in recs.records)
+    sc = snapshot_compare(log_default, shas[0], CTX.repo_sha, ctx=CTX)
+    assert_valid(sc.records)
+    assert (sc.report["files_at_base"], sc.report["files_at_head"]) == (198, 252)
+    assert all(r["status"] == "observed" for r in sc.records)
