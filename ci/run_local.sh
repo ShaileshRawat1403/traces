@@ -37,8 +37,8 @@ userns()        { unshare -rn true && echo "unshare available"; }  # CI also run
 
 job_lint()      { py_env && uv run --frozen ruff check backend tests; }
 job_types()     { py_env && uv run --frozen mypy && web_env && (cd web && npm run typecheck); }
-job_unit()      { py_env && (cd backend/traces/validators/checker && sha256sum -c SHA256SUMS) && uv run --frozen pytest -q tests/unit; }
-job_api()       { py_env && uv run --frozen pytest -q tests/api; }
+job_unit()      { py_env && toolchain_env && userns && (cd backend/traces/validators/checker && sha256sum -c SHA256SUMS) && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/unit; }
+job_api()       { py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/api; }
 job_web_build() { web_env && (cd web && npm run check:api && npm run build); }
 job_target() {
   if [ -d "$TARGET_PATH/.git" ]; then
