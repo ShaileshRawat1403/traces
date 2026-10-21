@@ -1,0 +1,22 @@
+## 2026-10-21T07:21:33+05:30
+$ git clone --no-hardlinks /workspace/traces-research/lab/repos/fsft src/fsft
+Cloning into 'src/fsft'...
+done.
+$ git -C src/fsft checkout --detach b1125d8839482cb7bbae603ddc6d0081bf87532e
+$ git -C src/fsft rev-parse HEAD
+b1125d8839482cb7bbae603ddc6d0081bf87532e
+$ git -C src/fsft status --porcelain | wc -l
+0
+$ git -C src/fsft ls-files | wc -l
+252
+$ source clone (lab/repos/fsft) rev-parse + status
+b1125d8839482cb7bbae603ddc6d0081bf87532e
+0
+$ stat -c %h (hardlink count) on one object pack
+1 src/fsft/.git/objects/pack/pack-6ad97985ddf84b24d140f124e7010973e98314a5.pack
+$ py314 ast.parse deps.py
+ok
+$ system python3 ast.parse deps.py
+SyntaxError: multiple exception types must be parenthesized
+$ sha256 of python3.14 binary
+28299dda2e5c8572d39821fee8552b543dfadc4681a4c4d0b03c69e56d7f9d66  tools/python/cpython-3.14.8-linux-x86_64-gnu/bin/python3.14

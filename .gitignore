@@ -147,3 +147,30 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ---- Traces research (Task 002) ----
+# Keep the small reviewed outputs and isolation logs under research/task002
+# (the generic "out", "logs" and "*.log" rules above would hide them).
+!research/task002/out/
+!research/task002/logs/
+!research/task002/logs/*.log
+# Never commit: bytecode, installed toolchains and caches, run dirs,
+# upstream clones, CodeGraph indexes, the full evidence export.
+__pycache__/
+*.pyc
+.codegraph/
+*.db
+research/**/work/
+research/**/src/
+research/**/_superseded_v1/
+research/**/tools/node_modules/
+research/**/tools/home/
+research/**/tools/cghome/
+research/**/tools/python/
+research/**/tools/py314/
+research/**/tools/uv-cache/
+research/**/tools/ts6/node_modules/
+research/**/out/evidence.jsonl
+research/**/out/rule_findings.json
+research/**/step1/logs/
+research/**/review/audit/ct_rerun/

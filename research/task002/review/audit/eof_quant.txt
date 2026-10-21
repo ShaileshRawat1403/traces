@@ -1,0 +1,7 @@
+records total 10050 records affected 2968 locations beyond lenient count (should be 0): 0
+by claim_kind/status now -> strict: [(('relationship', 'contains', 'verified'), 1455), (('relationship', 'imports', 'verified'), 1213), (('node', 'file', 'observed'), 152), (('relationship', 'calls', 'verified'), 111), (('relationship', 'references', 'verified'), 26), (('relationship', 'imports', 'rejected'), 9), (('relationship', 'calls', 'unvalidated'), 2)]
+by originator Counter({'codegraph': 2968})
+by location role/range_kind/rule [(('from_decl', 'file', 'file'), 2968), (('to_decl', 'file', 'file'), 405)]
+files involved 152
+records with a NON-file range ending at the EOF position: 0
+status change under strict L2: all affected -> rejected; from Counter({'verified': 2805, 'observed': 152, 'rejected': 9, 'unvalidated': 2})

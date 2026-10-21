@@ -1,0 +1,434 @@
+{
+ "run_id": "t002-20261021T1356-002b-2",
+ "summary": {
+  "CT1": "PASS",
+  "CT2": "PASS",
+  "CT3": "PASS",
+  "CT4": "PASS",
+  "CT5": "PASS",
+  "CT6": "PASS",
+  "CT7": "PASS",
+  "CT8": "PASS",
+  "CT9": "PASS",
+  "CT10": "PASS",
+  "CT11": "PASS",
+  "CT12": "PASS",
+  "CT13": "PASS",
+  "CT14": "PASS",
+  "CT15": "PASS",
+  "CT16": "PASS"
+ },
+ "pass": 16,
+ "tests": {
+  "CT1": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/ct/CT1a/out/errors.json",
+    "work/t002-20261021T1356-002b-2/ct/CT1b/out/errors.json",
+    "work/t002-20261021T1356-002b-2/adapter_real/out/report.json"
+   ],
+   "detail": {
+    "CT1a_version_1.6.3": {
+     "code": "E_VERSION",
+     "detail": "project_metadata.indexed_with_version='1.6.3' != 1.6.2",
+     "run_id": "t002-20261021T1356-002b-2",
+     "at": "2026-10-21T13:56:54+05:30",
+     "checks_passed": [
+      "telemetry env: CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1",
+      "4.1 package version, lockfile integrity, registry integrity and shasum"
+     ]
+    },
+    "CT1b_wrong_integrity": {
+     "code": "E_VERSION",
+     "detail": "lockfile entry 1.6.2 sha512-hODH/mGnCf3IUMs6rzktv/zbecJIKJfdZAYHZ9mqecb0G7ZkHaA8CZafDVnswANFEL1YFcG+lfAwc5SIXzUH6Q== != manifest 1.6.2 sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+     "run_id": "t002-20261021T1356-002b-2",
+     "at": "2026-10-21T13:56:54+05:30",
+     "checks_passed": [
+      "telemetry env: CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1"
+     ]
+    },
+    "real_checks_passed": [
+     "telemetry env: CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1",
+     "4.1 package version, lockfile integrity, registry integrity and shasum",
+     "4.2 indexed_with_version",
+     "4.3 schema max and extraction version",
+     "4.4 indexed_at_commit, dirty paths, HEAD, git status",
+     "4.5 index_state complete, discovered=accounted=175",
+     "4.6 tables and columns",
+     "4.7 probe log (a)-(d) pass; adapter netns net:[4026532211] = wrapper netns, outer net:[4026531840]"
+    ]
+   }
+  },
+  "CT2": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/ct/CT2a/out/errors.json",
+    "work/t002-20261021T1356-002b-2/ct/CT2b/out/errors.json"
+   ],
+   "detail": {
+    "CT2a": "missing column edges.provenance",
+    "CT2b": "missing table unresolved_refs"
+   }
+  },
+  "CT3": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/ct/CT3a/out/errors.json",
+    "work/t002-20261021T1356-002b-2/ct/CT3b/out/errors.json",
+    "work/t002-20261021T1356-002b-2/ct/CT3c/out/errors.json"
+   ],
+   "detail": {
+    "CT3a_byte_changed": "worktree not clean: [' M backend/app/api/routes/items.py']",
+    "CT3b_head_minus_1": "git rev-parse HEAD=99e9ec1ec1f758dc7991ff012c9be7b5fca0f276 != manifest repo_sha=b1125d8839482cb7bbae603ddc6d0081bf87532e",
+    "CT3c_manifest_other_sha": "indexed_at_commit=b1125d8839482cb7bbae603ddc6d0081bf87532e != manifest repo_sha=0000000000000000000000000000000000000000",
+    "clean_checkout": "OK records=9998 out=/workspace/traces-research/task002/work/t002-20261021T1356-002b-2/adapter_real/out"
+   }
+  },
+  "CT4": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl",
+    "work/t002-20261021T1356-002b-2/ct/CT4/out/errors.json"
+   ],
+   "detail": {
+    "edge_records": 4642,
+    "edge_rows": 4642,
+    "provenance_raw_row_mismatch": 0,
+    "row_columns_missing_in_raw": 0,
+    "by_provenance": {
+     "codegraph:synthesized:jsx-render": 288,
+     "codegraph:resolved-qualified": 36,
+     "codegraph:resolved-import": 1628,
+     "codegraph:structural": 1893,
+     "codegraph:name-match": 616,
+     "codegraph:value-ref": 88,
+     "codegraph:resolved-framework": 12,
+     "codegraph:resolved-function-ref": 65,
+     "codegraph:resolved-instance": 13,
+     "codegraph:synthesized:tanstack-link": 3
+    },
+    "name_match": 616,
+    "name_match_classes": {
+     "analyzer_inference": 616
+    },
+    "copy": {
+     "code": "E_PROVENANCE_UNKNOWN",
+     "detail": "edges:2024 unmapped resolvedBy 'guess'",
+     "run_id": "t002-20261021T1356-002b-2",
+     "at": "2026-10-21T13:56:55+05:30",
+     "checks_passed": [
+      "telemetry env: CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1",
+      "4.1 package version, lockfile integrity, registry integrity and shasum",
+      "4.2 indexed_with_version",
+      "4.3 schema max and extraction version",
+      "4.4 indexed_at_commit, dirty paths, HEAD, git status",
+      "4.5 index_state complete, discovered=accounted=175",
+      "4.6 tables and columns",
+      "4.7 probe log (a)-(d) pass; adapter netns net:[4026532211] = wrapper netns, outer net:[4026531840]"
+     ]
+    }
+   }
+  },
+  "CT5": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/schema_adapter.json",
+    "work/t002-20261021T1356-002b-2/schema_selftest.txt"
+   ],
+   "detail": {
+    "schema_check": {
+     "records": 9998,
+     "invalid": 0,
+     "valid": 9998,
+     "null_required_fields": 0,
+     "first_errors": []
+    },
+    "validator_self_test": "23/23 PASS",
+    "note": "jsonschema package not installed (install needs network, plan S4); validated with validators/schema_check.py, a stdlib Draft 2020-12 subset that raises on any keyword it does not implement"
+   }
+  },
+  "CT6": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl"
+   ],
+   "detail": {
+    "by_status": {
+     "unvalidated": 8017,
+     "missing_location": 1981
+    },
+    "by_label": {
+     "inferred": 9998
+    }
+   }
+  },
+  "CT7": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/checker_parser.json",
+    "work/t002-20261021T1356-002b-2/checker_lab_route.json",
+    "work/t002-20261021T1356-002b-2/check_lines_verbatim.txt",
+    "work/t002-20261021T1356-002b-2/checker_sha256.txt",
+    "work/t002-20261021T1356-002b-2/v1/validation/evidence.jsonl"
+   ],
+   "detail": {
+    "parser": "378/379",
+    "miss": [
+     {
+      "kind": "function",
+      "file": "frontend/src/components/ui/sidebar.tsx",
+      "name": "setOpen",
+      "start_line": 87,
+      "exact": false,
+      "basis": "ts_mismatch:PropertySignature@36,Variable@86"
+     }
+    ],
+    "lab_route": "351/379",
+    "check_lines_verbatim_tail": [
+     " \"route|other\": 8",
+     "}",
+     "exact_1based total: 320"
+    ],
+    "checker_sha256": "line_checker_v1.py: OK\nts_decls_v1.js: OK",
+    "checker_nodes_joined_to_adapter_node_records": "379/379",
+    "setOpen_after_validation": {
+     "status": "unvalidated",
+     "status_reason": "L3 fail, not established: token 'setOpen' (word) in frontend/src/components/ui/sidebar.tsx:87-97",
+     "flags": [
+      "extractor_location_is_body"
+     ],
+     "locations": [
+      [
+       87,
+       97,
+       "declaration",
+       "originator"
+      ],
+      [
+       86,
+       99,
+       "declaration",
+       "validator"
+      ]
+     ]
+    }
+   }
+  },
+  "CT8": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl",
+    "work/t002-20261021T1356-002b-2/v1/validation/evidence.jsonl"
+   ],
+   "detail": {
+    "adapter_missing_location": 1981,
+    "by_kind": {
+     "contains": 1893,
+     "references": 88
+    },
+    "adapter_rejected": 0,
+    "R_contains_syntax_structure_pass": 1891,
+    "contains_records_with_locations_after_validation": 1893,
+    "exceptions": {
+     "createSseClient -> abortHandler": [
+      "unvalidated",
+      "transitive containment, immediate parent not a node"
+     ],
+     "SidebarProvider -> setOpen": [
+      "unvalidated",
+      "declaration line differs from extractor line"
+     ]
+    },
+    "missing_location_records_rejected_after_validation": 0,
+    "note": "R-contains location_recovery adds locations to all 1,893 (setOpen matches as a body location, abortHandler at its real ancestor); 1,891 pass syntax_structure and are verified; the 2 exceptions stay unvalidated"
+   }
+  },
+  "CT9": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl",
+    "work/t002-20261021T1356-002b-2/ct/CT9a/out/errors.json",
+    "work/t002-20261021T1356-002b-2/ct/CT9b/out/errors.json"
+   ],
+   "detail": {
+    "distinct_paths": 152,
+    "bad_paths": [],
+    "CT9a": "files.path '/etc/passwd' absolute, contains '..', or absent at b1125d8839482cb7bbae603ddc6d0081bf87532e",
+    "CT9b": "files.path '../outside.py' absolute, contains '..', or absent at b1125d8839482cb7bbae603ddc6d0081bf87532e"
+   }
+  },
+  "CT10": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl"
+   ],
+   "detail": {
+    "unresolved_records": 3280,
+    "rows": 3314,
+    "rows_covered_incl_consolidated": 3314,
+    "consolidated_records": 34,
+    "create_item": [
+     [
+      68,
+      "Item.model_validate"
+     ],
+     [
+      68,
+      "current_user.id"
+     ],
+     [
+      69,
+      "session.add"
+     ],
+     [
+      70,
+      "session.commit"
+     ],
+     [
+      71,
+      "session.refresh"
+     ]
+    ]
+   }
+  },
+  "CT11": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl"
+   ],
+   "detail": {
+    "generated_files": 20,
+    "records_from_generated": 2417,
+    "missing_flag": 0,
+    "flag_on_others": 0,
+    "rule": "record's file = from.file (source endpoint or node), else its first location"
+   }
+  },
+  "CT12": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl"
+   ],
+   "detail": {
+    "AddItem calls ItemsService::createItem at AddItem.tsx:56": "c_8747c52f590dd32e24ee6054698b8332e0f99abc72d0e24dba0374bc35dc19d7",
+    "AddItem references onSubmit at AddItem.tsx:88": "c_e737ae71b86ba496de084941e79307ebe0df13a042fc765035a4128107039c60",
+    "route POST /items (items.py:61) references create_item": "c_45666999095b479a91968f6fbb8eef1029c1785195e30920082cb02b85e23a43",
+    "CurrentUser references get_current_user at deps.py:49": "c_a6e3ac5453f51eb218e9533f4b5fd24894083b9d3a0630ca0603ff90db23b2fa",
+    "users.py::create_user calls crud.py::create_user at users.py:68": "c_db0f3aa4aa38551bd20398da12ba53f8ac2bfaaf52ce7bded45a362353721da8",
+    "login.py::login_access_token calls crud.py::authenticate at login.py:30": "c_4822c5a12870fd9df7a687cb203c07b7e0b34cc16a18235334513c72b24a4832",
+    "Items renders AddItem (enclosing_scope at items.tsx:57)": "c_d1c3ba794865a0995876a0c5f576048fad62864007ebb119995d5ca60994463c"
+   }
+  },
+  "CT13": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl"
+   ],
+   "detail": {
+    "create_item_to_crud": 0,
+    "depends_on": 0,
+    "synthesized_from_unresolved_or_impact": 0
+   }
+  },
+  "CT14": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/inside_result.json",
+    "work/t002-20261021T1356-002b-2/adapter_real/out/records.jsonl",
+    "work/t002-20261021T1356-002b-2/adapter_copyA/out/records.jsonl",
+    "work/t002-20261021T1356-002b-2/adapter_copyB/out/records.jsonl"
+   ],
+   "detail": {
+    "canonical_sha256": {
+     "real": "45600280cb496a67647ff3dab0ba96abcd810e52e1c72ebca1da98d1376cef8e",
+     "copyA": "45600280cb496a67647ff3dab0ba96abcd810e52e1c72ebca1da98d1376cef8e",
+     "copyB": "45600280cb496a67647ff3dab0ba96abcd810e52e1c72ebca1da98d1376cef8e"
+    },
+    "index_runs": {
+     "copyA": {
+      "exit": 0,
+      "dir": "work/t002-20261021T1049-3/copyA"
+     },
+     "copyB": {
+      "exit": 0,
+      "dir": "work/t002-20261021T1049-3/copyB"
+     }
+    },
+    "validation_runs_hash": {
+     "v1": "73db432be3babab4922f3158a9ed86b63a2454f61647d883f978701f5ff0053d",
+     "v2": "73db432be3babab4922f3158a9ed86b63a2454f61647d883f978701f5ff0053d"
+    }
+   }
+  },
+  "CT15": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/netprobe.log",
+    "work/t002-20261021T1356-002b-2/snapshot_before.txt",
+    "work/t002-20261021T1356-002b-2/snapshot_after.txt",
+    "work/t002-20261021T1356-002b-2/files_before.txt",
+    "work/t002-20261021T1356-002b-2/files_after.txt"
+   ],
+   "detail": {
+    "probe": {
+     "a": "pass",
+     "b": "pass",
+     "c": "pass",
+     "d": "pass",
+     "e": "pass",
+     "wrapper_ns": "net:[4026532211]",
+     "outer_ns": "net:[4026531840]"
+    },
+    "control": "e=pass outer_ns=net:[4026531840]",
+    "indexer": [
+     "d_indexer=pass processes_seen=4 exit=0 wrapper_ns=net:[4026532230]",
+     "d_indexer=pass processes_seen=3 exit=0 wrapper_ns=net:[4026532230]"
+    ],
+    "indexer_log": "work/t002-20261021T1356-002b-2/netprobe_index_reused.log",
+    "indexer_run_wrapper_ns": "net:[4026532230]",
+    "indexer_processes_netns": {
+     "net:[4026532230]": 7
+    },
+    "adapter_netns_check": [
+     "4.7 probe log (a)-(d) pass; adapter netns net:[4026532211] = wrapper netns, outer net:[4026531840]"
+    ],
+    "telemetry_env_logged": true,
+    "snapshot_equal": true,
+    "changed_files_total": 1,
+    "changed_outside_allowed_scope": []
+   }
+  },
+  "CT16": {
+   "result": "PASS",
+   "evidence": [
+    "work/t002-20261021T1356-002b-2/validator_inputs/injected.jsonl",
+    "work/t002-20261021T1356-002b-2/v1/validation/evidence.jsonl",
+    "work/t002-20261021T1356-002b-2/snapshot_before.txt",
+    "work/t002-20261021T1356-002b-2/snapshot_after.txt",
+    "work/t002-20261021T1356-002b-2/adapter_real/out/opened_files.json",
+    "work/t002-20261021T1356-002b-2/adapter_copyA/out/opened_files.json",
+    "work/t002-20261021T1356-002b-2/adapter_copyB/out/opened_files.json"
+   ],
+   "detail": {
+    "adapter_opened_injected_file": [],
+    "injected_records_in_adapter_outputs": 0,
+    "index_tables_with_injected_markers": [],
+    "checkout_snapshot_unchanged": true,
+    "injected_in_validation_output": [
+     [
+      "N1",
+      "rejected"
+     ],
+     [
+      "N2b",
+      "rejected"
+     ],
+     [
+      "N2a",
+      "rejected"
+     ]
+    ]
+   }
+  }
+ }
+}

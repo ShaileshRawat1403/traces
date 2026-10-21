@@ -1,0 +1,40 @@
+## 2026-10-21T07:20:58+05:30
+v20.19.2
+11.21.0
+$ npm view @colbymchenry/codegraph@1.6.2 name version license dist.integrity dist.shasum dist.tarball --json
+{
+  "name": "@colbymchenry/codegraph",
+  "version": "1.6.2",
+  "license": "MIT",
+  "dist.integrity": "sha512-hODH/mGnCf3IUMs6rzktv/zbecJIKJfdZAYHZ9mqecb0G7ZkHaA8CZafDVnswANFEL1YFcG+lfAwc5SIXzUH6Q==",
+  "dist.shasum": "372b7b4f0190197b07d444116d6692240883a2d5",
+  "dist.tarball": "https://registry.npmjs.org/@colbymchenry/codegraph/-/codegraph-1.6.2.tgz"
+}
+npm notice
+npm notice New patch version of npm available! 11.21.0 -> 11.21.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.1
+npm notice To update run: npm install -g npm@11.21.1
+npm notice
+$ npm view @colbymchenry/codegraph-linux-x64@1.6.2 version license dist.integrity dist.shasum --json
+{
+  "version": "1.6.2",
+  "license": "MIT",
+  "dist.integrity": "sha512-DJWizz1qHNr1MsbK6fz1mjVUQjeTH3T+L0D2BGaLkygWzBnNMG30MvLq1ae0m6cUV414U8aEow5Eb/kIORA8+w==",
+  "dist.shasum": "7fca3d49db06571846ca98bca778c4ee6e83553c"
+}
+$ npm view typescript dist-tags --json
+{
+  "dev": "3.9.4",
+  "tag-for-publishing-older-releases": "4.1.6",
+  "insiders": "4.6.2-insiders.20220225",
+  "beta": "7.1.0-beta",
+  "rc": "7.0.1-rc",
+  "latest": "7.0.2",
+  "next": "7.1.0-dev.20261020.3"
+}
+$ npm view typescript@5 version --json
+  "5.8.2",
+  "5.8.3",
+  "5.9.2",
+  "5.9.3"
+]

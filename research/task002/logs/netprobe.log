@@ -1,0 +1,148 @@
+# Network isolation probe, 2026-10-21T10:04:04+05:30
+# Wrapper under test: tools/offline.sh (sha256 81042fecf68704913ba73359291e9b658f481e1d1853065fd7b845b0cb9d6466, mtime 2026-10-21 07:21:59.857192076 +0530)
+# Wrapper content:
+#   #!/usr/bin/env bash
+#   # Run a command with network cut (new user+net namespace, only a down loopback), telemetry off, sandboxed HOME.
+#   export HOME=/workspace/traces-research/task002/tools/cghome
+#   export CODEGRAPH_TELEMETRY=0 DO_NOT_TRACK=1 NO_UPDATE_NOTIFIER=1 CODEGRAPH_NO_DOWNLOAD=1
+#   export PATH=/workspace/traces-research/task002/tools/node_modules/.bin:$PATH
+#   exec unshare -rn -- "$@"
+
+################ INSIDE THE WRAPPER: tools/offline.sh bash tools/netprobe_cmds.sh ################
+$ id -u
+0
+[exit=0]
+$ cat /proc/self/ns/net
+cat: /proc/self/ns/net: Invalid argument
+[exit=1]
+netns: net:[4026532230]
+$ ip addr
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+[exit=0]
+$ ip link
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+[exit=0]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code}\n https://registry.npmjs.org/
+curl: (6) Could not resolve host: registry.npmjs.org
+http_code=000
+[exit=6]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code}\n https://1.1.1.1/
+curl: (7) Failed to connect to 1.1.1.1 port 443 after 0 ms: Could not connect to server
+http_code=000
+[exit=7]
+[wrapper exit=0]
+
+################ CONTROL, OUTSIDE THE WRAPPER: bash tools/netprobe_cmds.sh ################
+$ id -u
+1000
+[exit=0]
+$ cat /proc/self/ns/net
+cat: /proc/self/ns/net: Invalid argument
+[exit=1]
+netns: net:[4026531840]
+$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host proto kernel_lo 
+       valid_lft forever preferred_lft forever
+2: enp0s4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 82:2b:38:3d:bc:d0 brd ff:ff:ff:ff:ff:ff
+    inet 172.30.0.2/24 brd 172.30.0.255 scope global enp0s4
+       valid_lft forever preferred_lft forever
+    inet6 fe80::802b:38ff:fe3d:bcd0/64 scope link proto kernel_ll 
+       valid_lft forever preferred_lft forever
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether f2:96:30:ea:95:6d brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+[exit=0]
+$ ip link
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: enp0s4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+    link/ether 82:2b:38:3d:bc:d0 brd ff:ff:ff:ff:ff:ff
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default 
+    link/ether f2:96:30:ea:95:6d brd ff:ff:ff:ff:ff:ff
+[exit=0]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code}\n https://registry.npmjs.org/
+http_code=200
+[exit=0]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code}\n https://1.1.1.1/
+http_code=301
+[exit=0]
+[exit=0]
+
+################################################################
+# CHILD-PROCESS ISOLATION PROBES, 2026-10-21T10:08:34+05:30
+# Wrapper: tools/offline.sh sha256 81042fecf68704913ba73359291e9b658f481e1d1853065fd7b845b0cb9d6466 (unchanged)
+# Bundled Node: /workspace/traces-research/task002/tools/node_modules/@colbymchenry/codegraph-linux-x64/node (v24.16.0), sha256 b2959781cc5a74c357ffa02367efa8a0330cbb1c9cb347732fdfaaaca381cbcd
+# Outer shell netns (outside wrapper): net:[4026531840]
+################################################################
+
+=== (a) INSIDE WRAPPER: sh parent spawns sh -c child running curl ===
+$ tools/offline.sh sh -c 'echo "[sh parent] netns $(readlink /proc/self/ns/net)"; sh -c "echo [sh child] netns \$(readlink /proc/self/ns/net); curl registry; curl 1.1.1.1"'
+[sh parent] pid 309328 netns net:[4026532230]
+[sh child] pid 309330 netns net:[4026532230]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code} https://registry.npmjs.org/
+curl: (6) Could not resolve host: registry.npmjs.org
+http_code=000
+[exit=6]
+$ curl -sS -m 8 -o /dev/null -w http_code=%{http_code} https://1.1.1.1/
+curl: (7) Failed to connect to 1.1.1.1 port 443 after 0 ms: Could not connect to server
+http_code=000
+[exit=7]
+[sh child exit=0]
+[wrapper exit=0]
+
+=== (b) INSIDE WRAPPER: CodeGraph bundled Node 24 parent, child_process spawns + in-process https/net ===
+$ tools/offline.sh /workspace/traces-research/task002/tools/node_modules/@colbymchenry/codegraph-linux-x64/node tools/netprobe_child.js
+[node parent] node v24.16.0 pid 309335 netns net:[4026532329]
+$ (child_process.spawnSync -> sh) sh "-c" "echo \"[sh child] pid $$ netns $(readlink /proc/self/ns/net)\""
+[sh child] pid 309343 netns net:[4026532329]
+[exit=0]
+$ (child_process.spawnSync -> curl) curl "-sS" "-m" "8" "-o" "/dev/null" "-w" "http_code=%{http_code}\\n" "https://registry.npmjs.org/"
+http_code=000
+curl: (6) Could not resolve host: registry.npmjs.org
+[exit=6]
+$ (child_process.spawnSync -> curl) curl "-sS" "-m" "8" "-o" "/dev/null" "-w" "http_code=%{http_code}\\n" "https://1.1.1.1/"
+http_code=000
+curl: (7) Failed to connect to 1.1.1.1 port 443 after 0 ms: Could not connect to server
+[exit=7]
+$ (in-process) https.get("https://registry.npmjs.org/", {timeout: 8000})
+$ (in-process) net.connect({host: "1.1.1.1", port: 443, timeout: 8000})
+[in-process net 1.1.1.1:443] result=ERROR ENETUNREACH connect ENETUNREACH 1.1.1.1:443 - Local (0.0.0.0:0)
+[in-process https registry] result=ERROR EAI_AGAIN getaddrinfo EAI_AGAIN registry.npmjs.org
+[node parent done]
+[wrapper exit=0]
+
+=== CONTROL (b), OUTSIDE WRAPPER: same Node 24 probe ===
+$ /workspace/traces-research/task002/tools/node_modules/@colbymchenry/codegraph-linux-x64/node tools/netprobe_child.js
+[node parent] node v24.16.0 pid 309352 netns net:[4026531840]
+$ (child_process.spawnSync -> sh) sh "-c" "echo \"[sh child] pid $$ netns $(readlink /proc/self/ns/net)\""
+[sh child] pid 309360 netns net:[4026531840]
+[exit=0]
+$ (child_process.spawnSync -> curl) curl "-sS" "-m" "8" "-o" "/dev/null" "-w" "http_code=%{http_code}\\n" "https://registry.npmjs.org/"
+http_code=200
+[exit=0]
+$ (child_process.spawnSync -> curl) curl "-sS" "-m" "8" "-o" "/dev/null" "-w" "http_code=%{http_code}\\n" "https://1.1.1.1/"
+http_code=301
+[exit=0]
+$ (in-process) https.get("https://registry.npmjs.org/", {timeout: 8000})
+$ (in-process) net.connect({host: "1.1.1.1", port: 443, timeout: 8000})
+[in-process net 1.1.1.1:443] result=CONNECTED 
+[in-process https registry] result=CONNECTED status 200
+[node parent done]
+[exit=0]
+
+################################################################
+# NOTE 2026-10-21T10:15:03+05:30: HOME and wrapper state check (open item O1)
+# tools/offline.sh sha256 81042fecf68704913ba73359291e9b658f481e1d1853065fd7b845b0cb9d6466, mtime 2026-10-21 07:21:59.857192076 +0530
+# Same sha256 as logged in the 10:04 basic probe and the 10:08 CHILD-PROCESS ISOLATION PROBES header (81042fecf68704913ba73359291e9b658f481e1d1853065fd7b845b0cb9d6466); mtime 07:21:59 IST predates both. Wrapper unchanged; probes not re-run for this note.
+# HOME inside the wrapper: offline.sh exports HOME=/workspace/traces-research/task002/tools/cghome for every wrapped command (index, CLI, validators).
+# HOME in the setup shell (outside the wrapper, used only for the npm TS 6.0.3 download and file writes): /workspace/traces-research/task002/tools/home.
+# Check: outer $HOME=/workspace/traces-research/task002/tools/home ; wrapped $HOME=/workspace/traces-research/task002/tools/cghome
+################################################################
