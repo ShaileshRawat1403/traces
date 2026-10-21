@@ -1,4 +1,4 @@
-"""Explain engine tests on generic synthetic records (no fixture names). Run: uv run --frozen pytest backend/traces/explain/tests"""
+"""Explain engine tests on generic synthetic records (no fixture names). Collected by the default pytest run (testpaths = tests)"""
 from __future__ import annotations
 
 from pathlib import Path
