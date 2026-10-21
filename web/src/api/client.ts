@@ -117,8 +117,8 @@ export const api = {
   overview: (repoId: string, sha: string) => request<Overview>("GET", `${snapPath(repoId, sha)}/overview`),
   components: (repoId: string, sha: string) => request<Component[]>("GET", `${snapPath(repoId, sha)}/components`),
   routes: (repoId: string, sha: string) => request<RouteItem[]>("GET", `${snapPath(repoId, sha)}/routes`),
-  graph: (repoId: string, sha: string, q: Record<string, string | number | boolean | undefined>) =>
-    request<GraphResponse>("GET", `${snapPath(repoId, sha)}/graph${qs(q)}`),
+  /** `query` is built by graphQuery() so array filters repeat their key. */
+  graph: (repoId: string, sha: string, query: string) => request<GraphResponse>("GET", `${snapPath(repoId, sha)}/graph${query}`),
   source: (repoId: string, sha: string, path: string, start?: number, end?: number) =>
     request<SourceView>("GET", `${snapPath(repoId, sha)}/source${qs({ path, start, end })}`),
   trace: (repoId: string, sha: string, from: string, to?: string) =>

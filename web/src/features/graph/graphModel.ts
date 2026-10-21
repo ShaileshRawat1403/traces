@@ -1,4 +1,4 @@
-import type { GraphEdge, GraphResponse } from "../../api/client";
+import type { Component, GraphEdge, GraphNode, GraphResponse } from "../../api/client";
 import { presentStatus } from "../../status/status";
 
 /** Edges the architecture graph may draw, plus client-side hidden counts (rejected never drawn as architecture). */
@@ -11,4 +11,167 @@ export function drawableEdges(data: Pick<GraphResponse, "edges">) {
     else edges.push(e);
   }
   return { edges, hidden };
+}
+
+// ---------------------------------------------------------------- URL state <-> graph query (CONTRACTS.md 4.8)
+
+export const STATUS_FILTERS = ["verified", "observed", "unvalidated", "missing_location"] as const;
+export type StatusFilter = (typeof STATUS_FILTERS)[number];
+/** Unvalidated and missing_location (both "Inferred") are off by default; rejected is never requested. */
+export const DEFAULT_STATUS: readonly StatusFilter[] = ["verified", "observed"];
+export const LAYERS: readonly Component["layer"][] = ["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"];
+
+export interface GraphState {
+  focus: string | null;
+  depth: number;
+  layer: string[];
+  rel: string[];
+  status: StatusFilter[];
+  q: string;
+  limit: number;
+}
+
+const clampDepth = (n: number) => (Number.isFinite(n) ? Math.min(4, Math.max(0, Math.trunc(n))) : 1);
+
+export function readGraphState(sp: URLSearchParams): GraphState {
+  const st = sp.getAll("status").filter((s): s is StatusFilter => (STATUS_FILTERS as readonly string[]).includes(s));
+  return {
+    focus: sp.get("focus") || null,
+    depth: sp.has("depth") ? clampDepth(Number(sp.get("depth"))) : 1,
+    layer: sp.getAll("layer"),
+    rel: sp.getAll("rel"),
+    status: sp.has("status") || sp.has("status_set") ? st : [...DEFAULT_STATUS],
+    q: sp.get("q") ?? "",
+    limit: Number(sp.get("limit")) || 300,
+  };
+}
+
+export function writeGraphState(s: GraphState, keep?: URLSearchParams): URLSearchParams {
+  const n = new URLSearchParams();
+  for (const k of ["view", "claim"]) {
+    const v = keep?.get(k);
+    if (v) n.set(k, v);
+  }
+  if (s.focus) n.set("focus", s.focus);
+  if (s.depth !== 1) n.set("depth", String(s.depth));
+  s.layer.forEach((l) => n.append("layer", l));
+  s.rel.forEach((r) => n.append("rel", r));
+  const isDefault = s.status.length === DEFAULT_STATUS.length && DEFAULT_STATUS.every((d) => s.status.includes(d));
+  if (!isDefault) {
+    n.set("status_set", "1"); // distinguishes "none selected" from "default"
+    s.status.forEach((x) => n.append("status", x));
+  }
+  if (s.q) n.set("q", s.q);
+  if (s.limit !== 300) n.set("limit", String(s.limit));
+  return n;
+}
+
+/** Query string for GET .../graph. Arrays repeat the key, as FastAPI expects. include_rejected is never sent. */
+export function graphQuery(s: GraphState): string {
+  const n = new URLSearchParams();
+  if (s.focus) {
+    n.set("focus", s.focus);
+    n.set("depth", String(s.depth));
+  }
+  s.layer.forEach((l) => n.append("layer", l));
+  s.rel.forEach((r) => n.append("rel", r));
+  s.status.forEach((x) => n.append("status", x));
+  if (s.q.trim()) n.set("q", s.q.trim());
+  n.set("limit", String(s.limit));
+  return `?${n.toString()}`;
+}
+
+// ---------------------------------------------------------------- compound grouping
+
+/** Component that owns a file: the component whose path is the longest prefix of the file (paths from the API's rule). */
+export function componentForFile(file: string | null | undefined, components: readonly Component[]): Component | null {
+  if (!file) return null;
+  let best: Component | null = null;
+  let bestLen = -1;
+  for (const c of components) {
+    for (const p of c.paths) {
+      const prefix = p.endsWith("/") ? p : `${p}/`;
+      if ((file === p || file.startsWith(prefix)) && p.length > bestLen) {
+        best = c;
+        bestLen = p.length;
+      }
+    }
+  }
+  return best;
+}
+
+export interface ElementData {
+  id: string;
+  label: string;
+  parent?: string;
+  entity?: string;
+  source?: string;
+  target?: string;
+  tone?: string;
+  line?: string;
+}
+
+/** Cytoscape elements: component nodes become compound parents of the symbol nodes inside their paths. */
+export function toElements(data: GraphResponse, components: readonly Component[]): { data: ElementData }[] {
+  const ids = new Set(data.nodes.map((n) => n.id));
+  const parentOf = (n: GraphNode): string | undefined => {
+    if (n.entity === "component") return undefined;
+    const c = componentForFile(n.file, components);
+    return c && ids.has(c.id) ? c.id : undefined;
+  };
+  const nodes = data.nodes.map((n) => ({ data: { id: n.id, label: n.label, entity: n.entity, parent: parentOf(n) } }));
+  const { edges } = drawableEdges(data);
+  return [
+    ...nodes,
+    ...edges
+      .filter((e) => ids.has(e.source) && ids.has(e.target))
+      .map((e) => {
+        const p = presentStatus(e, "default");
+        return { data: { id: e.id, label: e.kind, source: e.source, target: e.target, tone: p.tone, line: p.line } };
+      }),
+  ];
+}
+
+// ---------------------------------------------------------------- keyboard navigation
+
+export type Direction = "up" | "down" | "left" | "right";
+export interface Pos {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/**
+ * Nearest node in a direction (screen coordinates, y grows downward). Candidates must lie within a 45 degree cone;
+ * distance is weighted to prefer nodes aligned with the direction.
+ */
+export function nextInDirection(nodes: readonly Pos[], fromId: string | null, dir: Direction): string | null {
+  if (nodes.length === 0) return null;
+  const from = nodes.find((n) => n.id === fromId);
+  if (!from) {
+    // No selection: start at the top-left-most node.
+    return [...nodes].sort((a, b) => a.y + a.x - (b.y + b.x))[0]!.id;
+  }
+  let best: string | null = null;
+  let bestScore = Infinity;
+  for (const n of nodes) {
+    if (n.id === from.id) continue;
+    const dx = n.x - from.x;
+    const dy = n.y - from.y;
+    const main = dir === "right" ? dx : dir === "left" ? -dx : dir === "down" ? dy : -dy;
+    const cross = dir === "left" || dir === "right" ? Math.abs(dy) : Math.abs(dx);
+    if (main <= 0 || cross > main) continue;
+    const score = main + 2 * cross;
+    if (score < bestScore) {
+      bestScore = score;
+      best = n.id;
+    }
+  }
+  return best;
+}
+
+/** Label counts for a component, read from the components endpoint (keys as the API reports them). */
+export function countsFor(id: string, components: readonly Component[]): Record<string, number> | null {
+  const c = components.find((x) => x.id === id);
+  return c ? c.claim_counts : null;
 }

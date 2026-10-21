@@ -1,135 +1,355 @@
-// Code-split route: this module (and Cytoscape) loads only when the graph route is opened.
+// Code-split route: this module and Cytoscape load only when the graph route opens.
 import { useQuery } from "@tanstack/react-query";
-import cytoscape from "cytoscape";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
-import { api, type GraphResponse } from "../../api/client";
+import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { api, type Component, type GraphEdge, type GraphNode, type GraphResponse } from "../../api/client";
 import { splitSymbol } from "../../api/record";
 import { snapshotBase } from "../../app/nav";
-import { presentStatus } from "../../status/status";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
-import { StatusChip } from "../../ui/StatusChip";
-import { drawableEdges } from "./graphModel";
+import { LineSample, StatusChip } from "../../ui/StatusChip";
+import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
+import { GraphCanvas } from "./GraphCanvas";
+import { LAYERS, STATUS_FILTERS, countsFor, drawableEdges, graphQuery, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
 
-const TOKENS = { verified: "#0f5e63", observed: "#475569", inferred: "#8a5300", unknown: "#5b21b6", node: "#ffffff", nodeLine: "#c9c3b8", ink: "#1d1b18" };
+const STATUS_TEXT: Record<StatusFilter, string> = {
+  verified: "Verified",
+  observed: "Observed",
+  unvalidated: "Inferred (unvalidated)",
+  missing_location: "Inferred, no source location",
+};
 
-function Canvas({ data, onSelect }: { data: GraphResponse; onSelect: (id: string) => void }) {
-  const box = useRef<HTMLDivElement>(null);
-  const cyRef = useRef<cytoscape.Core | null>(null);
-  const { edges } = useMemo(() => drawableEdges(data), [data]);
-  useEffect(() => {
-    if (!box.current) return;
-    const ids = new Set(data.nodes.map((n) => n.id));
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const cy = cytoscape({
-      container: box.current,
-      elements: [
-        ...data.nodes.map((n) => ({ data: { id: n.id, label: n.label } })),
-        ...edges
-          .filter((e) => ids.has(e.source) && ids.has(e.target))
-          .map((e) => {
-            const p = presentStatus(e, "default");
-            return { data: { id: e.id, source: e.source, target: e.target, tone: p.tone, line: p.line } };
-          }),
-      ],
-      style: [
-        { selector: "node", style: { label: "data(label)", "font-size": 11, color: TOKENS.ink, "background-color": TOKENS.node, "border-width": 1.5, "border-color": TOKENS.nodeLine, "text-valign": "bottom", "text-margin-y": 4, width: 18, height: 18, "text-max-width": "120px", "text-wrap": "ellipsis" } },
-        { selector: "edge", style: { width: 2, "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 0.8 } },
-        { selector: 'edge[tone = "verified"]', style: { "line-color": TOKENS.verified, "target-arrow-color": TOKENS.verified } },
-        { selector: 'edge[tone = "observed"]', style: { "line-color": TOKENS.observed, "target-arrow-color": TOKENS.observed, width: 1 } },
-        { selector: 'edge[tone = "inferred"]', style: { "line-color": TOKENS.inferred, "target-arrow-color": TOKENS.inferred, "target-arrow-fill": "hollow" } },
-        { selector: 'edge[tone = "unknown"]', style: { "line-color": TOKENS.unknown, "target-arrow-color": TOKENS.unknown } },
-        { selector: 'edge[line = "dashed"]', style: { "line-style": "dashed" } },
-        { selector: 'edge[line = "dotted"]', style: { "line-style": "dotted" } },
-        { selector: ":selected", style: { "border-width": 3, "border-color": "#1c64d8", "line-color": "#1c64d8", "target-arrow-color": "#1c64d8" } },
-      ],
-      layout: { name: "cose", animate: !reduced },
-      wheelSensitivity: 0.3,
-    });
-    cy.on("tap", "node", (ev) => onSelect(ev.target.id() as string));
-    cyRef.current = cy;
-    return () => {
-      cy.destroy();
-      cyRef.current = null;
-    };
-  }, [data, edges, onSelect]);
-  const zoom = (f: number) => cyRef.current?.zoom({ level: (cyRef.current.zoom() ?? 1) * f, renderedPosition: { x: (box.current?.clientWidth ?? 0) / 2, y: (box.current?.clientHeight ?? 0) / 2 } });
+function Legend() {
   return (
-    <div>
-      <div className="mb-2 flex gap-2" role="toolbar" aria-label="Graph view controls">
-        <Button onClick={() => zoom(1.25)} aria-label="Zoom in">+</Button>
-        <Button onClick={() => zoom(0.8)} aria-label="Zoom out">−</Button>
-        <Button onClick={() => cyRef.current?.fit(undefined, 24)}>Fit</Button>
-      </div>
-      <div ref={box} className="h-[60vh] min-h-80 w-full rounded-lg border border-line bg-surface" role="img" aria-label={`Architecture graph with ${data.nodes.length} nodes. Use the list view for keyboard and screen reader navigation.`} />
-    </div>
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="Edge legend">
+      <li className="flex items-center gap-1 text-verified">
+        <LineSample line="solid" /> <span className="text-ink-2">Verified</span>
+      </li>
+      <li className="flex items-center gap-1 text-observed">
+        <LineSample line="thin" /> <span className="text-ink-2">Observed</span>
+      </li>
+      <li className="flex items-center gap-1 text-inferred">
+        <LineSample line="dashed" /> <span className="text-ink-2">Inferred</span>
+      </li>
+      <li className="flex items-center gap-1 text-inferred">
+        <LineSample line="dotted" /> <span className="text-ink-2">Inferred, no source location</span>
+      </li>
+      <li className="text-ink-2">Rejected claims are never drawn.</li>
+    </ul>
   );
 }
 
-function ListView({ data, focus }: { data: GraphResponse; focus: string | null }) {
-  const { repoId = "", sha = "" } = useParams();
-  const { edges } = drawableEdges(data);
-  const shown = focus ? edges.filter((e) => e.source === focus || e.target === focus) : edges;
-  const name = (id: string) => data.nodes.find((n) => n.id === id)?.label ?? splitSymbol(id).name;
-  if (shown.length === 0) return <Empty title="No relationships match these filters" />;
+function Filters({ state: urlState, onChange: commit }: { state: GraphState; onChange: (s: GraphState) => void }) {
+  const relId = useId();
+  // The URL is the source of truth, but router navigation is async: hold the choice locally so a controlled checkbox
+  // does not flick back for a frame before the URL catches up.
+  const [state, setLocal] = useState(urlState);
+  const urlKey = JSON.stringify(urlState);
+  useEffect(() => setLocal(JSON.parse(urlKey) as GraphState), [urlKey]);
+  const onChange = (s: GraphState) => {
+    setLocal(s);
+    commit(s);
+  };
+  const toggle = <T extends string>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  const [rel, setRel] = useState(state.rel.join(", "));
   return (
-    <ul className="flex flex-col gap-2" data-testid="graph-list">
-      {shown.map((e) => (
-        <li key={e.id} className="rounded-lg border border-line bg-surface p-3 text-sm">
-          <StatusChip status={e.status} label={e.label} flags={e.flags} qualifier={e.qualifier} />
-          <p className="mt-1 break-words">
-            <code>{name(e.source)}</code> <span className="text-muted">{e.kind}</span> <code>{name(e.target)}</code>
-          </p>
-          {e.id.startsWith("c_") ? <Link to={`${snapshotBase(repoId, sha)}/claim/${e.id}`}>Open evidence</Link> : null}
+    <details className="rounded-lg border border-line bg-surface" data-testid="graph-filters">
+      <summary className="tap flex cursor-pointer items-center px-3 text-sm font-medium">
+        Filters
+        <span className="ml-2 text-xs font-normal text-muted">
+          {state.status.length} statuses{state.layer.length ? `, ${state.layer.length} layers` : ""}
+          {state.rel.length ? `, ${state.rel.length} kinds` : ""}
+        </span>
+      </summary>
+      <div className="grid gap-4 border-t border-line p-3 sm:grid-cols-3">
+        <fieldset>
+          <legend className="mb-1 text-sm font-semibold">Evidence status</legend>
+          {STATUS_FILTERS.map((s) => (
+            <label key={s} className="tap flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-5 w-5" checked={state.status.includes(s)} onChange={() => onChange({ ...state, status: toggle(state.status, s) })} />
+              {STATUS_TEXT[s]}
+            </label>
+          ))}
+          <p className="mt-1 text-xs text-muted">Inferred relationships are off by default. Rejected claims are never requested.</p>
+        </fieldset>
+        <fieldset>
+          <legend className="mb-1 text-sm font-semibold">Layer</legend>
+          <div className="grid grid-cols-2 gap-x-2">
+            {LAYERS.map((l) => (
+              <label key={l} className="tap flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-5 w-5" checked={state.layer.includes(l)} onChange={() => onChange({ ...state, layer: toggle(state.layer, l) })} />
+                {l}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted">None selected means all layers.</p>
+        </fieldset>
+        <div>
+          <label htmlFor={relId} className="mb-1 block text-sm font-semibold">
+            Relationship kinds
+          </label>
+          <input
+            id={relId}
+            value={rel}
+            onChange={(e) => setRel(e.target.value)}
+            onBlur={() => onChange({ ...state, rel: rel.split(",").map((x) => x.trim()).filter(Boolean) })}
+            placeholder="renders, calls, imports"
+            className="tap w-full rounded-md border border-line-strong px-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-muted">Comma separated. Empty means all kinds.</p>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function nodeName(nodes: readonly GraphNode[], id: string) {
+  return nodes.find((n) => n.id === id)?.label ?? splitSymbol(id).name;
+}
+
+function EdgeRow({ e, nodes, onEvidence }: { e: GraphEdge; nodes: readonly GraphNode[]; onEvidence: (id: string) => void }) {
+  return (
+    <li className="rounded-lg border border-line bg-surface p-3 text-sm">
+      <StatusChip status={e.status} label={e.label} flags={e.flags} qualifier={e.qualifier} />
+      <p className="mt-1 break-words">
+        <code>{nodeName(nodes, e.source)}</code> <span className="text-muted">{e.kind}</span> <code>{nodeName(nodes, e.target)}</code>
+      </p>
+      <Button className="mt-1" onClick={() => onEvidence(e.id)}>
+        Open evidence
+      </Button>
+    </li>
+  );
+}
+
+function Counts({ counts }: { counts: Record<string, number> | null }) {
+  if (!counts) return null;
+  const entries = Object.entries(counts).filter(([k]) => k !== "rejected");
+  if (entries.length === 0) return null;
+  return (
+    <p className="text-xs text-ink-2" data-testid="component-counts">
+      {entries.map(([k, n]) => `${n.toLocaleString("en-US")} ${k}`).join(" · ")}
+    </p>
+  );
+}
+
+function SelectionPanel({
+  data,
+  components,
+  selected,
+  state,
+  onState,
+  onEvidence,
+  onClear,
+}: {
+  data: GraphResponse;
+  components: readonly Component[];
+  selected: string;
+  state: GraphState;
+  onState: (s: GraphState) => void;
+  onEvidence: (id: string) => void;
+  onClear: () => void;
+}) {
+  const node = data.nodes.find((n) => n.id === selected);
+  if (!node) return null;
+  const { edges } = drawableEdges(data);
+  const mine = edges.filter((e) => e.source === selected || e.target === selected);
+  const focused = state.focus === selected;
+  return (
+    <section className="rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected node" data-testid="selection-panel">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h2 className="break-all font-semibold">{node.label}</h2>
+        <span className="text-xs text-muted">
+          {node.entity}
+          {node.layer ? ` · ${node.layer}` : ""} · {node.degree} connections
+        </span>
+      </div>
+      {node.file ? <p className="break-all font-mono text-xs text-ink-2">{node.file}</p> : null}
+      <Counts counts={countsFor(node.id, components)} />
+      <div className="mt-2 flex flex-wrap gap-2">
+        {focused ? (
+          <>
+            <Button onClick={() => onState({ ...state, depth: Math.min(4, state.depth + 1) })} disabled={state.depth >= 4}>
+              Expand to depth {Math.min(4, state.depth + 1)}
+            </Button>
+            <Button onClick={() => onState({ ...state, depth: Math.max(0, state.depth - 1) })} disabled={state.depth <= 0}>
+              Reduce depth
+            </Button>
+          </>
+        ) : (
+          <Button variant="primary" onClick={() => onState({ ...state, focus: selected, depth: 1 })}>
+            {node.entity === "component" ? "Expand component" : "Focus here"}
+          </Button>
+        )}
+        <Button onClick={onClear}>Clear selection</Button>
+      </div>
+      <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
+      {mine.length === 0 ? (
+        <p className="text-sm text-muted">None with the current filters.</p>
+      ) : (
+        <ul className="mt-1 flex max-h-72 flex-col gap-2 overflow-y-auto">
+          {mine.slice(0, 50).map((e) => (
+            <EdgeRow key={e.id} e={e} nodes={data.nodes} onEvidence={onEvidence} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function CardsView({ data, components, onSelect, onFocus }: { data: GraphResponse; components: readonly Component[]; onSelect: (id: string) => void; onFocus: (id: string) => void }) {
+  if (data.nodes.length === 0) return <Empty title="No nodes match these filters" />;
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="graph-cards">
+      {data.nodes.map((n) => (
+        <li key={n.id} className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3">
+          <span className="break-all font-medium">{n.label}</span>
+          <span className="text-xs text-muted">
+            {n.entity}
+            {n.layer ? ` · ${n.layer}` : ""} · {n.degree} connections
+          </span>
+          <Counts counts={countsFor(n.id, components)} />
+          <div className="mt-1 flex gap-2">
+            <Button onClick={() => onSelect(n.id)}>Select</Button>
+            <Button onClick={() => onFocus(n.id)}>{n.entity === "component" ? "Expand" : "Focus"}</Button>
+          </div>
         </li>
       ))}
     </ul>
   );
 }
 
+function ListView({ data, selected, onEvidence }: { data: GraphResponse; selected: string | null; onEvidence: (id: string) => void }) {
+  const { edges } = drawableEdges(data);
+  const shown = selected ? edges.filter((e) => e.source === selected || e.target === selected) : edges;
+  if (shown.length === 0) return <Empty title="No relationships match these filters" />;
+  return (
+    <ul className="flex flex-col gap-2" data-testid="graph-list">
+      {shown.map((e) => (
+        <EdgeRow key={e.id} e={e} nodes={data.nodes} onEvidence={onEvidence} />
+      ))}
+    </ul>
+  );
+}
+
+type Mode = "graph" | "list" | "cards";
+
 export default function GraphPage() {
   const { repoId = "", sha = "" } = useParams();
   const [sp, setSp] = useSearchParams();
-  const mode = sp.get("view") === "list" ? "list" : "graph";
-  const focus = sp.get("focus");
-  const params = { focus: focus ?? undefined, depth: sp.get("depth") ?? undefined, q: sp.get("q") ?? undefined, layer: sp.get("layer") ?? undefined };
-  const q = useQuery({ queryKey: ["graph", repoId, sha, params], queryFn: () => api.graph(repoId, sha, params) });
-  const [selected, setSelected] = useState<string | null>(null);
-  const setMode = (m: string) =>
+  const state = readGraphState(sp);
+  const mode: Mode = sp.get("view") === "list" ? "list" : sp.get("view") === "cards" ? "cards" : "graph";
+  const claim = sp.get("claim");
+  const [selected, setSelected] = useState<string | null>(state.focus);
+  const [q, setQ] = useState(state.q);
+  const searchId = useId();
+  const query = graphQuery(state);
+  const graph = useQuery({ queryKey: ["graph", repoId, sha, query], queryFn: () => api.graph(repoId, sha, query) });
+  // Component counts and paths come from the components endpoint; the graph still renders if it is unavailable.
+  const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
+  const components = useMemo(() => comps.data ?? [], [comps.data]);
+  const elements = useMemo(() => (graph.data ? toElements(graph.data, components) : []), [graph.data, components]);
+
+  const setState = (s: GraphState) => setSp(writeGraphState(s, sp));
+  const setParam = (k: string, v: string | null) =>
     setSp((p) => {
       const n = new URLSearchParams(p);
-      n.set("view", m);
+      if (v) n.set(k, v);
+      else n.delete(k);
       return n;
     });
+  const openEvidence = useCallback(
+    (id: string) =>
+      setSp((p) => {
+        const n = new URLSearchParams(p);
+        n.set("claim", id);
+        return n;
+      }),
+    [setSp],
+  );
+  const describe = useCallback(
+    (id: string) => {
+      const n = graph.data?.nodes.find((x) => x.id === id);
+      if (!n) return "";
+      const rel = graph.data ? drawableEdges(graph.data).edges.filter((e) => e.source === id || e.target === id).length : 0;
+      return `${n.label}, ${n.entity}${n.layer ? `, ${n.layer}` : ""}, ${rel} relationships shown`;
+    },
+    [graph.data],
+  );
+  const submitSearch = (e: FormEvent) => {
+    e.preventDefault();
+    setState({ ...state, q });
+  };
+
   return (
     <>
-      <PageHeader title="Architecture graph">Components first; expand one to see its symbols. Inferred relationships are dashed, and rejected ones are never drawn.</PageHeader>
-      {q.isPending ? (
+      <PageHeader title="Architecture graph">
+        Components first; expand one to load its symbols. Inferred relationships are dashed and off by default. Rejected claims are never drawn.
+      </PageHeader>
+
+      <div className="mb-3 flex flex-col gap-2">
+        <form onSubmit={submitSearch} role="search" className="flex gap-2">
+          <label htmlFor={searchId} className="sr-only">
+            Search nodes
+          </label>
+          <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="tap min-w-0 flex-1 rounded-md border border-line-strong px-3" />
+          <Button type="submit">Search</Button>
+        </form>
+        <Filters state={state} onChange={setState} />
+        {state.focus ? (
+          <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="focus-bar">
+            Focused on <code className="break-all">{graph.data ? nodeName(graph.data.nodes, state.focus) : splitSymbol(state.focus).name}</code> at depth {state.depth}
+            <Button onClick={() => setState({ ...state, focus: null, depth: 1 })}>Back to components</Button>
+          </p>
+        ) : null}
+      </div>
+
+      {graph.isPending ? (
         <Loading label="Loading graph" />
-      ) : q.isError ? (
-        <ErrorState error={q.error} what="The architecture graph" />
+      ) : graph.isError ? (
+        <ErrorState error={graph.error} what="The architecture graph" />
       ) : (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <div role="group" aria-label="View as" className="inline-flex rounded-md border border-line-strong">
-              {(["graph", "list"] as const).map((m) => (
-                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
-                  {m === "graph" ? "Graph" : "List"}
+              {(["graph", "list", "cards"] as const).map((m) => (
+                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
+                  {m === "graph" ? "Graph" : m === "list" ? "List" : "Cards"}
                 </button>
               ))}
             </div>
-            <span className="text-sm text-muted">
-              {q.data.nodes.length} nodes{q.data.truncated ? `, truncated at ${q.data.limit}` : ""}
+            <span className="text-sm text-muted" data-testid="graph-summary">
+              {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
+              {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
             </span>
-            {selected ? <span className="text-sm">Selected: <code>{selected}</code></span> : null}
           </div>
-          <div className="mb-3">
-            <HiddenCounts counts={q.data.hidden_counts} extra={drawableEdges(q.data).hidden} reviewHref={`${snapshotBase(repoId, sha)}/review`} />
+          <div className="mb-3 flex flex-col gap-2">
+            <HiddenCounts counts={graph.data.hidden_counts} extra={drawableEdges(graph.data).hidden} reviewHref={`${snapshotBase(repoId, sha)}/review`} />
+            <Legend />
+            {comps.isError ? <p className="text-xs text-muted">Component counts are not available from the API yet.</p> : null}
           </div>
-          {mode === "graph" ? <Canvas data={q.data} onSelect={setSelected} /> : <ListView data={q.data} focus={focus} />}
+          <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+            <div className="min-w-0">
+              {graph.data.nodes.length === 0 ? (
+                <Empty title="Nothing matches these filters">Try including inferred relationships or clearing the search.</Empty>
+              ) : mode === "graph" ? (
+                <GraphCanvas elements={elements} selected={selected} onSelect={setSelected} onExpand={(id) => setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 })} onEdge={openEvidence} describe={describe} />
+              ) : mode === "list" ? (
+                <ListView data={graph.data} selected={selected} onEvidence={openEvidence} />
+              ) : (
+                <CardsView data={graph.data} components={components} onSelect={setSelected} onFocus={(id) => setState({ ...state, focus: id, depth: 1 })} />
+              )}
+            </div>
+            <div className="min-w-0">
+              {selected && graph.data.nodes.some((n) => n.id === selected) ? (
+                <SelectionPanel data={graph.data} components={components} selected={selected} state={state} onState={setState} onEvidence={openEvidence} onClear={() => setSelected(null)} />
+              ) : (
+                <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a node to see its relationships and open their evidence.</p>
+              )}
+            </div>
+          </div>
         </>
       )}
+      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setParam("claim", null)} />
     </>
   );
 }

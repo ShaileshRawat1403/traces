@@ -23,3 +23,49 @@ export const overviewSample: Schemas["Overview"] = {
   languages: { Python: 40, TypeScript: 120 },
   counts: { verified: 900, observed: 1500, inferred: 30 },
 };
+
+const sym = (file: string, name: string) => `${file}::${name}`;
+export const COMPONENT_IDS = { web: "cmp_web", api: "cmp_api" } as const;
+
+export const componentsSample: Schemas["Component"][] = [
+  { id: COMPONENT_IDS.web, name: "web", layer: "frontend", kind: "package", paths: ["web/src"], rule: "top-level package directory", claim_counts: { verified: 12, observed: 30, inferred: 4 } },
+  { id: COMPONENT_IDS.api, name: "api", layer: "api", kind: "package", paths: ["api"], rule: "top-level package directory", claim_counts: { verified: 8, observed: 21, inferred: 2 } },
+];
+
+export const graphComponentsSample: Schemas["GraphResponse"] = {
+  snapshot_id: SNAPSHOT_ID,
+  nodes: [
+    { id: COMPONENT_IDS.web, label: "web", entity: "component", layer: "frontend", file: null, degree: 1 },
+    { id: COMPONENT_IDS.api, label: "api", entity: "component", layer: "api", file: null, degree: 1 },
+  ],
+  edges: [{ id: cid(20), source: COMPONENT_IDS.web, target: COMPONENT_IDS.api, kind: "calls", status: "observed", label: "observed", flags: [], qualifier: null }],
+  hidden_counts: { unvalidated: 3, rejected: 1 },
+  truncated: false,
+  limit: 300,
+};
+
+export const graphSymbolsSample: Schemas["GraphResponse"] = {
+  snapshot_id: SNAPSHOT_ID,
+  nodes: [
+    { id: sym("web/src/TaskList.tsx", "TaskList"), label: "TaskList", entity: "symbol", layer: "frontend", file: "web/src/TaskList.tsx", degree: 2 },
+    { id: sym("web/src/TaskItem.tsx", "TaskItem"), label: "TaskItem", entity: "symbol", layer: "frontend", file: "web/src/TaskItem.tsx", degree: 1 },
+    { id: sym("web/src/client.ts", "listTasks"), label: "listTasks", entity: "symbol", layer: "frontend", file: "web/src/client.ts", degree: 2 },
+    { id: sym("api/tasks.py", "list_tasks"), label: "list_tasks", entity: "symbol", layer: "api", file: "api/tasks.py", degree: 1 },
+  ],
+  edges: [
+    { id: cid(21), source: sym("web/src/TaskList.tsx", "TaskList"), target: sym("web/src/TaskItem.tsx", "TaskItem"), kind: "renders", status: "verified", label: "verified", flags: [], qualifier: null },
+    { id: cid(22), source: sym("web/src/TaskList.tsx", "TaskList"), target: sym("web/src/client.ts", "listTasks"), kind: "calls", status: "observed", label: "observed", flags: [], qualifier: null },
+    { id: cid(23), source: sym("web/src/client.ts", "listTasks"), target: sym("api/tasks.py", "list_tasks"), kind: "http_call", status: "unvalidated", label: "inferred", flags: [], qualifier: "matched by route string" },
+    { id: cid(24), source: sym("api/tasks.py", "list_tasks"), target: sym("web/src/TaskItem.tsx", "TaskItem"), kind: "renders", status: "rejected", label: "rejected", flags: [], qualifier: null },
+  ],
+  hidden_counts: { missing_location: 1 },
+  truncated: false,
+  limit: 300,
+};
+
+/** A SourceView for any requested window: numbered placeholder lines, capped at total_lines (shortened when past the end). */
+export function sourceSample(path: string, start: number, end: number, total_lines = 40): Schemas["SourceView"] {
+  const last = Math.min(end, total_lines);
+  const lines = Array.from({ length: Math.max(0, last - start + 1) }, (_, i) => `const line${start + i} = ${start + i}; // sample`);
+  return { snapshot_id: SNAPSHOT_ID, sha: SHA, path, blob_sha: "f".repeat(40), start_line: start, end_line: last, total_lines, lines, generated: false, claim_ids: [cid(21)] };
+}
