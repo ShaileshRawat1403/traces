@@ -33,11 +33,9 @@ def main(argv: list[str] | None = None) -> int:
 
         print(import_pipeline_run(Path(a.run_dir)))
     elif a.cmd == "openapi":
-        import json
+        from traces.api.app import openapi_json
 
-        from traces.api.app import app
-
-        text = json.dumps(app.openapi(), indent=2, sort_keys=True) + "\n"
+        text = openapi_json()
         if a.out:
             open(a.out, "w").write(text)
         else:

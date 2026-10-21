@@ -1,0 +1,3929 @@
+{
+ "components": {
+  "schemas": {
+   "Citation": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_id": {
+      "title": "Claim Id",
+      "type": "string"
+     },
+     "commit": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Commit"
+     },
+     "end_line": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Line"
+     },
+     "file": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File"
+     },
+     "label": {
+      "enum": [
+       "verified",
+       "observed",
+       "inferred",
+       "rejected"
+      ],
+      "title": "Label",
+      "type": "string"
+     },
+     "start_line": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Start Line"
+     },
+     "status": {
+      "enum": [
+       "verified",
+       "observed",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "claim_id",
+     "status",
+     "label"
+    ],
+    "title": "Citation",
+    "type": "object"
+   },
+   "ClaimPage": {
+    "additionalProperties": false,
+    "properties": {
+     "hidden_counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "description": "records excluded by the status filter, by status (rejected hidden unless include_rejected)",
+      "title": "Hidden Counts",
+      "type": "object"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ClaimSummary"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "limit": {
+      "title": "Limit",
+      "type": "integer"
+     },
+     "offset": {
+      "title": "Offset",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total",
+     "offset",
+     "limit",
+     "hidden_counts"
+    ],
+    "title": "ClaimPage",
+    "type": "object"
+   },
+   "ClaimSummary": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_id": {
+      "title": "Claim Id",
+      "type": "string"
+     },
+     "claim_kind": {
+      "title": "Claim Kind",
+      "type": "string"
+     },
+     "class": {
+      "title": "Class",
+      "type": "string"
+     },
+     "evidence_scope": {
+      "title": "Evidence Scope",
+      "type": "string"
+     },
+     "flags": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+     },
+     "from_symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "From Symbol"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Kind"
+     },
+     "label": {
+      "enum": [
+       "verified",
+       "observed",
+       "inferred",
+       "rejected"
+      ],
+      "title": "Label",
+      "type": "string"
+     },
+     "qualifier": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qualifier"
+     },
+     "statement": {
+      "title": "Statement",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "verified",
+       "observed",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "to_symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To Symbol"
+     }
+    },
+    "required": [
+     "claim_id",
+     "claim_kind",
+     "kind",
+     "status",
+     "label",
+     "class",
+     "evidence_scope",
+     "statement"
+    ],
+    "title": "ClaimSummary",
+    "type": "object"
+   },
+   "Component": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Claim Counts",
+      "type": "object"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "layer": {
+      "enum": [
+       "frontend",
+       "api",
+       "backend",
+       "data",
+       "infra",
+       "docs",
+       "tests",
+       "other"
+      ],
+      "title": "Layer",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "paths": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Paths",
+      "type": "array"
+     },
+     "rule": {
+      "description": "deterministic grouping rule that produced this component",
+      "title": "Rule",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "layer",
+     "kind",
+     "paths",
+     "rule",
+     "claim_counts"
+    ],
+    "title": "Component",
+    "type": "object"
+   },
+   "ErrorBody": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "description": "machine code, e.g. not_implemented, invalid_repo_url, not_found, rate_limited, too_large",
+      "title": "Code",
+      "type": "string"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "milestone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Milestone"
+     },
+     "owner": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "seat that owns the missing capability (not_implemented only)",
+      "title": "Owner"
+     }
+    },
+    "required": [
+     "code",
+     "message"
+    ],
+    "title": "ErrorBody",
+    "type": "object"
+   },
+   "ErrorResponse": {
+    "additionalProperties": false,
+    "properties": {
+     "error": {
+      "$ref": "#/components/schemas/ErrorBody"
+     }
+    },
+    "required": [
+     "error"
+    ],
+    "title": "ErrorResponse",
+    "type": "object"
+   },
+   "ExplainRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "focus_claim_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Focus Claim Ids",
+      "type": "array"
+     },
+     "mode": {
+      "default": "no_llm",
+      "enum": [
+       "no_llm",
+       "prepare_bundle"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "question": {
+      "maxLength": 2000,
+      "title": "Question",
+      "type": "string"
+     }
+    },
+    "required": [
+     "question"
+    ],
+    "title": "ExplainRequest",
+    "type": "object"
+   },
+   "ExplainResponse": {
+    "additionalProperties": false,
+    "properties": {
+     "answer": {
+      "description": "deterministic, template-built answer from evidence (no LLM)",
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Answer",
+      "type": "array"
+     },
+     "categories": {
+      "additionalProperties": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "description": "code_structure | history_patterns | documented_decisions | inference | runtime_observations -> claim ids",
+      "title": "Categories",
+      "type": "object"
+     },
+     "citations": {
+      "items": {
+       "$ref": "#/components/schemas/Citation"
+      },
+      "title": "Citations",
+      "type": "array"
+     },
+     "outbound_manifest": {
+      "default": [],
+      "description": "exactly what the bundle would send to a provider",
+      "items": {
+       "$ref": "#/components/schemas/OutboundItem"
+      },
+      "title": "Outbound Manifest",
+      "type": "array"
+     },
+     "prompt_bundle": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "mode=prepare_bundle: scoped prompt for the browser to send after consent; keys never reach the backend",
+      "title": "Prompt Bundle"
+     },
+     "requires_consent": {
+      "default": true,
+      "title": "Requires Consent",
+      "type": "boolean"
+     },
+     "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "snapshot_id",
+     "answer",
+     "citations",
+     "categories"
+    ],
+    "title": "ExplainResponse",
+    "type": "object"
+   },
+   "GraphEdge": {
+    "additionalProperties": false,
+    "properties": {
+     "flags": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+     },
+     "id": {
+      "description": "claim_id",
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "enum": [
+       "verified",
+       "observed",
+       "inferred",
+       "rejected"
+      ],
+      "title": "Label",
+      "type": "string"
+     },
+     "qualifier": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qualifier"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "verified",
+       "observed",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "target": {
+      "title": "Target",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "source",
+     "target",
+     "kind",
+     "status",
+     "label"
+    ],
+    "title": "GraphEdge",
+    "type": "object"
+   },
+   "GraphNode": {
+    "additionalProperties": false,
+    "properties": {
+     "degree": {
+      "default": 0,
+      "title": "Degree",
+      "type": "integer"
+     },
+     "entity": {
+      "enum": [
+       "symbol",
+       "file",
+       "component",
+       "route",
+       "operation",
+       "commit",
+       "dependency",
+       "repo"
+      ],
+      "title": "Entity",
+      "type": "string"
+     },
+     "file": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "layer": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Layer"
+     }
+    },
+    "required": [
+     "id",
+     "label",
+     "entity"
+    ],
+    "title": "GraphNode",
+    "type": "object"
+   },
+   "GraphResponse": {
+    "additionalProperties": false,
+    "properties": {
+     "edges": {
+      "items": {
+       "$ref": "#/components/schemas/GraphEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+     },
+     "hidden_counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Hidden Counts",
+      "type": "object"
+     },
+     "limit": {
+      "title": "Limit",
+      "type": "integer"
+     },
+     "nodes": {
+      "items": {
+       "$ref": "#/components/schemas/GraphNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+     },
+     "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+     },
+     "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "snapshot_id",
+     "nodes",
+     "edges",
+     "hidden_counts",
+     "truncated",
+     "limit"
+    ],
+    "title": "GraphResponse",
+    "type": "object"
+   },
+   "HeadInfo": {
+    "additionalProperties": false,
+    "properties": {
+     "behind": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true when the latest discovered commit differs from the newest ready snapshot",
+      "title": "Behind"
+     },
+     "checked_at": {
+      "title": "Checked At",
+      "type": "string"
+     },
+     "default_branch": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Branch"
+     },
+     "displayed_sha": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Displayed Sha"
+     },
+     "latest_sha": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latest Sha"
+     },
+     "repo_id": {
+      "title": "Repo Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "repo_id",
+     "default_branch",
+     "latest_sha",
+     "displayed_sha",
+     "checked_at"
+    ],
+    "title": "HeadInfo",
+    "type": "object"
+   },
+   "Health": {
+    "additionalProperties": false,
+    "properties": {
+     "status": {
+      "const": "ok",
+      "title": "Status",
+      "type": "string"
+     },
+     "store_migration": {
+      "title": "Store Migration",
+      "type": "integer"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status",
+     "version",
+     "store_migration"
+    ],
+    "title": "Health",
+    "type": "object"
+   },
+   "IndexJobCreate": {
+    "additionalProperties": false,
+    "properties": {
+     "reindex": {
+      "default": false,
+      "title": "Reindex",
+      "type": "boolean"
+     },
+     "sha": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "full SHA; default: latest discovered HEAD",
+      "title": "Sha"
+     }
+    },
+    "title": "IndexJobCreate",
+    "type": "object"
+   },
+   "Job": {
+    "additionalProperties": false,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ErrorBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "events": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/JobEvent"
+      },
+      "title": "Events",
+      "type": "array"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "index",
+       "reindex",
+       "history",
+       "baseline"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "phase": {
+      "enum": [
+       "queued",
+       "fetching",
+       "checking_out",
+       "indexing",
+       "adapting",
+       "validating",
+       "storing",
+       "history",
+       "done",
+       "failed"
+      ],
+      "title": "Phase",
+      "type": "string"
+     },
+     "progress": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Progress",
+      "type": "number"
+     },
+     "repo_id": {
+      "title": "Repo Id",
+      "type": "string"
+     },
+     "snapshot_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Snapshot Id"
+     },
+     "state": {
+      "enum": [
+       "queued",
+       "running",
+       "succeeded",
+       "failed",
+       "cancelled"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+     },
+     "version": {
+      "description": "increments on every change; equals the ETag",
+      "title": "Version",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "repo_id",
+     "snapshot_id",
+     "kind",
+     "state",
+     "phase",
+     "progress",
+     "version",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "Job",
+    "type": "object"
+   },
+   "JobEvent": {
+    "additionalProperties": false,
+    "properties": {
+     "at": {
+      "title": "At",
+      "type": "string"
+     },
+     "level": {
+      "enum": [
+       "info",
+       "warning",
+       "error"
+      ],
+      "title": "Level",
+      "type": "string"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "phase": {
+      "enum": [
+       "queued",
+       "fetching",
+       "checking_out",
+       "indexing",
+       "adapting",
+       "validating",
+       "storing",
+       "history",
+       "done",
+       "failed"
+      ],
+      "title": "Phase",
+      "type": "string"
+     }
+    },
+    "required": [
+     "at",
+     "phase",
+     "level",
+     "message"
+    ],
+    "title": "JobEvent",
+    "type": "object"
+   },
+   "Meta": {
+    "additionalProperties": false,
+    "properties": {
+     "capabilities": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "description": "capability -> implemented in this build",
+      "title": "Capabilities",
+      "type": "object"
+     },
+     "evidence_schema": {
+      "title": "Evidence Schema",
+      "type": "string"
+     },
+     "evidence_schemas_readable": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Evidence Schemas Readable",
+      "type": "array"
+     },
+     "extractor": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Extractor",
+      "type": "object"
+     },
+     "isolation": {
+      "enum": [
+       "unshare",
+       "none"
+      ],
+      "title": "Isolation",
+      "type": "string"
+     },
+     "validators": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Validators",
+      "type": "object"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "version",
+     "evidence_schema",
+     "evidence_schemas_readable",
+     "extractor",
+     "validators",
+     "isolation",
+     "capabilities"
+    ],
+    "title": "Meta",
+    "type": "object"
+   },
+   "OutboundItem": {
+    "additionalProperties": false,
+    "properties": {
+     "chars": {
+      "title": "Chars",
+      "type": "integer"
+     },
+     "claim_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Claim Id"
+     },
+     "end_line": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Line"
+     },
+     "file": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "File"
+     },
+     "kind": {
+      "enum": [
+       "claim_statement",
+       "source_snippet",
+       "history_quote",
+       "question",
+       "instructions"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "sha256": {
+      "title": "Sha256",
+      "type": "string"
+     },
+     "start_line": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Start Line"
+     }
+    },
+    "required": [
+     "kind",
+     "chars",
+     "sha256"
+    ],
+    "title": "OutboundItem",
+    "type": "object"
+   },
+   "Overview": {
+    "additionalProperties": false,
+    "properties": {
+     "architecture": {
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Architecture",
+      "type": "array"
+     },
+     "business": {
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Business",
+      "type": "array"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+     },
+     "entry_points": {
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Entry Points",
+      "type": "array"
+     },
+     "implementation": {
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Implementation",
+      "type": "array"
+     },
+     "languages": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Languages",
+      "type": "object"
+     },
+     "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+     },
+     "start_here": {
+      "items": {
+       "$ref": "#/components/schemas/OverviewFact"
+      },
+      "title": "Start Here",
+      "type": "array"
+     }
+    },
+    "required": [
+     "snapshot_id",
+     "business",
+     "architecture",
+     "implementation",
+     "entry_points",
+     "start_here",
+     "languages",
+     "counts"
+    ],
+    "title": "Overview",
+    "type": "object"
+   },
+   "OverviewFact": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Claim Ids",
+      "type": "array"
+     },
+     "kind": {
+      "enum": [
+       "fact",
+       "interpretation",
+       "unknown"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text",
+     "kind"
+    ],
+    "title": "OverviewFact",
+    "type": "object"
+   },
+   "Repo": {
+    "additionalProperties": false,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "default_branch": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Default Branch"
+     },
+     "host": {
+      "title": "Host",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "latest_discovered_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latest Discovered At"
+     },
+     "latest_discovered_sha": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Latest Discovered Sha"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "owner": {
+      "title": "Owner",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     },
+     "visibility": {
+      "const": "public",
+      "title": "Visibility",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "host",
+     "owner",
+     "name",
+     "url",
+     "visibility",
+     "created_at"
+    ],
+    "title": "Repo",
+    "type": "object"
+   },
+   "RepoCreate": {
+    "additionalProperties": false,
+    "properties": {
+     "sha": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "optional full commit SHA to pin; default: current HEAD of the default branch",
+      "title": "Sha"
+     },
+     "url": {
+      "description": "https://github.com/<owner>/<repo>; public repositories only in v1",
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "url"
+    ],
+    "title": "RepoCreate",
+    "type": "object"
+   },
+   "RouteItem": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Claim Id"
+     },
+     "file": {
+      "title": "File",
+      "type": "string"
+     },
+     "flags": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+     },
+     "handler_symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Handler Symbol"
+     },
+     "line": {
+      "title": "Line",
+      "type": "integer"
+     },
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "operation_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation Id"
+     },
+     "path": {
+      "title": "Path",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "verified",
+       "observed",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "method",
+     "path",
+     "handler_symbol",
+     "operation_id",
+     "file",
+     "line",
+     "status",
+     "claim_id"
+    ],
+    "title": "RouteItem",
+    "type": "object"
+   },
+   "Snapshot": {
+    "additionalProperties": false,
+    "properties": {
+     "created_at": {
+      "title": "Created At",
+      "type": "string"
+     },
+     "evidence_schema": {
+      "title": "Evidence Schema",
+      "type": "string"
+     },
+     "extractor": {
+      "additionalProperties": true,
+      "title": "Extractor",
+      "type": "object"
+     },
+     "frameworks": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Frameworks",
+      "type": "array"
+     },
+     "generated_paths": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Generated Paths",
+      "type": "array"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "indexed_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Indexed At"
+     },
+     "languages": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Languages",
+      "type": "object"
+     },
+     "repo_id": {
+      "title": "Repo Id",
+      "type": "string"
+     },
+     "sha": {
+      "title": "Sha",
+      "type": "string"
+     },
+     "state": {
+      "enum": [
+       "pending",
+       "indexing",
+       "ready",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "stats": {
+      "additionalProperties": true,
+      "title": "Stats",
+      "type": "object"
+     }
+    },
+    "required": [
+     "id",
+     "repo_id",
+     "sha",
+     "state",
+     "evidence_schema",
+     "extractor",
+     "languages",
+     "frameworks",
+     "generated_paths",
+     "stats",
+     "created_at"
+    ],
+    "title": "Snapshot",
+    "type": "object"
+   },
+   "SourceView": {
+    "additionalProperties": false,
+    "properties": {
+     "blob_sha": {
+      "title": "Blob Sha",
+      "type": "string"
+     },
+     "claim_ids": {
+      "description": "claims with a location overlapping the returned range",
+      "items": {
+       "type": "string"
+      },
+      "title": "Claim Ids",
+      "type": "array"
+     },
+     "end_line": {
+      "title": "End Line",
+      "type": "integer"
+     },
+     "generated": {
+      "title": "Generated",
+      "type": "boolean"
+     },
+     "lines": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "path": {
+      "title": "Path",
+      "type": "string"
+     },
+     "sha": {
+      "title": "Sha",
+      "type": "string"
+     },
+     "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+     },
+     "start_line": {
+      "title": "Start Line",
+      "type": "integer"
+     },
+     "total_lines": {
+      "title": "Total Lines",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "snapshot_id",
+     "sha",
+     "path",
+     "blob_sha",
+     "start_line",
+     "end_line",
+     "total_lines",
+     "lines",
+     "generated",
+     "claim_ids"
+    ],
+    "title": "SourceView",
+    "type": "object"
+   },
+   "TraceHop": {
+    "additionalProperties": false,
+    "properties": {
+     "claim_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "null only for gap hops",
+      "title": "Claim Id"
+     },
+     "evidence_scope": {
+      "const": "static",
+      "default": "static",
+      "title": "Evidence Scope",
+      "type": "string"
+     },
+     "from_symbol": {
+      "title": "From Symbol",
+      "type": "string"
+     },
+     "index": {
+      "title": "Index",
+      "type": "integer"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "enum": [
+       "verified",
+       "observed",
+       "inferred",
+       "rejected"
+      ],
+      "title": "Label",
+      "type": "string"
+     },
+     "qualifier": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qualifier"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "required for gap and library_contract hops (both are inferred)",
+      "title": "Reason"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "enum": [
+         "verified",
+         "observed",
+         "unvalidated",
+         "missing_location",
+         "rejected"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "to_symbol": {
+      "title": "To Symbol",
+      "type": "string"
+     },
+     "type": {
+      "enum": [
+       "edge",
+       "gap",
+       "library_contract"
+      ],
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "index",
+     "type",
+     "from_symbol",
+     "to_symbol",
+     "kind",
+     "status",
+     "label"
+    ],
+    "title": "TraceHop",
+    "type": "object"
+   },
+   "TraceResponse": {
+    "additionalProperties": false,
+    "properties": {
+     "complete": {
+      "description": "false when the trace contains gaps",
+      "title": "Complete",
+      "type": "boolean"
+     },
+     "disclaimer": {
+      "default": "Static analysis only. No runtime behavior has been observed.",
+      "title": "Disclaimer",
+      "type": "string"
+     },
+     "from_symbol": {
+      "title": "From Symbol",
+      "type": "string"
+     },
+     "hidden_counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Hidden Counts",
+      "type": "object"
+     },
+     "hops": {
+      "items": {
+       "$ref": "#/components/schemas/TraceHop"
+      },
+      "title": "Hops",
+      "type": "array"
+     },
+     "snapshot_id": {
+      "title": "Snapshot Id",
+      "type": "string"
+     },
+     "to_symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To Symbol"
+     }
+    },
+    "required": [
+     "snapshot_id",
+     "from_symbol",
+     "to_symbol",
+     "hops",
+     "hidden_counts",
+     "complete"
+    ],
+    "title": "TraceResponse",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Read-only evidence query and index API for Traces. Static analysis only; no runtime behavior is observed. Evidence records follow traces-evidence/0.4.",
+  "title": "Traces API",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/v1/health": {
+   "get": {
+    "operationId": "health_api_v1_health_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Health",
+    "tags": [
+     "service"
+    ]
+   }
+  },
+  "/api/v1/jobs/{job_id}": {
+   "get": {
+    "description": "Poll a job. ETag is the job version; send If-None-Match to get 304 when nothing changed. Poll every 1-2 s. No SSE.",
+    "operationId": "poll_job_api_v1_jobs__job_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "job_id",
+      "required": true,
+      "schema": {
+       "title": "Job Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "if-none-match",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "If-None-Match"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Job"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "304": {
+      "description": "Not modified (If-None-Match matched the ETag)"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Poll Job",
+    "tags": [
+     "jobs"
+    ]
+   }
+  },
+  "/api/v1/meta": {
+   "get": {
+    "operationId": "meta_api_v1_meta_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Meta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Meta",
+    "tags": [
+     "service"
+    ]
+   }
+  },
+  "/api/v1/repos": {
+   "get": {
+    "operationId": "list_repos_api_v1_repos_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Repo"
+         },
+         "title": "Response List Repos Api V1 Repos Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "List Repos",
+    "tags": [
+     "repos"
+    ]
+   },
+   "post": {
+    "description": "Validate a public GitHub URL and register the repo. Does not fetch anything; indexing is a separate job.",
+    "operationId": "register_repo_api_v1_repos_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RepoCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Repo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Register Repo",
+    "tags": [
+     "repos"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}": {
+   "get": {
+    "operationId": "get_repo_api_v1_repos__repo_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Repo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Get Repo",
+    "tags": [
+     "repos"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/compare": {
+   "get": {
+    "operationId": "compare_api_v1_repos__repo_id__compare_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "base",
+      "required": true,
+      "schema": {
+       "title": "Base",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "head",
+      "required": true,
+      "schema": {
+       "title": "Head",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Compare",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/head": {
+   "get": {
+    "description": "Latest discovered commit on the default branch vs. the displayed snapshot (cached ls-remote, rate limited).",
+    "operationId": "repo_head_api_v1_repos__repo_id__head_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HeadInfo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Repo Head",
+    "tags": [
+     "repos"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/index-jobs": {
+   "post": {
+    "operationId": "create_index_job_api_v1_repos__repo_id__index_jobs_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IndexJobCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Job"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Create Index Job",
+    "tags": [
+     "jobs"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots": {
+   "get": {
+    "operationId": "list_snapshots_api_v1_repos__repo_id__snapshots_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Snapshot"
+         },
+         "title": "Response List Snapshots Api V1 Repos  Repo Id  Snapshots Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "List Snapshots",
+    "tags": [
+     "snapshots"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}": {
+   "get": {
+    "operationId": "get_snapshot_api_v1_repos__repo_id__snapshots__sha__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Snapshot"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Get Snapshot",
+    "tags": [
+     "snapshots"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/chat/bundle": {
+   "post": {
+    "operationId": "chat_bundle_api_v1_repos__repo_id__snapshots__sha__chat_bundle_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ExplainRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExplainResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Chat Bundle",
+    "tags": [
+     "explain"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/claims": {
+   "get": {
+    "description": "List claims. Rejected claims are excluded unless include_rejected=true (reviewer view); hidden_counts reports what was excluded.",
+    "operationId": "list_claims_api_v1_repos__repo_id__snapshots__sha__claims_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "enum": [
+           "verified",
+           "observed",
+           "unvalidated",
+           "missing_location",
+           "rejected"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "claim_kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(node|relationship)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Claim Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "kind",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "in": "query",
+      "name": "symbol",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Symbol"
+      }
+     },
+     {
+      "in": "query",
+      "name": "file",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "File"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_rejected",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Rejected",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "List Claims",
+    "tags": [
+     "evidence"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/claims/{claim_id}": {
+   "get": {
+    "description": "Evidence by claim: the full record with locations, checks, status history and provenance. Rejected claims are returned\n(a deep link names them explicitly); the UI shows them only in reviewer and evidence views.",
+    "operationId": "get_claim_api_v1_repos__repo_id__snapshots__sha__claims__claim_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "claim_id",
+      "required": true,
+      "schema": {
+       "title": "Claim Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Get Claim Api V1 Repos  Repo Id  Snapshots  Sha  Claims  Claim Id  Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "The full traces-evidence/0.4 record (schema: backend/traces/evidence/schema/evidence_record.v0.4.schema.json)"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Get Claim",
+    "tags": [
+     "evidence"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/components": {
+   "get": {
+    "operationId": "components_api_v1_repos__repo_id__snapshots__sha__components_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Component"
+         },
+         "title": "Response Components Api V1 Repos  Repo Id  Snapshots  Sha  Components Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Components",
+    "tags": [
+     "views"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/explain": {
+   "post": {
+    "description": "No-LLM explanation, or (mode=prepare_bundle) a scoped prompt bundle with citations and an outbound manifest for the browser\nto send after user consent. The request model forbids extra fields, so provider keys cannot be submitted.",
+    "operationId": "explain_api_v1_repos__repo_id__snapshots__sha__explain_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ExplainRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExplainResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Explain",
+    "tags": [
+     "explain"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/export": {
+   "get": {
+    "operationId": "export_api_v1_repos__repo_id__snapshots__sha__export_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "application/x-ndjson, one traces-evidence/0.4 record per line, sorted by claim_id"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Export",
+    "tags": [
+     "evidence"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/graph": {
+   "get": {
+    "description": "Graph query: filters (layer, rel, status, q) and neighborhood (focus + depth). Rejected excluded unless include_rejected.",
+    "operationId": "graph_api_v1_repos__repo_id__snapshots__sha__graph_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "focus",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Focus"
+      }
+     },
+     {
+      "in": "query",
+      "name": "depth",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "maximum": 4,
+       "minimum": 0,
+       "title": "Depth",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "layer",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Layer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "rel",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Rel"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "items": {
+          "enum": [
+           "verified",
+           "observed",
+           "unvalidated",
+           "missing_location",
+           "rejected"
+          ],
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_rejected",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Rejected",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 300,
+       "maximum": 2000,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GraphResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Graph",
+    "tags": [
+     "views"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/cochange": {
+   "get": {
+    "operationId": "history_cochange_api_v1_repos__repo_id__snapshots__sha__history_cochange_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Target"
+      }
+     },
+     {
+      "in": "query",
+      "name": "level",
+      "required": false,
+      "schema": {
+       "default": "file",
+       "pattern": "^(file|component)$",
+       "title": "Level",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Cochange",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/hotspots": {
+   "get": {
+    "operationId": "history_hotspots_api_v1_repos__repo_id__snapshots__sha__history_hotspots_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "level",
+      "required": false,
+      "schema": {
+       "default": "file",
+       "pattern": "^(file|component)$",
+       "title": "Level",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Hotspots",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/lifecycle": {
+   "get": {
+    "operationId": "history_lifecycle_api_v1_repos__repo_id__snapshots__sha__history_lifecycle_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "path",
+      "required": true,
+      "schema": {
+       "title": "Path",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Lifecycle",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/milestones": {
+   "get": {
+    "operationId": "history_milestones_api_v1_repos__repo_id__snapshots__sha__history_milestones_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Milestones",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/rationale": {
+   "get": {
+    "operationId": "history_rationale_api_v1_repos__repo_id__snapshots__sha__history_rationale_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Target"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Rationale",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/history/timeline": {
+   "get": {
+    "operationId": "history_timeline_api_v1_repos__repo_id__snapshots__sha__history_timeline_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "path",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Path"
+      }
+     },
+     {
+      "in": "query",
+      "name": "component",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Component"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ClaimPage"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "History Timeline",
+    "tags": [
+     "history"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/overview": {
+   "get": {
+    "operationId": "overview_api_v1_repos__repo_id__snapshots__sha__overview_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Overview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Overview",
+    "tags": [
+     "views"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/routes": {
+   "get": {
+    "operationId": "routes_api_v1_repos__repo_id__snapshots__sha__routes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RouteItem"
+         },
+         "title": "Response Routes Api V1 Repos  Repo Id  Snapshots  Sha  Routes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Routes",
+    "tags": [
+     "views"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/source": {
+   "get": {
+    "description": "Pinned source view at the snapshot SHA (read from Git objects, never from a working tree).",
+    "operationId": "source_api_v1_repos__repo_id__snapshots__sha__source_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "path",
+      "required": true,
+      "schema": {
+       "title": "Path",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "start",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Start",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "end",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SourceView"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Source",
+    "tags": [
+     "views"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/snapshots/{sha}/trace": {
+   "get": {
+    "description": "Cross-layer trace as ordered hops: edge, gap and library_contract (gap and library_contract are inferred with a reason).",
+    "operationId": "trace_api_v1_repos__repo_id__snapshots__sha__trace_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "sha",
+      "required": true,
+      "schema": {
+       "title": "Sha",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "from",
+      "required": true,
+      "schema": {
+       "title": "From",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_rejected",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Rejected",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TraceResponse"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     },
+     "501": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not implemented in this build (error.code = not_implemented)"
+     }
+    },
+    "summary": "Trace",
+    "tags": [
+     "views"
+    ]
+   }
+  }
+ }
+}

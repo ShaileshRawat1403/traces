@@ -151,3 +151,64 @@ def import_pipeline_run(run_dir: Path, store: Store | None = None) -> dict[str, 
     st.upsert_snapshot(ref.cache_key, meta["repo_sha"], "ready", extractor={"codegraph": "1.6.2", "typescript": "6.0.3", "python": meta.get("python")},
                        stats={"records": n, "by_status": st.status_counts(sid)})
     return {"snapshot_id": sid, "records": n, "by_status": st.status_counts(sid)}
+
+
+# -------------------------------------------------------------------- jobs (index job state machine, CONTRACTS s3.2)
+JOB_TRANSITIONS: dict[str, set[str]] = {
+    "queued": {"running", "cancelled", "failed"},
+    "running": {"succeeded", "failed", "cancelled"},
+    "succeeded": set(), "failed": set(), "cancelled": set(),
+}
+JOB_PHASES = ("queued", "fetching", "checking_out", "indexing", "adapting", "validating", "storing", "history", "done", "failed")
+
+
+class JobTransitionError(ValueError):
+    pass
+
+
+def _job_row(st: Store, job_id: str) -> dict[str, Any] | None:
+    r = st.db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def create_job(st: Store, job_id: str, repo_id: str, kind: str, snapshot_id: str | None = None) -> dict[str, Any]:
+    t = now()
+    with st.db:
+        st.db.execute("INSERT INTO jobs (id, repo_id, snapshot_id, kind, state, phase, progress, version, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                      (job_id, repo_id, snapshot_id, kind, "queued", "queued", 0.0, 1, t, t))
+        st.db.execute("INSERT INTO job_events (job_id, at, phase, level, message) VALUES (?,?,?,?,?)", (job_id, t, "queued", "info", "job queued"))
+    return get_job(st, job_id) or {}
+
+
+def update_job(st: Store, job_id: str, *, state: str | None = None, phase: str | None = None, progress: float | None = None,
+               message: str | None = None, error_code: str | None = None, error_detail: str | None = None, level: str = "info") -> dict[str, Any]:
+    cur = _job_row(st, job_id)
+    if cur is None:
+        raise KeyError(job_id)
+    if state and state != cur["state"] and state not in JOB_TRANSITIONS[cur["state"]]:
+        raise JobTransitionError(f"{cur['state']} -> {state}")
+    if phase and phase not in JOB_PHASES:
+        raise JobTransitionError(f"unknown phase {phase}")
+    if progress is not None and not (cur["progress"] <= progress <= 1):
+        raise JobTransitionError("progress must be monotonic in [0, 1]")
+    t = now()
+    new_state = state or cur["state"]
+    fields = {"state": new_state, "phase": phase or cur["phase"], "progress": cur["progress"] if progress is None else progress,
+              "message": message if message is not None else cur["message"], "error_code": error_code or cur["error_code"],
+              "error_detail": error_detail or cur["error_detail"], "version": cur["version"] + 1, "updated_at": t,
+              "started_at": cur["started_at"] or (t if new_state == "running" else None),
+              "finished_at": t if new_state in ("succeeded", "failed", "cancelled") else None}
+    with st.db:
+        st.db.execute("UPDATE jobs SET " + ", ".join(f"{k}=?" for k in fields) + " WHERE id=?", (*fields.values(), job_id))
+        if message or phase or state:
+            st.db.execute("INSERT INTO job_events (job_id, at, phase, level, message) VALUES (?,?,?,?,?)",
+                          (job_id, t, fields["phase"], level, message or f"{fields['state']}/{fields['phase']}"))
+    return get_job(st, job_id) or {}
+
+
+def get_job(st: Store, job_id: str) -> dict[str, Any] | None:
+    j = _job_row(st, job_id)
+    if j is None:
+        return None
+    j["events"] = [dict(e) for e in st.db.execute("SELECT at, phase, level, message FROM job_events WHERE job_id=? ORDER BY id", (job_id,))]
+    return j

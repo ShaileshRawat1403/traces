@@ -28,7 +28,7 @@ class RepoRef:
 
     @property
     def cache_key(self) -> str:
-        return f"{self.host}__{self.owner}__{self.name}"
+        return f"{self.host}__{self.owner}__{self.name}".lower()  # GitHub names are case-insensitive
 
 
 def parse_repo_url(url: str) -> RepoRef:
