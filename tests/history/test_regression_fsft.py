@@ -14,6 +14,7 @@ from traces.history import (
     RunContext,
     canonical_hash,
     churn,
+    cochange,
     commit_facts,
     hotspots,
     ingest,
@@ -98,3 +99,35 @@ def test_hotspots_valid(log_default: HistoryLog) -> None:
     assert_valid(res.records)
     assert len(res.records) == 145
     assert all("complexity_proxy" in r["flags"] for r in res.records)
+
+
+def test_cochange_admin_forms(log_default: HistoryLog) -> None:
+    res = cochange(log_default, ctx=CTX)
+    assert_valid(res.records)
+    r = next(x for x in res.records if (x["from"]["file"], x["to"]["file"]) == (
+        "frontend/src/components/Admin/AddUser.tsx", "frontend/src/components/Admin/EditUser.tsx"))
+    assert r["qualifier"] == "changed together in 12 of 14 commits"
+    assert (r["metrics"]["support"], r["metrics"]["revs_a"], r["metrics"]["revs_b"]) == (12, 12, 14)
+    assert r["status"] == "observed" and r["class"] == "history_pattern"
+    assert res.report["commits_considered"] == 563
+    assert res.report["skipped_commits"] == {"bot": 953, "large_changeset": 21}
+    assert len(res.records) == 144
+
+
+def test_zero_collisions_and_regenerable(fsft_repo: RepoRef, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """HT4/HT5: every record from every stage has a unique claim_id; a second run (cold cache, then warm cache)
+    reproduces the same canonical hash."""
+    cache = tmp_path_factory.mktemp("hcache")
+
+    def run(ctx: RunContext) -> list[dict]:
+        log = ingest(fsft_repo, HistoryConfig(), cache_dir=cache)
+        out: list[dict] = []
+        for fn in (commit_facts, lifecycle, churn, hotspots, cochange):
+            out += list(fn(log, ctx=ctx).records)
+        return out
+
+    a = run(CTX)
+    ids = [r["claim_id"] for r in a]
+    assert len(ids) == len(set(ids)) == 6460 + 9 + 235 + 145 + 144
+    b = run(RunContext("h-again", "2026-10-23T09:00:00+05:30", CTX.repo, CTX.repo_sha))
+    assert canonical_hash(sorted(a, key=lambda r: r["claim_id"])) == canonical_hash(sorted(b, key=lambda r: r["claim_id"]))

@@ -1,10 +1,11 @@
 """Traces history module: native-Git history as evidence records (docs/contracts/history.md).
 
 Read-only, no network. Implemented so far: gitcmd, ingest and cache, filters and config, commit facts, lifecycle,
-churn and hotspots. Milestones, snapshot diffs, reverts, manifests, aliases, impact and PR context follow.
+churn and hotspots, co-change. Milestones, snapshot diffs, reverts, manifests, aliases, impact and PR context follow.
 """
 
 from .churn import churn, hotspots
+from .cochange import cochange
 from .config import FilterSpec, HistoryConfig, Limits, Thresholds
 from .errors import HistoryError
 from .facts import commit_facts
@@ -19,5 +20,5 @@ from .shapes import ComponentDef, ComponentMap, Record, default_context, validat
 __all__ = [
     "Change", "Commit", "ComponentDef", "ComponentMap", "HistoryRepoRef", "FilterSpec", "GitRunner", "HistoryConfig", "HistoryError", "HistoryLog",
     "HistoryResult", "Limits", "Record", "RepoRef", "RunContext", "Thresholds", "canonical_hash", "churn", "claim_id",
-    "commit_facts", "default_context", "hotspots", "ingest", "lifecycle", "validate_component_map",
+    "cochange", "commit_facts", "default_context", "hotspots", "ingest", "lifecycle", "validate_component_map",
 ]
