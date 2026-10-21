@@ -1,10 +1,11 @@
 """Traces history module: native-Git history as evidence records (docs/contracts/history.md).
 
 Read-only, no network. Implemented so far: gitcmd, ingest and cache, filters and config, commit facts, lifecycle,
-churn and hotspots, co-change, manifests, reverts, milestones, snapshot compare and evidence-set diff, history impact and PR context (injected provider only).
+churn and hotspots, co-change, alias suggestions, manifests, reverts, milestones, snapshot compare and evidence-set diff, history impact and PR context (injected provider only).
 The whole-run entry point run()/GitHistoryRunner (section 8.11) runs every stage under a RunBudget.
 """
 
+from .aliases import alias_suggestions, review_wording, set_review_state
 from .churn import churn, hotspots
 from .cochange import cochange
 from .config import FilterSpec, HistoryConfig, Limits, Thresholds
@@ -28,5 +29,5 @@ __all__ = [
     "Change", "Commit", "ComponentDef", "ComponentMap", "HistoryRepoRef", "FilterSpec", "GitRunner", "HistoryConfig", "HistoryError", "HistoryLog",
     "HistoryResult", "Limits", "Record", "RepoRef", "RunContext", "Thresholds", "canonical_hash", "churn", "claim_id",
     "cochange", "commit_facts", "default_context", "hotspots", "ingest", "lifecycle", "manifest_changes", "manifest_events", "evidence_set_diff", "find_reverts", "link_prs", "pr_context", "PrArtifactSource", "history_impact", "ImpactResult", "milestone_records", "select_milestones", "snapshot_compare", "reverts", "validate_component_map",
-    "GitHistoryRunner", "RunBudget", "StageOutcome", "run",
+    "GitHistoryRunner", "RunBudget", "StageOutcome", "run", "alias_suggestions", "review_wording", "set_review_state",
 ]

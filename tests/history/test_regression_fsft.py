@@ -259,3 +259,16 @@ def test_run_end_to_end_totals(fsft_repo: RepoRef, tmp_path_factory: pytest.Temp
     assert rep["records_digest"] == canonical_hash(finalize(direct))
     v = rep["volatile"]
     assert v["finalize_s"] > 0 and v["elapsed_s"] >= v["finalize_s"]
+
+
+def test_ht13_alias_crud_622(log_default: HistoryLog) -> None:
+    from traces.history.aliases import alias_suggestions
+
+    res = alias_suggestions(log_default, ctx=CTX)
+    assert_valid(res.records)
+    assert len(res.records) == 54 and res.report["skipped"] == {"pairs_over_cap": 1, "blob_over_max_bytes": 0}
+    assert all(r["status"] == "unvalidated" and r["class"] == "history_inferred" for r in res.records)
+    (crud,) = [r for r in res.records if r["from"]["file"].startswith("src/backend/app/crud/")]
+    assert crud["to"]["file"] == "src/backend/app/crud.py" and crud["provenance_raw"]["head_to"] == "backend/app/crud.py"
+    assert crud["citations"][0]["commit"].startswith("2d0f7742")
+    assert crud["metrics"]["line_containment"] == 0.6667
