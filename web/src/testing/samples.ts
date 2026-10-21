@@ -69,3 +69,30 @@ export function sourceSample(path: string, start: number, end: number, total_lin
   const lines = Array.from({ length: Math.max(0, last - start + 1) }, (_, i) => `const line${start + i} = ${start + i}; // sample`);
   return { snapshot_id: SNAPSHOT_ID, sha: SHA, path, blob_sha: "f".repeat(40), start_line: start, end_line: last, total_lines, lines, generated: false, claim_ids: [cid(21)] };
 }
+
+const hop = (h: Partial<Schemas["TraceHop"]> & Pick<Schemas["TraceHop"], "index" | "type" | "from_symbol" | "to_symbol" | "kind">): Schemas["TraceHop"] => ({
+  status: "verified",
+  label: "verified",
+  claim_id: cid(30 + h.index),
+  qualifier: null,
+  reason: null,
+  evidence_scope: "static",
+  ...h,
+});
+
+/** A five-step trace covering every hop type, delivered out of order to exercise index ordering. */
+export const traceSample: Schemas["TraceResponse"] = {
+  snapshot_id: SNAPSHOT_ID,
+  from_symbol: sym("web/src/TaskForm.tsx", "TaskForm"),
+  to_symbol: sym("api/models.py", "Task"),
+  complete: false,
+  disclaimer: "Static analysis only. No runtime behavior has been observed.",
+  hidden_counts: { rejected: 1 },
+  hops: [
+    hop({ index: 2, type: "library_contract", from_symbol: sym("web/src/client.ts", "createTask"), to_symbol: sym("api/tasks.py", "create_task"), kind: "http_call", status: "unvalidated", label: "inferred", reason: "Matched by the HTTP client's documented request contract; the route string is not resolved statically." }),
+    hop({ index: 0, type: "edge", from_symbol: sym("web/src/TaskForm.tsx", "TaskForm"), to_symbol: sym("web/src/TaskForm.tsx", "onSubmit"), kind: "defines" }),
+    hop({ index: 1, type: "edge", from_symbol: sym("web/src/TaskForm.tsx", "onSubmit"), to_symbol: sym("web/src/client.ts", "createTask"), kind: "calls", status: "observed", label: "observed" }),
+    hop({ index: 3, type: "gap", from_symbol: sym("api/tasks.py", "create_task"), to_symbol: sym("api/crud.py", "save"), kind: "calls", status: null, label: "inferred", claim_id: null, reason: "No recorded relationship between these symbols; the call goes through dependency injection." }),
+    hop({ index: 4, type: "edge", from_symbol: sym("api/crud.py", "save"), to_symbol: sym("api/models.py", "Task"), kind: "writes", status: "missing_location", label: "inferred" }),
+  ],
+};
