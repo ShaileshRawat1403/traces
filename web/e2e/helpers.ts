@@ -23,3 +23,6 @@ export async function expectAccessible(page: Page) {
   const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.length} nodes, e.g. ${v.nodes[0]?.target.join(" ")}`);
   expect(summary, summary.join("\n")).toEqual([]);
 }
+
+/** Screenshot folder for a screen. TRACES_SHOTS_DIR overrides the default under test-results/ (gitignored). */
+export const shotsDir = (screen: string) => `${process.env.TRACES_SHOTS_DIR ?? "test-results/shots"}/${screen}`;

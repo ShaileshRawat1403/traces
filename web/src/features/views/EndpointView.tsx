@@ -14,11 +14,14 @@ export function EndpointView<T>({
   title,
   intro,
   fetcher,
+  render,
 }: {
   name: string;
   title: string;
   intro: ReactNode;
   fetcher: (repoId: string, sha: string) => Promise<T>;
+  /** Renderer for the contract shape. Without one, a 200 says the screen is not built yet. */
+  render?: (data: T) => ReactNode;
 }) {
   const { repoId = "", sha = "" } = useParams();
   const q = useQuery({ queryKey: keys.view(name, repoId, sha), queryFn: () => fetcher(repoId, sha) });
@@ -29,6 +32,8 @@ export function EndpointView<T>({
         <Loading label={`Loading ${title}`} />
       ) : q.isError ? (
         <ErrorState error={q.error} what={title} />
+      ) : render ? (
+        render(q.data)
       ) : (
         <Card>
           <p role="status">The API now serves {title.toLowerCase()} for this snapshot. Its screen is scheduled for the next UI checkpoint; nothing is rendered from it here yet.</p>

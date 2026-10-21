@@ -6,6 +6,7 @@ import { presentStatus } from "../../status/status";
 import { Card, ErrorState, Loading } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { EndpointView } from "./EndpointView";
+import { OverviewView } from "./OverviewView";
 import { Link } from "react-router-dom";
 
 // Allowed label for each status, used only to render the chip for a status count (CONTRACTS.md 2).
@@ -46,14 +47,17 @@ function SnapshotCounts() {
 }
 
 export function OverviewPage() {
+  const { repoId = "", sha = "" } = useParams();
+  const base = snapshotBase(repoId, sha);
   return (
     <>
       <SnapshotCounts />
       <EndpointView
         name="overview"
         title="Overview"
-        intro="What the system does, its entry points and where to start, each fact tagged grounded or interpretation."
+        intro="What the system does, its entry points and where to start. Grounded facts cite evidence; interpretations and unknowns are labelled as such."
         fetcher={api.overview}
+        render={(data) => <OverviewView data={data} base={base} />}
       />
     </>
   );
