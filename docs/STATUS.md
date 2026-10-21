@@ -30,7 +30,7 @@ Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/trace
 | History contract | done | Traces History | [docs/contracts/history.md](contracts/history.md), merged from PR #3 |
 | API: history endpoints, compare | 501 | Traces History | HISTORY |
 | API: explain, chat bundle | 501 | Traces UI | EXPLAIN |
-| Web scaffold | done | Traces UI | repos, snapshots, claims, reviewer view; other views show explicit not-implemented |
+| Web UI shell | merged (#6) | Traces UI | working screens: repos list and register, repo page, claims, reviewer view, evidence page, job polling (ETag). Overview, components, routes, graph, trace, source, history and ask call their real endpoints and show the 501 state. Bundle: main 120 kB gzip, graph chunk 140 kB gzip (lazy-loaded). Playwright e2e in `web/e2e` (not yet in CI; Traces Lab owns the harness) |
 | OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
 | CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
 | Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
@@ -52,6 +52,6 @@ Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/
 
 1. CI activation: waiting on Shailesh to add the `workflow` scope to the push token (D-018); until then CI has not run.
 2. Memory cap for the indexer: `ulimit -v` breaks CodeGraph's WebAssembly; choose cgroup v2 or container limits (D-006).
-3. Web bundle is one 600+ kB chunk (Cytoscape); code-split the graph view when it lands.
+3. Bug (owner: Traces): concurrent API requests cause intermittent 500s, `sqlite3.InterfaceError: bad parameter or other API misuse` in `Store.get_repo` (`backend/traces/evidence/store.py`): one `sqlite3` connection opened with `check_same_thread=False` is shared across request threads without a lock. Reported by Traces UI in PR #6 (7 times in about 300 e2e page loads).
 4. `starlette.testclient` warns that `httpx` is deprecated in favor of `httpx2`; switch when FastAPI's test client does.
 5. Index worker, HEAD discovery and the GitHub client (with token, cache, rate limits) are not built (INGEST/INDEX).
