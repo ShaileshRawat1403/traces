@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       e2e:
-        description: "Run the e2e placeholder job (fails until tests/e2e lands)"
+        description: "Unused. Browser tests run on every push and pull request."
         type: boolean
         default: false
 
@@ -101,6 +101,7 @@ jobs:
       - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
       - name: frozen checker integrity
         run: cd backend/traces/validators/checker && sha256sum -c SHA256SUMS
@@ -139,6 +140,7 @@ jobs:
       - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
       - name: API tests
         env:
@@ -225,6 +227,7 @@ jobs:
       - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
       - name: contract tests
         env:
@@ -270,6 +273,7 @@ jobs:
       - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
       - name: regression and migration tests
         env:
@@ -286,17 +290,37 @@ jobs:
           retention-days: 7
 
   e2e:
-    # Placeholder until tests/e2e (Playwright, desktop + Pixel-class mobile) lands. It runs only on a manual dispatch with
-    # e2e=true, so push and PR runs report it as skipped, never as passed (hashFiles cannot be used in a job-level `if`).
-    # The harness PR replaces this condition and the steps.
-    name: e2e (Playwright; placeholder, skipped until tests/e2e lands)
-    needs: [api, web-build, target]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.e2e }}
+    name: e2e (Playwright against a seeded snapshot)
+    needs: web-build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - name: harness present
-        run: test -f tests/e2e/playwright.config.ts || { echo "tests/e2e/playwright.config.ts missing" >&2; exit 1; }
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: web dependencies
+        run: cd web && npm ci --ignore-scripts
+      - name: toolchain (CodeGraph 1.6.2 + TypeScript 6.0.3, integrity-pinned, no install scripts)
+        run: cd toolchain && npm ci --ignore-scripts
+      - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
+          unshare -rn true && echo "unshare available"
+      - name: Playwright browser
+        run: cd web && npx playwright install --with-deps chromium
+      - name: seed, serve, and run the browser tests
+        env:
+          TRACES_ISOLATION: unshare
+        run: bash scripts/e2e_ui.sh

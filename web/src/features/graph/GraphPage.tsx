@@ -10,7 +10,7 @@ import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States"
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas } from "./GraphCanvas";
-import { LAYERS, STATUS_FILTERS, countsFor, drawableEdges, graphQuery, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
+import { LAYERS, STATUS_FILTERS, canvasElements, countsFor, drawableEdges, graphQuery, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
@@ -248,6 +248,7 @@ export default function GraphPage() {
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const components = useMemo(() => comps.data ?? [], [comps.data]);
   const elements = useMemo(() => (graph.data ? toElements(graph.data, components) : []), [graph.data, components]);
+  const drawn = useMemo(() => canvasElements(elements, !!state.focus), [elements, state.focus]);
 
   const setState = (s: GraphState) => setSp(writeGraphState(s, sp));
   const setParam = (k: string, v: string | null) =>
@@ -319,6 +320,9 @@ export default function GraphPage() {
               {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
               {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
             </span>
+            {!state.focus && drawn.length < elements.length ? (
+              <span className="text-xs text-muted">Canvas shows components. Expand one to load symbols.</span>
+            ) : null}
           </div>
           <div className="mb-3 flex flex-col gap-2">
             <HiddenCounts counts={graph.data.hidden_counts} extra={drawableEdges(graph.data).hidden} reviewHref={`${snapshotBase(repoId, sha)}/review`} />
@@ -330,7 +334,7 @@ export default function GraphPage() {
               {graph.data.nodes.length === 0 ? (
                 <Empty title="Nothing matches these filters">Try including inferred relationships or clearing the search.</Empty>
               ) : mode === "graph" ? (
-                <GraphCanvas elements={elements} selected={selected} onSelect={setSelected} onExpand={(id) => setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 })} onEdge={openEvidence} describe={describe} />
+                <GraphCanvas elements={drawn} selected={selected} onSelect={setSelected} onExpand={(id) => setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 })} onEdge={openEvidence} describe={describe} />
               ) : mode === "list" ? (
                 <ListView data={graph.data} selected={selected} onEvidence={openEvidence} />
               ) : (

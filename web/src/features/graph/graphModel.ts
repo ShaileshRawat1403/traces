@@ -111,6 +111,21 @@ export interface ElementData {
   line?: string;
 }
 
+/** Opening frame: components only, when the page mixes symbols in. A focused neighborhood is drawn in full. */
+export function canvasElements<T extends { data: ElementData }>(elements: readonly T[], focused: boolean): T[] {
+  if (focused) return [...elements];
+  const nodes = elements.filter((e) => !e.data.source);
+  const comps = nodes.filter((e) => e.data.entity === "component");
+  if (comps.length === 0 || comps.length === nodes.length) return [...elements];
+  const ids = new Set(comps.map((n) => n.data.id));
+  const edges = elements.filter((e) => {
+    const src = e.data.source;
+    const tgt = e.data.target;
+    return !!src && !!tgt && ids.has(src) && ids.has(tgt);
+  });
+  return [...comps, ...edges];
+}
+
 /** Cytoscape elements: component nodes become compound parents of the symbol nodes inside their paths. */
 export function toElements(data: GraphResponse, components: readonly Component[]): { data: ElementData }[] {
   const ids = new Set(data.nodes.map((n) => n.id));

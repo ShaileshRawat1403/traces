@@ -3,6 +3,21 @@ import type { ExplainResponse } from "../../api/client";
 import { CitationLinks, StandingChip, factStanding } from "../../ui/Facts";
 import { StatusChip } from "../../ui/StatusChip";
 
+function Meter({ label, n, total, cls }: { label: string; n: number; total: number; cls: string }) {
+  const pct = total === 0 ? 0 : Math.round((n / total) * 100);
+  return (
+    <div className="rounded-md border border-line bg-canvas px-2 py-1">
+      <div className="flex justify-between gap-2 text-ink-2">
+        <span>{label}</span>
+        <span className="tabular-nums">{n}</span>
+      </div>
+      <span className="mt-1 block h-1.5 rounded bg-sunken">
+        <span className={`block h-1.5 rounded ${cls}`} style={{ width: `${pct}%` }} />
+      </span>
+    </div>
+  );
+}
+
 const CITE_CAP = 12;
 
 const CATEGORY: Record<string, { title: string; help: string }> = {
@@ -42,6 +57,11 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
         <p className="mt-1 text-xs text-muted" data-testid="answer-summary">
           {counts.grounded} grounded, {counts.interpretation} interpretation, {counts.unknown} unknown. Built from evidence records without an AI model. Static analysis only.
         </p>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-xs" aria-hidden="true">
+          <Meter label="Grounded" n={counts.grounded} total={r.answer.length} cls="bg-verified" />
+          <Meter label="Interpretation" n={counts.interpretation} total={r.answer.length} cls="bg-inferred" />
+          <Meter label="Unknown" n={counts.unknown} total={r.answer.length} cls="bg-unknown" />
+        </div>
         <ol className="mt-3 flex flex-col gap-3">
           {r.answer.map((f, i) => (
             <li key={i} className="flex flex-col gap-1" data-standing={sentenceStanding(f)} data-testid="answer-sentence">

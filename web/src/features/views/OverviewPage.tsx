@@ -1,5 +1,6 @@
-import { useParams } from "react-router-dom";
-import { api } from "../../api/client";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useParams } from "react-router-dom";
+import { api, type Component } from "../../api/client";
 import { useSnapshot } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { presentStatus } from "../../status/status";
@@ -7,9 +8,8 @@ import { Card, ErrorState, Loading } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { EndpointView } from "./EndpointView";
 import { OverviewView } from "./OverviewView";
-import { Link } from "react-router-dom";
 
-// Allowed label for each status, used only to render the chip for a status count (CONTRACTS.md 2).
+const LAYER_ORDER = ["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"] as const;
 const LABEL_FOR: Record<string, string> = { verified: "verified", observed: "observed", unvalidated: "inferred", missing_location: "inferred", rejected: "rejected" };
 
 function SnapshotCounts() {
@@ -48,12 +48,56 @@ function SnapshotCounts() {
   );
 }
 
+function ComponentMap() {
+  const { repoId = "", sha = "" } = useParams();
+  const base = snapshotBase(repoId, sha);
+  const q = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
+  if (!q.data?.length) return null;
+  const groups = new Map<Component["layer"], Component[]>();
+  for (const c of q.data) {
+    const list = groups.get(c.layer) ?? [];
+    list.push(c);
+    groups.set(c.layer, list);
+  }
+  return (
+    <section className="mb-4 rounded-lg border border-line bg-surface p-4" aria-label="Components by layer">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Components by layer</h2>
+        <p className="text-xs text-muted">Open a layer in the graph. Grouping is a stored rule, not a guess.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {LAYER_ORDER.filter((layer) => groups.has(layer)).map((layer) => (
+          <div key={layer} className="rounded-md border border-line bg-canvas p-3">
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold capitalize">{layer}</h3>
+              <Link to={`${base}/graph?layer=${layer}`} className="text-xs">
+                Graph
+              </Link>
+            </div>
+            <ul className="flex flex-col gap-1">
+              {(groups.get(layer) ?? []).map((c) => (
+                <li key={c.id} className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate" title={c.paths.join(", ")}>
+                    {c.name}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-xs text-muted">{Object.values(c.claim_counts).reduce((a, b) => a + b, 0)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function OverviewPage() {
   const { repoId = "", sha = "" } = useParams();
   const base = snapshotBase(repoId, sha);
   return (
     <>
       <SnapshotCounts />
+      <ComponentMap />
       <EndpointView
         name="overview"
         title="Overview"

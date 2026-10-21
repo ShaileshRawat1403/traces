@@ -147,7 +147,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
         aria-roledescription="graph"
         aria-label="Architecture graph. Use arrow keys to move between nodes, Enter to expand, Escape to clear. The list and cards views show the same data."
         onKeyDown={onKeyDown}
-        className="h-[min(68vh,40rem)] min-h-80 w-full touch-none rounded-lg border border-line bg-[#070b0a]"
+        className="h-[min(72dvh,44rem)] min-h-80 w-full touch-none rounded-lg border border-line bg-[#070b0a]"
         data-testid="graph-canvas"
       />
       <p className="sr-only" aria-live="polite" data-testid="graph-announce">

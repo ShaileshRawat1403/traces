@@ -1,7 +1,63 @@
 import * as Tabs from "@radix-ui/react-tabs";
+import { Link } from "react-router-dom";
 import type { Overview } from "../../api/client";
 import { FactGroups, partitionFacts, type Fact } from "../../ui/Facts";
 import { Card } from "../../ui/States";
+
+const LAYER_HELP = "Three readings of the same snapshot. A fact without a citation is not treated as grounded.";
+
+function SystemStrip({ data, base }: { data: Overview; base: string }) {
+  const langs = Object.entries(data.languages).sort((a, b) => b[1] - a[1]);
+  const total = langs.reduce((a, [, n]) => a + n, 0) || 1;
+  const jumps = [
+    { to: `${base}/graph`, label: "Graph", hint: "Components and relationships" },
+    { to: `${base}/trace`, label: "Trace", hint: "One path, including gaps" },
+    { to: `${base}/history`, label: "History", hint: "What Git actually changed" },
+    { to: `${base}/ask`, label: "Ask", hint: "Answer from stored evidence" },
+  ];
+  return (
+    <section className="rounded-lg border border-line bg-surface p-4" aria-label="System at a glance">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">See the system</h2>
+          <p className="mt-1 max-w-xl text-sm text-muted">{LAYER_HELP}</p>
+        </div>
+        <ul className="flex flex-wrap gap-2">
+          {jumps.map((j) => (
+            <li key={j.to}>
+              <Link to={j.to} className="tap inline-flex flex-col justify-center rounded-md border border-line-strong bg-canvas px-3 py-1 text-ink no-underline hover:border-accent">
+                <span className="text-sm font-semibold">{j.label}</span>
+                <span className="text-xs font-normal text-muted">{j.hint}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {langs.length > 0 ? (
+        <div className="mt-4" role="img" aria-label={`Languages by file count: ${langs.map(([k, n]) => `${k} ${n}`).join(", ")}`}>
+          <div className="flex h-3 overflow-hidden rounded-full bg-sunken">
+            {langs.map(([k, n], i) => (
+              <span key={k} className="h-3" style={{ width: `${(n / total) * 100}%`, background: LANG_COLORS[i % LANG_COLORS.length] }} />
+            ))}
+          </div>
+          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2">
+            {langs.map(([k, n], i) => (
+              <li key={k} className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full" style={{ background: LANG_COLORS[i % LANG_COLORS.length] }} aria-hidden="true" />
+                {k}
+                <span className="tabular-nums text-muted">{n.toLocaleString("en-US")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted">No language counts were stored for this snapshot.</p>
+      )}
+    </section>
+  );
+}
+
+const LANG_COLORS = ["#2fafa4", "#7eb6ff", "#e2b16a", "#c4b4ea", "#ef8d86", "#b7c4ce"];
 
 function Lead({ title, facts, base, empty }: { title: string; facts: readonly Fact[]; base: string; empty: string }) {
   const p = partitionFacts(facts);
@@ -53,6 +109,7 @@ const LAYERS = [
 export function OverviewView({ data, base }: { data: Overview; base: string }) {
   return (
     <div className="flex flex-col gap-4" data-testid="overview">
+      <SystemStrip data={data} base={base} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Lead title="Entry points" facts={data.entry_points} base={base} empty="No entry points reported." />
         <Lead title="Where to start" facts={data.start_here} base={base} empty="No starting points reported." />

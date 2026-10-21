@@ -15,6 +15,13 @@ function Sym({ id }: { id: string }) {
   );
 }
 
+const RAIL: Record<HopView["kind"], string> = {
+  edge: "bg-verified",
+  hidden: "bg-line-strong",
+  gap: "bg-inferred",
+  library_contract: "bg-unknown",
+};
+
 const FRAME: Record<HopView["kind"], string> = {
   edge: "border-line bg-surface",
   hidden: "border-dashed border-line-strong bg-sunken",
@@ -101,11 +108,18 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
       {hops.length === 0 ? (
         <p className="text-sm text-ink-2">The API returned no steps for this trace.</p>
       ) : (
-        <ol className="flex flex-col gap-2" aria-label="Trace steps in order">
-          {hops.map((v) => (
-            <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
-          ))}
-        </ol>
+        <>
+          <div className="mb-3 flex items-center gap-1 overflow-x-auto" aria-hidden="true" data-testid="trace-rail">
+            {hops.map((v) => (
+              <span key={`rail-${v.hop.index}`} className={`h-2 min-w-6 flex-1 rounded-full ${RAIL[v.kind]}`} />
+            ))}
+          </div>
+          <ol className="flex flex-col gap-2" aria-label="Trace steps in order">
+            {hops.map((v) => (
+              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
+            ))}
+          </ol>
+        </>
       )}
     </section>
   );

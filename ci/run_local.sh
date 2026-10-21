@@ -52,12 +52,7 @@ job_target() {
 need_target()   { [ -d "$TARGET_PATH/.git" ] || { echo "target cache missing (run the target job first)" >&2; return 1; }; }
 job_contract()  { need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/contract; }
 job_regression(){ need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/regression; }
-job_e2e() {
-  # Mirrors the CI placeholder (skipped on push and PR): reported as SKIP until the Playwright harness lands.
-  [ -f tests/e2e/playwright.config.ts ] || return 77
-  echo "tests/e2e exists but the e2e job is still a placeholder; wire it in .github/workflows/ci.yml and here" >&2
-  return 1
-}
+job_e2e()       { py_env && toolchain_env && web_env && userns && TRACES_ISOLATION=unshare bash scripts/e2e_ui.sh; }
 
 {
   echo "date: $(date '+%Y-%m-%d %H:%M:%S %Z')"
