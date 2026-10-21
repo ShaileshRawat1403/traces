@@ -2367,6 +2367,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/chat/bundle": {
    "post": {
+    "description": "Prompt bundle for browser-side chat (always prepare_bundle, whatever mode says); the backend never sees provider keys.",
     "operationId": "chat_bundle_api_v1_repos__repo_id__snapshots__sha__chat_bundle_post",
     "parameters": [
      {
@@ -2428,16 +2429,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Chat Bundle",
@@ -2843,16 +2834,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Explain",

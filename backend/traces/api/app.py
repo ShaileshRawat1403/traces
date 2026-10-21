@@ -6,7 +6,7 @@ HTTP 501 with an explicit not_implemented error naming the owning seat. Nothing 
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from functools import lru_cache
 from typing import Annotated, Any, NoReturn
 
@@ -42,6 +42,7 @@ from traces.core.config import get_settings
 from traces.evidence.jobs import IndexJobRunner
 from traces.evidence.migrate import CURRENT, SCHEMAS
 from traces.evidence.store import Store, get_job, now
+from traces.explain import bundle as explain_bundle
 from traces.ingest.errors import IngestError
 from traces.ingest.remote import HeadProbe
 from traces.ingest.urls import parse_repo_url, require_sha
@@ -170,7 +171,7 @@ def meta() -> Meta:
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
                               "index_jobs": True, "head": True, "overview": False, "components": False, "routes": False,
                               "graph": False, "source": False, "trace": False, "history": False, "compare": False,
-                              "explain": False, "chat_bundle": False})
+                              "explain": True, "chat_bundle": True})
 
 
 # ------------------------------------------------------------------------------------------------ repos and snapshots
@@ -445,19 +446,33 @@ def compare(repo_id: str, base: str, head: str, st: StoreDep) -> ClaimPage:
     not_implemented("Snapshot compare", HIST, "HISTORY")
 
 
-# ------------------------------------------------------------------------------------------------ explain and chat (Traces UI seat)
-@app.post(f"{SNAP}/explain", response_model=ExplainResponse, responses=NI, tags=["explain"])
+# ------------------------------------------------------------------------------------------------ explain and chat (Traces UI seat, D-023)
+def _explain(fn: Callable[..., dict[str, Any]], what: str, repo_id: str, sha: str, body: ExplainRequest, st: Store) -> ExplainResponse:
+    """Calls the deterministic explain engine (traces.explain.bundle) on the resolved snapshot. No LLM call and no provider
+    credentials: prepare_bundle only returns the scoped prompt and outbound manifest for the browser to send after consent."""
+    snap = _snapshot(st, repo_id, sha)
+    try:
+        out = fn(snap["id"], body.question, body.focus_claim_ids, store=st)
+    except NotImplementedError:
+        not_implemented(what, "Traces UI", "EXPLAIN")
+    except LookupError as e:
+        raise ApiError(404, "not_found", str(e.args[0]) if e.args else f"not found in {snap['id']}") from None
+    return ExplainResponse.model_validate(out)
+
+
+@app.post(f"{SNAP}/explain", response_model=ExplainResponse, responses=ERR, tags=["explain"])
 def explain(repo_id: str, sha: str, body: ExplainRequest, st: StoreDep) -> ExplainResponse:
     """No-LLM explanation, or (mode=prepare_bundle) a scoped prompt bundle with citations and an outbound manifest for the browser
     to send after user consent. The request model forbids extra fields, so provider keys cannot be submitted."""
-    _snapshot(st, repo_id, sha)
-    not_implemented("Explain", "Traces UI", "EXPLAIN")
+    if body.mode == "prepare_bundle":
+        return _explain(explain_bundle.prompt_bundle, "Explain", repo_id, sha, body, st)
+    return _explain(explain_bundle.explain, "Explain", repo_id, sha, body, st)
 
 
-@app.post(f"{SNAP}/chat/bundle", response_model=ExplainResponse, responses=NI, tags=["explain"])
+@app.post(f"{SNAP}/chat/bundle", response_model=ExplainResponse, responses=ERR, tags=["explain"])
 def chat_bundle(repo_id: str, sha: str, body: ExplainRequest, st: StoreDep) -> ExplainResponse:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Chat bundle", "Traces UI", "EXPLAIN")
+    """Prompt bundle for browser-side chat (always prepare_bundle, whatever mode says); the backend never sees provider keys."""
+    return _explain(explain_bundle.prompt_bundle, "Chat bundle", repo_id, sha, body, st)
 
 
 def openapi_json() -> str:

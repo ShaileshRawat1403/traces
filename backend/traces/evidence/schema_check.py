@@ -2,14 +2,24 @@
 task002/spec/evidence_record.schema.json. Written because no jsonschema package is installed and
 installing one needs network (not approved). Unsupported keywords raise, so nothing is silently skipped.
 `format: date-time` is checked (stricter than the 2020-12 default, where format is an annotation)."""
-import datetime, json, re, sys
+from __future__ import annotations
+
+import copy
+import datetime
+import json
+import re
+import sys
+from collections.abc import Callable
+from typing import Any
+
+Schema = Any  # a JSON Schema node: dict, or True/False
 
 SUPPORTED = {"$schema", "$id", "title", "description", "type", "additionalProperties", "required", "properties", "const", "enum",
              "pattern", "minLength", "minItems", "minimum", "items", "$ref", "allOf", "anyOf", "if", "then", "else", "not", "contains", "format", "$defs"}  # anyOf, else added for schema 0.3 (Decision 002-B)
-TYPES = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None)}
+TYPES: dict[str, type | tuple[type, ...]] = {"object": dict, "array": list, "string": str, "boolean": bool, "null": type(None)}
 
 
-def is_type(v, t):
+def is_type(v: Any, t: str) -> bool:
     if t == "integer":
         return isinstance(v, int) and not isinstance(v, bool)
     if t == "number":
@@ -17,16 +27,16 @@ def is_type(v, t):
     return isinstance(v, TYPES[t])
 
 
-def eq(a, b):
+def eq(a: Any, b: Any) -> bool:
     return type(a) == type(b) and a == b if not (isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool) and not isinstance(b, bool)) else a == b
 
 
 class Validator:
-    def __init__(self, schema):
+    def __init__(self, schema: Schema) -> None:
         self.root = schema
         self._walk_keywords(schema)
 
-    def _walk_keywords(self, s):
+    def _walk_keywords(self, s: Schema) -> None:
         if isinstance(s, dict):
             for k, v in s.items():
                 if k not in SUPPORTED:
@@ -40,9 +50,9 @@ class Validator:
                 elif k in ("items", "if", "then", "else", "not", "contains", "additionalProperties") and isinstance(v, dict):
                     self._walk_keywords(v)
 
-    def errors(self, inst, schema=None, path="$"):
+    def errors(self, inst: Any, schema: Schema = None, path: str = "$") -> list[str]:
         s = self.root if schema is None else schema
-        out = []
+        out: list[str] = []
         if s is True:
             return out
         if s is False:
@@ -106,18 +116,18 @@ class Validator:
         return out
 
 
-def self_test(v):
+def self_test(v: Validator) -> list[tuple[str, bool]]:
     """Known-bad inputs must be rejected; returns list of (case, rejected)."""
-    good = {"schema_version": "traces-evidence/0.3", "claim_id": "c_" + "0" * 64, "run_id": "r", "repo": "x", "repo_sha": "0" * 40,
+    good: dict[str, Any] = {"schema_version": "traces-evidence/0.3", "claim_id": "c_" + "0" * 64, "run_id": "r", "repo": "x", "repo_sha": "0" * 40,
             "claim_kind": "node", "node_kind": "function", "granularity": "symbol", "statement": "s", "class": "source_backed_declaration",
             "originator": {"name": "codegraph", "version": "1.6.2", "role": "extractor"}, "provenance_raw": {}, "provenance": "codegraph:declaration",
             "origin": {"kind": "tool_output"}, "injected": False, "evidence_scope": "static", "locations": [], "checks": [], "status": "missing_location",
             "label": "inferred", "status_reason": "r", "status_history": [{"from": None, "to": "missing_location", "at": "2026-10-21T10:00:00+05:30", "run_id": "r", "check_ids": [], "by": "t"}],
             "visible_to_reviewer": True}
-    cases = []
+    cases: list[tuple[str, bool]] = []
     cases.append(("good record accepted", not v.errors(good)))
-    import copy
-    def bad(name, fn):
+
+    def bad(name: str, fn: Callable[[dict[str, Any]], Any]) -> None:
         g = copy.deepcopy(good); fn(g); cases.append((name, bool(v.errors(g))))
     bad("missing statement", lambda g: g.pop("statement"))
     bad("evidence_scope runtime", lambda g: g.update(evidence_scope="runtime"))
@@ -152,13 +162,13 @@ if __name__ == "__main__":
     v = Validator(schema)
     if sys.argv[2] == "--self-test":
         cs = self_test(v)
-        for n, ok in cs:
-            print(("PASS " if ok else "FAIL ") + n)
+        for name, ok in cs:
+            print(("PASS " if ok else "FAIL ") + name)
         sys.exit(0 if all(ok for _, ok in cs) else 1)
     n = bad = 0
     nulls = 0
     req = schema["required"]
-    first = []
+    first: list[tuple[Any, list[str]]] = []
     for line in open(sys.argv[2]):
         r = json.loads(line); n += 1
         e = v.errors(r)

@@ -164,7 +164,6 @@ NOT_IMPLEMENTED = [
     ("get", f"{BASE}/history/timeline", None), ("get", f"{BASE}/history/lifecycle?path=a", None), ("get", f"{BASE}/history/hotspots", None),
     ("get", f"{BASE}/history/cochange", None), ("get", f"{BASE}/history/milestones", None), ("get", f"{BASE}/history/rationale", None),
     ("get", f"/api/v1/repos/{RID}/compare?base={SHA}&head={SHA}", None),
-    ("post", f"{BASE}/explain", {"question": "what is this"}), ("post", f"{BASE}/chat/bundle", {"question": "q", "mode": "prepare_bundle"}),
 ]
 
 
@@ -174,6 +173,46 @@ def test_stubs_return_explicit_501(client, method, path, body):
     assert r.status_code == 501
     e = r.json()["error"]
     assert e["code"] == "not_implemented" and e["owner"] and e["milestone"]
+
+
+def test_explain_no_llm_is_wired(client):
+    assert client.get("/api/v1/meta").json()["capabilities"]["explain"] is True
+    r = client.post(f"{BASE}/explain", json={"question": "what changed in this file?"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["snapshot_id"] == f"{RID}@{SHA}" and d["answer"] and d["prompt_bundle"] is None and d["outbound_manifest"] == []
+    assert "c_" + "7" * 64 not in {c["claim_id"] for c in d["citations"] if c["status"] != "rejected"}
+
+
+@pytest.mark.parametrize("path,body", [(f"{BASE}/explain", {"question": "q", "mode": "prepare_bundle"}),
+                                       (f"{BASE}/chat/bundle", {"question": "q"}), (f"{BASE}/chat/bundle", {"question": "q", "mode": "no_llm"})])
+def test_prepare_bundle_and_chat_bundle_are_wired(client, path, body):
+    assert client.get("/api/v1/meta").json()["capabilities"]["chat_bundle"] is True
+    r = client.post(path, json=body)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["prompt_bundle"] and d["outbound_manifest"] and d["requires_consent"] is True
+    text = json.dumps(d).lower()
+    assert "api_key" not in text and "sk-" not in text
+
+
+def test_explain_unknown_snapshot_and_lookup_error_are_404(client, monkeypatch):
+    other = f"/api/v1/repos/{RID}/snapshots/{'e' * 40}"
+    for p in (f"{other}/explain", f"{other}/chat/bundle"):
+        r = client.post(p, json={"question": "q"})
+        assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+    from traces.explain import bundle
+
+    def gone(*a, **k):
+        raise LookupError("snapshot vanished")
+
+    monkeypatch.setattr(bundle, "explain", gone)
+    monkeypatch.setattr(bundle, "prompt_bundle", gone)
+    for p, b in ((f"{BASE}/explain", {"question": "q"}), (f"{BASE}/explain", {"question": "q", "mode": "prepare_bundle"}),
+                 (f"{BASE}/chat/bundle", {"question": "q"})):
+        r = client.post(p, json=b)
+        assert r.status_code == 404 and r.json()["error"] == {"code": "not_found", "message": "snapshot vanished", "owner": None,
+                                                              "milestone": None, "detail": None}
 
 
 def test_explain_refuses_provider_keys(client):

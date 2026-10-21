@@ -96,3 +96,6 @@ The binding text is in [docs/contracts/history.md section 20](contracts/history.
 | D-H7 | `dist/` and `build/` are filtered at any depth, matching whole directory segments only. |
 | D-H8 | The evidence side supplies `generated_paths`, including generator-config output dirs. |
 | D-H9 | Milestone cap: 8 by default for the index worker, 20 for on-demand compare. |
+
+## D-023 API explain and chat bundle call the deterministic explain engine (2026-10-21)
+`POST S/explain` calls `traces.explain.bundle.explain(snapshot_id, question, focus_claim_ids, store=st)` for `mode=no_llm` and `prompt_bundle(...)` for `mode=prepare_bundle`. `POST S/chat/bundle` always calls `prompt_bundle(...)`. A `LookupError` from the engine maps to 404 `not_found`, and an unknown snapshot is 404 before the engine runs. `/meta` reports `explain` and `chat_bundle` as true. There's no LLM call in the backend and no provider credential path: the request model still forbids extra fields, and the bundle is sent by the browser only after consent. This is additive. The response model is unchanged, and the only OpenAPI change is that the 501 response is removed from these two operations. (D-021 and D-022 are reserved by the open INGEST (#9) and INDEX (#15) PRs.)
