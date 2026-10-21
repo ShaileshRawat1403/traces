@@ -22,6 +22,7 @@ from traces.history import (
     ingest,
     lifecycle,
 )
+from traces.history.impact import history_impact
 from traces.history.manifests import manifest_changes
 from traces.history.milestones import milestone_records, select_milestones, snapshot_compare
 from traces.history.records import recompute_claim_id
@@ -30,6 +31,7 @@ from traces.history.reverts import reverts
 from ._schema import assert_valid
 from .conftest import NO_FILTERS
 
+IMPACT_N = 12  # history_impact candidates for Admin/AddUser.tsx
 CTX = RunContext("h-regress", "2026-10-21T12:00:00+05:30", "fastapi/full-stack-fastapi-template",
                  "b1125d8839482cb7bbae603ddc6d0081bf87532e")
 
@@ -128,14 +130,20 @@ def test_zero_collisions_and_regenerable(fsft_repo: RepoRef, tmp_path_factory: p
     def run(ctx: RunContext) -> list[dict]:
         log = ingest(fsft_repo, HistoryConfig(), cache_dir=cache)
         out: list[dict] = []
-        for fn in (commit_facts, lifecycle, churn, hotspots, cochange):
+        for fn in (commit_facts, lifecycle, churn, hotspots, cochange, manifest_changes, reverts):
             out += list(fn(log, ctx=ctx).records)
+        ms = select_milestones(log)
+        out += list(milestone_records(log, ms, ctx=ctx).records)
+        out += list(snapshot_compare(log, ms[0].sha, ms[-1].sha, ctx=ctx).records)
+        co = [r for r in out if r.get("relationship_kind") == "co_changed_with"]
+        out += list(history_impact("frontend/src/components/Admin/AddUser.tsx", co).by_source["history:co_change"])
         return out
 
     a = run(CTX)
     ids = [r["claim_id"] for r in a]
     assert sum(recompute_claim_id(r) != r["claim_id"] for r in a) == 0
-    assert len(ids) == len(set(ids)) == 6460 + 9 + 235 + 145 + 144
+    assert len(ids) == len(set(ids))
+    assert len(ids) == 6460 + 9 + 235 + 145 + 144 + 653 + 54 + 8 + 416 + IMPACT_N
     b = run(RunContext("h-again", "2026-10-23T09:00:00+05:30", CTX.repo, CTX.repo_sha))
     assert canonical_hash(sorted(a, key=lambda r: r["claim_id"])) == canonical_hash(sorted(b, key=lambda r: r["claim_id"]))
 
@@ -187,3 +195,17 @@ def test_ht22_milestones(log_default: HistoryLog) -> None:
     assert_valid(sc.records)
     assert (sc.report["files_at_base"], sc.report["files_at_head"]) == (198, 252)
     assert all(r["status"] == "observed" for r in sc.records)
+
+
+def test_ht23_impact_adduser(log_default: HistoryLog) -> None:
+    co = cochange(log_default, ctx=CTX).records
+    res = history_impact("frontend/src/components/Admin/AddUser.tsx", co)
+    recs = res.by_source["history:co_change"]
+    assert_valid(recs)
+    assert set(res.by_source) == {"history:co_change", "history:alias"} and res.known_gaps
+    assert recs and all(r["status"] == "unvalidated" and r["relationship_kind"] == "history_impact_candidate"
+                        for r in recs)
+    assert len(recs) == IMPACT_N
+    edit = next(r for r in recs if r["to"]["file"] == "frontend/src/components/Admin/EditUser.tsx")
+    assert edit["qualifier"] == "history signal: changed together in 12 of 14 commits"
+    assert history_impact("frontend/src/components/Admin/AddUser.tsx", co).by_source == res.by_source
