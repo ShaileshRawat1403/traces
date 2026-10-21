@@ -1,13 +1,14 @@
 """Traces read-only query/index API (FastAPI). Contract: docs/CONTRACTS.md section 4; generated OpenAPI: docs/contracts/openapi.json.
 
-FOUNDATION implements health/meta, repo registration and listing, snapshots, claims (list, by id) and export from the
-store, and job polling with ETag. Every other endpoint is declared with its final request/response models and returns
-HTTP 501 with an explicit not_implemented error naming the owning seat. Nothing returns placeholder data."""
+Health, repos, snapshots, claims, export, jobs, head discovery, index jobs, overview, components, routes, graph,
+source, trace, history views, explain and chat bundle are implemented. Nothing returns placeholder relationships.
+"""
 from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterator
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response
@@ -42,6 +43,19 @@ from traces.core.config import get_settings
 from traces.evidence.jobs import IndexJobRunner
 from traces.evidence.migrate import CURRENT, SCHEMAS
 from traces.evidence.store import Store, get_job, now
+from traces.evidence.views import (
+    LIFECYCLE_KINDS,
+    TIMELINE_KINDS,
+    ViewError,
+    compare_view,
+    components_view,
+    graph_view,
+    history_page,
+    overview_view,
+    routes_view,
+    source_view,
+    trace_view,
+)
 from traces.explain import bundle as explain_bundle
 from traces.ingest.errors import IngestError
 from traces.ingest.remote import HeadProbe
@@ -169,8 +183,8 @@ def meta() -> Meta:
                 validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api"},
                 isolation="none" if s.isolation == "none" else "unshare",
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
-                              "index_jobs": True, "head": True, "overview": False, "components": False, "routes": False,
-                              "graph": False, "source": False, "trace": False, "history": False, "compare": False,
+                              "index_jobs": True, "head": True, "overview": True, "components": True, "routes": True,
+                              "graph": True, "source": True, "trace": True, "history": True, "compare": True,
                               "explain": True, "chat_bundle": True})
 
 
@@ -352,98 +366,133 @@ def export(repo_id: str, sha: str, st: StoreDep) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="application/x-ndjson", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
-# ------------------------------------------------------------------------------------------------ views (declared, not implemented)
-@app.get(f"{SNAP}/overview", response_model=Overview, responses=NI, tags=["views"])
+# ------------------------------------------------------------------------------------------------ views
+def _view(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    try:
+        return fn(*args, **kwargs)
+    except ViewError as e:
+        raise ApiError(e.status, e.code, e.message) from None
+
+
+def _checkout(repo_id: str, sha: str) -> Path:
+    return get_settings().targets_dir / repo_id / sha / "source"
+
+
+@app.get(f"{SNAP}/overview", response_model=Overview, responses=ERR, tags=["views"])
 def overview(repo_id: str, sha: str, st: StoreDep) -> Overview:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Overview", "Traces", "VIEWS")
+    """Grounded facts, documented interpretations and explicit unknowns. Nothing here is a business claim without a source."""
+    snap = _snapshot(st, repo_id, sha)
+    repo = st.get_repo(repo_id) or {}
+    checkout = _checkout(repo_id, sha)
+    return Overview.model_validate(_view(overview_view, st, snap, repo_name=f"{repo.get('owner', '')}/{repo.get('name', '')}",
+                                         checkout=checkout if checkout.exists() else None))
 
 
-@app.get(f"{SNAP}/components", response_model=list[Component], responses=NI, tags=["views"])
+@app.get(f"{SNAP}/components", response_model=list[Component], responses=ERR, tags=["views"])
 def components(repo_id: str, sha: str, st: StoreDep) -> list[Component]:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Components", "Traces", "VIEWS")
+    """Deterministic components stored at index time (rule id on each row) with claim counts by status."""
+    snap = _snapshot(st, repo_id, sha)
+    return [Component.model_validate(c) for c in components_view(st, snap["id"])]
 
 
-@app.get(f"{SNAP}/routes", response_model=list[RouteItem], responses=NI, tags=["views"])
+@app.get(f"{SNAP}/routes", response_model=list[RouteItem], responses=ERR, tags=["views"])
 def routes(repo_id: str, sha: str, st: StoreDep) -> list[RouteItem]:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Route inventory", "Traces", "VIEWS")
+    """Route and operation records already stored. A method that was not on the record is UNKNOWN, not guessed from a scan."""
+    snap = _snapshot(st, repo_id, sha)
+    return [RouteItem.model_validate(r) for r in routes_view(st, snap["id"])]
 
 
-@app.get(f"{SNAP}/graph", response_model=GraphResponse, responses=NI, tags=["views"])
+@app.get(f"{SNAP}/graph", response_model=GraphResponse, responses=ERR, tags=["views"])
 def graph(repo_id: str, sha: str, st: StoreDep,
           focus: str | None = None, depth: Annotated[int, Query(ge=0, le=4)] = 1,
           layer: Annotated[list[str] | None, Query()] = None, rel: Annotated[list[str] | None, Query()] = None,
           status: Annotated[list[Status] | None, Query()] = None, q: str | None = None,
           include_rejected: bool = False, limit: Annotated[int, Query(ge=1, le=2000)] = 300) -> GraphResponse:
-    """Graph query: filters (layer, rel, status, q) and neighborhood (focus + depth). Rejected excluded unless include_rejected."""
-    _snapshot(st, repo_id, sha)
-    not_implemented("Graph query", "Traces", "VIEWS")
+    """Static relationships only. History patterns (co-change, hotspots) are not drawn here. Rejected edges are excluded unless include_rejected."""
+    snap = _snapshot(st, repo_id, sha)
+    return GraphResponse.model_validate(graph_view(
+        st, snap["id"], focus=focus, depth=depth, layer=layer, rel=rel, status=list(status) if status else None,
+        q=q, include_rejected=include_rejected, limit=limit))
 
 
-@app.get(f"{SNAP}/source", response_model=SourceView, responses=NI, tags=["views"])
+@app.get(f"{SNAP}/source", response_model=SourceView, responses=ERR, tags=["views"])
 def source(repo_id: str, sha: str, st: StoreDep, path: str, start: Annotated[int, Query(ge=1)] = 1,
            end: Annotated[int | None, Query(ge=1)] = None) -> SourceView:
-    """Pinned source view at the snapshot SHA (read from Git objects, never from a working tree)."""
-    _snapshot(st, repo_id, sha)
-    not_implemented("Source view", "Traces", "VIEWS")
+    """Pinned source at the snapshot SHA, read from the local checkout's Git objects. Paths cannot escape the tree."""
+    snap = _snapshot(st, repo_id, sha)
+    return SourceView.model_validate(_view(source_view, st, snap, path=path, start=start, end=end, checkout=_checkout(repo_id, sha)))
 
 
-@app.get(f"{SNAP}/trace", response_model=TraceResponse, responses=NI, tags=["views"])
+@app.get(f"{SNAP}/trace", response_model=TraceResponse, responses=ERR, tags=["views"])
 def trace(repo_id: str, sha: str, st: StoreDep, from_: Annotated[str, Query(alias="from")],
           to: str | None = None, include_rejected: bool = False) -> TraceResponse:
-    """Cross-layer trace as ordered hops: edge, gap and library_contract (gap and library_contract are inferred with a reason)."""
-    _snapshot(st, repo_id, sha)
-    not_implemented("Trace", "Traces", "VIEWS")
+    """Ordered static hops. A missing link is a gap (inferred, with a reason). library_contract hops are not verified calls."""
+    snap = _snapshot(st, repo_id, sha)
+    return TraceResponse.model_validate(trace_view(st, snap["id"], frm=from_, to=to, include_rejected=include_rejected))
 
 
-# ------------------------------------------------------------------------------------------------ history (Traces History seat)
-HIST = "Traces History"
+# ------------------------------------------------------------------------------------------------ history (read from stored history records)
+def _history(st: Store, snap_id: str, **kwargs: Any) -> ClaimPage:
+    return ClaimPage.model_validate(history_page(st, snap_id, **kwargs))
 
 
-@app.get(f"{SNAP}/history/timeline", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/timeline", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_timeline(repo_id: str, sha: str, st: StoreDep, path: str | None = None, component: str | None = None,
                      offset: Annotated[int, Query(ge=0)] = 0, limit: Annotated[int, Query(ge=1, le=500)] = 100) -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("History timeline", HIST, "HISTORY")
+    """Commit nodes, newest committer time first. A path or component filter switches to the file-change records for that scope."""
+    snap = _snapshot(st, repo_id, sha)
+    if path or component:
+        return _history(st, snap["id"], kinds=set(TIMELINE_KINDS), claim_kind="relationship", path=path, component=component,
+                        offset=offset, limit=limit, by_time=True)
+    return _history(st, snap["id"], kinds={"commit"}, claim_kind="node", offset=offset, limit=limit, by_time=True)
 
 
-@app.get(f"{SNAP}/history/lifecycle", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/lifecycle", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_lifecycle(repo_id: str, sha: str, st: StoreDep, path: str) -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("File lifecycle", HIST, "HISTORY")
+    snap = _snapshot(st, repo_id, sha)
+    return _history(st, snap["id"], kinds=set(LIFECYCLE_KINDS), path=path, by_time=True, limit=500)
 
 
-@app.get(f"{SNAP}/history/hotspots", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/hotspots", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_hotspots(repo_id: str, sha: str, st: StoreDep, level: Annotated[str, Query(pattern="^(file|component)$")] = "file") -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Hotspots", HIST, "HISTORY")
+    """History-pattern metrics. A hotspot score is not a quality judgment and not a code dependency."""
+    snap = _snapshot(st, repo_id, sha)
+    kind = "component_history_metrics" if level == "component" else "file_history_metrics"
+    return _history(st, snap["id"], kinds={kind}, claim_kind="node", limit=500)
 
 
-@app.get(f"{SNAP}/history/cochange", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/cochange", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_cochange(repo_id: str, sha: str, st: StoreDep, target: str | None = None,
                      level: Annotated[str, Query(pattern="^(file|component)$")] = "file") -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Co-change", HIST, "HISTORY")
+    """Changed-together records. Coupling is not causation and not a static dependency."""
+    snap = _snapshot(st, repo_id, sha)
+    return _history(st, snap["id"], kinds={"co_changed_with"}, claim_kind="relationship", granularity=level, target=target, limit=500)
 
 
-@app.get(f"{SNAP}/history/milestones", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/milestones", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_milestones(repo_id: str, sha: str, st: StoreDep) -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Milestones", HIST, "HISTORY")
+    snap = _snapshot(st, repo_id, sha)
+    return _history(st, snap["id"], kinds={"milestone"}, claim_kind="node", by_time=True, limit=50)
 
 
-@app.get(f"{SNAP}/history/rationale", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{SNAP}/history/rationale", response_model=ClaimPage, responses=ERR, tags=["history"])
 def history_rationale(repo_id: str, sha: str, st: StoreDep, target: str | None = None) -> ClaimPage:
-    _snapshot(st, repo_id, sha)
-    not_implemented("Documented rationale", HIST, "HISTORY")
+    """Quoted PR or commit text. A quote is evidence the text exists, not proof of intent."""
+    snap = _snapshot(st, repo_id, sha)
+    return _history(st, snap["id"], kinds={"documents_rationale"}, target=target, limit=200)
 
 
-@app.get(f"{API}/repos/{{repo_id}}/compare", response_model=ClaimPage, responses=NI, tags=["history"])
+@app.get(f"{API}/repos/{{repo_id}}/compare", response_model=ClaimPage, responses=ERR, tags=["history"])
 def compare(repo_id: str, base: str, head: str, st: StoreDep) -> ClaimPage:
-    _repo(st, repo_id)
-    not_implemented("Snapshot compare", HIST, "HISTORY")
+    """Static claims present on only one of two indexed snapshots. Rename-aware snapshot_added records are returned when history stored them; otherwise the underlying claims are returned with their own kinds."""
+    b = _snapshot(st, repo_id, base)
+    h = _snapshot(st, repo_id, head)
+    stored = history_page(st, h["id"], kinds={"snapshot_added", "snapshot_removed"}, limit=200)
+    if stored["total"] == 0 and b["id"] != h["id"]:
+        stored = history_page(st, b["id"], kinds={"snapshot_added", "snapshot_removed"}, limit=200)
+    if stored["total"]:
+        return ClaimPage.model_validate(stored)
+    return ClaimPage.model_validate(compare_view(st, base_id=b["id"], head_id=h["id"]))
 
 
 # ------------------------------------------------------------------------------------------------ explain and chat (Traces UI seat, D-023)

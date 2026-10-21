@@ -1984,6 +1984,7 @@
   },
   "/api/v1/repos/{repo_id}/compare": {
    "get": {
+    "description": "Static claims present on only one of two indexed snapshots. Rename-aware snapshot_added records are returned when history stored them; otherwise the underlying claims are returned with their own kinds.",
     "operationId": "compare_api_v1_repos__repo_id__compare_get",
     "parameters": [
      {
@@ -2044,16 +2045,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Compare",
@@ -2697,6 +2688,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/components": {
    "get": {
+    "description": "Deterministic components stored at index time (rule id on each row) with claim counts by status.",
     "operationId": "components_api_v1_repos__repo_id__snapshots__sha__components_get",
     "parameters": [
      {
@@ -2752,16 +2744,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Components",
@@ -2898,7 +2880,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/graph": {
    "get": {
-    "description": "Graph query: filters (layer, rel, status, q) and neighborhood (focus + depth). Rejected excluded unless include_rejected.",
+    "description": "Static relationships only. History patterns (co-change, hotspots) are not drawn here. Rejected edges are excluded unless include_rejected.",
     "operationId": "graph_api_v1_repos__repo_id__snapshots__sha__graph_get",
     "parameters": [
      {
@@ -3080,16 +3062,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Graph",
@@ -3100,6 +3072,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/cochange": {
    "get": {
+    "description": "Changed-together records. Coupling is not causation and not a static dependency.",
     "operationId": "history_cochange_api_v1_repos__repo_id__snapshots__sha__history_cochange_get",
     "parameters": [
      {
@@ -3178,16 +3151,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Cochange",
@@ -3198,6 +3161,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/hotspots": {
    "get": {
+    "description": "History-pattern metrics. A hotspot score is not a quality judgment and not a code dependency.",
     "operationId": "history_hotspots_api_v1_repos__repo_id__snapshots__sha__history_hotspots_get",
     "parameters": [
      {
@@ -3260,16 +3224,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Hotspots",
@@ -3340,16 +3294,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Lifecycle",
@@ -3411,16 +3355,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Milestones",
@@ -3431,6 +3365,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/rationale": {
    "get": {
+    "description": "Quoted PR or commit text. A quote is evidence the text exists, not proof of intent.",
     "operationId": "history_rationale_api_v1_repos__repo_id__snapshots__sha__history_rationale_get",
     "parameters": [
      {
@@ -3498,16 +3433,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Rationale",
@@ -3518,6 +3443,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/timeline": {
    "get": {
+    "description": "Commit nodes, newest committer time first. A path or component filter switches to the file-change records for that scope.",
     "operationId": "history_timeline_api_v1_repos__repo_id__snapshots__sha__history_timeline_get",
     "parameters": [
      {
@@ -3624,16 +3550,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Timeline",
@@ -3644,6 +3560,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/overview": {
    "get": {
+    "description": "Grounded facts, documented interpretations and explicit unknowns. Nothing here is a business claim without a source.",
     "operationId": "overview_api_v1_repos__repo_id__snapshots__sha__overview_get",
     "parameters": [
      {
@@ -3695,16 +3612,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Overview",
@@ -3715,6 +3622,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/routes": {
    "get": {
+    "description": "Route and operation records already stored. A method that was not on the record is UNKNOWN, not guessed from a scan.",
     "operationId": "routes_api_v1_repos__repo_id__snapshots__sha__routes_get",
     "parameters": [
      {
@@ -3770,16 +3678,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Routes",
@@ -3790,7 +3688,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/source": {
    "get": {
-    "description": "Pinned source view at the snapshot SHA (read from Git objects, never from a working tree).",
+    "description": "Pinned source at the snapshot SHA, read from the local checkout's Git objects. Paths cannot escape the tree.",
     "operationId": "source_api_v1_repos__repo_id__snapshots__sha__source_get",
     "parameters": [
      {
@@ -3879,16 +3777,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Source",
@@ -3899,7 +3787,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/trace": {
    "get": {
-    "description": "Cross-layer trace as ordered hops: edge, gap and library_contract (gap and library_contract are inferred with a reason).",
+    "description": "Ordered static hops. A missing link is a gap (inferred, with a reason). library_contract hops are not verified calls.",
     "operationId": "trace_api_v1_repos__repo_id__snapshots__sha__trace_get",
     "parameters": [
      {
@@ -3986,16 +3874,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Trace",

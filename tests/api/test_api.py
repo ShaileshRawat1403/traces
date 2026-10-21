@@ -68,7 +68,8 @@ def test_health_and_meta(client):
     h = client.get("/api/v1/health").json()
     assert h["status"] == "ok" and h["store_migration"] >= 1
     m = client.get("/api/v1/meta").json()
-    assert m["evidence_schema"] == "traces-evidence/0.4" and m["capabilities"]["graph"] is False and m["capabilities"]["head"] is True
+    assert m["evidence_schema"] == "traces-evidence/0.4" and m["capabilities"]["graph"] is True and m["capabilities"]["head"] is True
+    assert m["capabilities"]["history"] is True and m["capabilities"]["explain"] is True
 
 
 @pytest.mark.parametrize("url", ["http://github.com/a/b", "https://gitlab.com/a/b", "https://github.com/a", "https://github.com/a/b/../c",
@@ -156,23 +157,6 @@ def test_claim_by_id_and_export(client):
     e = client.get(f"{BASE}/export")
     assert e.headers["content-type"].startswith("application/x-ndjson")
     assert [json.loads(x)["claim_id"] for x in e.text.splitlines()] == sorted(["c_" + d * 64 for d in "567"])
-
-
-NOT_IMPLEMENTED = [
-    ("get", f"{BASE}/overview", None), ("get", f"{BASE}/components", None), ("get", f"{BASE}/routes", None),
-    ("get", f"{BASE}/graph", None), ("get", f"{BASE}/source?path=README.md", None), ("get", f"{BASE}/trace?from=x", None),
-    ("get", f"{BASE}/history/timeline", None), ("get", f"{BASE}/history/lifecycle?path=a", None), ("get", f"{BASE}/history/hotspots", None),
-    ("get", f"{BASE}/history/cochange", None), ("get", f"{BASE}/history/milestones", None), ("get", f"{BASE}/history/rationale", None),
-    ("get", f"/api/v1/repos/{RID}/compare?base={SHA}&head={SHA}", None),
-]
-
-
-@pytest.mark.parametrize("method,path,body", NOT_IMPLEMENTED)
-def test_stubs_return_explicit_501(client, method, path, body):
-    r = client.request(method.upper(), path, json=body)
-    assert r.status_code == 501
-    e = r.json()["error"]
-    assert e["code"] == "not_implemented" and e["owner"] and e["milestone"]
 
 
 def test_explain_no_llm_is_wired(client):

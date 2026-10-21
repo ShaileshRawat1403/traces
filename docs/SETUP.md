@@ -46,3 +46,19 @@ cd web && npm run check:api                      # generated TS types match docs
 | `TRACES_API_PORT`, `TRACES_WEB_PORT` | 8000, 5173 | start script ports |
 
 If `unshare -rn true` fails on Ubuntu 24.04+, allow unprivileged user namespaces: `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`.
+
+## Host notes for a real index
+
+These are required for the sandboxed index and for history. A missing one fails closed. It is not a reason to set `TRACES_ISOLATION=none` unless user namespaces themselves are unavailable.
+
+| Need | Why |
+| --- | --- |
+| Git >= 2.47 on `PATH` | The history runner refuses older git (`E_GIT_VERSION`). Debian 12's package is 2.39. |
+| `ip` (iproute2) | Isolation probe (a) reads `ip -o link`. |
+| `curl` | Isolation probe (b) and (c). |
+| `/dev/fd` -> `/proc/self/fd` | Bash process substitution in the probe. Normal Linux has this. A container that omits it can be fixed with `ln -s /proc/self/fd /dev/fd`. |
+| `net.core.fb_tunnels_only_for_init_net=1` (or `2`) | Probe (a) requires the new netns to contain only `lo`, state DOWN. Some kernels also create an address-less `sit0` fallback in every netns. `sysctl -w net.core.fb_tunnels_only_for_init_net=1` keeps that device in the initial namespace only. Ubuntu's default is already 1. |
+
+The repo-root [package.json](../package.json) sets `"type": "commonjs"` so the validator and probe scripts stay CommonJS when the checkout sits under a parent package that is ESM. `web/package.json` still says `"type": "module"`.
+
+

@@ -28,6 +28,23 @@ function build(root, sha, proj = 'frontend') {
   }
   const host = ts.createCompilerHost(parsed.options, true);
   host.writeFile = () => { throw new Error('write attempted'); };
+  // Module resolution must not climb into a parent node_modules. A checkout that sits under
+  // another project would otherwise treat those packages as installed and change check text.
+  // The TypeScript lib (TS_MODULE) stays readable. Packages inside the checkout still resolve.
+  const realRoot = path.resolve(root);
+  const tsPkg = path.resolve(process.env.TS_MODULE);
+  const blocked = (p) => {
+    const r = path.resolve(p);
+    if (r === tsPkg || r.startsWith(tsPkg + path.sep)) return false;
+    if (r === realRoot || r.startsWith(realRoot + path.sep)) return false;
+    return r.split(path.sep).includes('node_modules');
+  };
+  const origFile = host.fileExists.bind(host);
+  const origRead = host.readFile.bind(host);
+  const origDir = host.directoryExists.bind(host);
+  host.fileExists = (p) => !blocked(p) && origFile(p);
+  host.readFile = (p) => (blocked(p) ? undefined : origRead(p));
+  host.directoryExists = (p) => !blocked(p) && origDir(p);
   const program = ts.createProgram({rootNames: parsed.fileNames, options: parsed.options, host, projectReferences: parsed.projectReferences});
   const blobs = blobMap(root, sha);
   const repoFiles = []; let mismatches = [];
