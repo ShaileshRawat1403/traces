@@ -96,3 +96,34 @@ export const traceSample: Schemas["TraceResponse"] = {
     hop({ index: 4, type: "edge", from_symbol: sym("api/crud.py", "save"), to_symbol: sym("api/models.py", "Task"), kind: "writes", status: "missing_location", label: "inferred" }),
   ],
 };
+
+/** ExplainResponse with every sentence standing, in order, plus a prepare_bundle variant with a manifest. */
+export const explainSample: Schemas["ExplainResponse"] = {
+  snapshot_id: SNAPSHOT_ID,
+  answer: [
+    { kind: "unknown", text: "Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown.", claim_ids: [] },
+    { kind: "interpretation", text: "A recorded path of 3 steps links TaskForm to create_task.", claim_ids: [cid(40), cid(41), cid(42)] },
+    { kind: "fact", text: "The evidence records that TaskForm calls createTask, at web/src/TaskForm.tsx:12 (verified).", claim_ids: [cid(40)] },
+    { kind: "interpretation", text: "Not established: createTask hands off, through a library, to create_task. This is inferred.", claim_ids: [cid(41)] },
+    { kind: "fact", text: "A route POST /tasks is declared at api/tasks.py:18 (observed).", claim_ids: Array.from({ length: 15 }, (_, i) => cid(50 + i)) },
+  ],
+  citations: [
+    { claim_id: cid(40), status: "verified", label: "verified", file: "web/src/TaskForm.tsx", start_line: 12, end_line: 12, commit: SHA },
+    { claim_id: cid(41), status: "unvalidated", label: "inferred", file: "web/src/client.ts", start_line: 30, end_line: 34, commit: SHA },
+    { claim_id: cid(42), status: "missing_location", label: "inferred", file: null, start_line: null, end_line: null, commit: SHA },
+  ],
+  categories: { code_structure: [cid(40)], inference: [cid(41), cid(42)], documented_decisions: [], history_patterns: [], runtime_observations: [] },
+  prompt_bundle: null,
+  outbound_manifest: [],
+  requires_consent: true,
+};
+
+export const explainBundleSample: Schemas["ExplainResponse"] = {
+  ...explainSample,
+  prompt_bundle: { instructions: "Use only the evidence below.", prompt: "Use only the evidence below.\n<evidence>\n[c_1] (verified) TaskForm calls createTask\n</evidence>\n<question>How is a task saved?</question>" },
+  outbound_manifest: [
+    { kind: "instructions", claim_id: null, file: null, start_line: null, end_line: null, chars: 28, sha256: "a".repeat(64) },
+    { kind: "claim_statement", claim_id: cid(40), file: "web/src/TaskForm.tsx", start_line: 12, end_line: 12, chars: 27, sha256: "b".repeat(64) },
+    { kind: "question", claim_id: null, file: null, start_line: null, end_line: null, chars: 19, sha256: "c".repeat(64) },
+  ],
+};

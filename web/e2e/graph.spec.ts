@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { componentsSample, graphComponentsSample, graphSymbolsSample, sourceSample } from "../src/testing/samples";
-import { base, capabilities, expectAccessible, firstSnapshot } from "./helpers";
+import { base, capabilities, expectAccessible, firstSnapshot, shotsDir } from "./helpers";
 
-const SHOTS = "/workspace/traces-ui-shots/graph";
+const SHOTS = shotsDir("graph");
 
 // Live: the real API. Contract-shape: only the not-yet-implemented graph, components and source endpoints are answered
 // by the test with generic schema-typed samples; claims come from the real API (a real verified claim id is put on the
