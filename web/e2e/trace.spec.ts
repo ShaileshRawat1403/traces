@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { traceSample } from "../src/testing/samples";
-import { base, capabilities, expectAccessible, firstSnapshot } from "./helpers";
+import { base, capabilities, expectAccessible, firstSnapshot, shotsDir } from "./helpers";
 
-const SHOTS = "/workspace/traces-ui-shots/trace";
+const SHOTS = shotsDir("trace");
 
 // Live: the real API. Contract-shape: only the not-yet-implemented trace endpoint is answered with a generic
 // schema-typed TraceResponse; a real claim id from the store is put on the library contract hop so the drawer is real.
