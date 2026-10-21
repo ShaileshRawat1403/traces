@@ -159,7 +159,6 @@ def test_claim_by_id_and_export(client):
 
 
 NOT_IMPLEMENTED = [
-    ("post", f"/api/v1/repos/{RID}/index-jobs", {}),
     ("get", f"{BASE}/overview", None), ("get", f"{BASE}/components", None), ("get", f"{BASE}/routes", None),
     ("get", f"{BASE}/graph", None), ("get", f"{BASE}/source?path=README.md", None), ("get", f"{BASE}/trace?from=x", None),
     ("get", f"{BASE}/history/timeline", None), ("get", f"{BASE}/history/lifecycle?path=a", None), ("get", f"{BASE}/history/hotspots", None),

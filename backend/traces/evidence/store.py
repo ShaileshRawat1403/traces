@@ -180,6 +180,59 @@ class Store:
                 n += 1
         return n
 
+    def delete_claims(self, snapshot_id: str, *, scopes: Iterable[str] | None = None) -> int:
+        """Remove a snapshot's claims (all, or only the given evidence scopes) before a reindex stores fresh ones."""
+        sc = list(scopes) if scopes is not None else None
+        where, args = ("snapshot_id=?", [snapshot_id]) if sc is None else \
+            (f"snapshot_id=? AND evidence_scope IN ({','.join('?' * len(sc))})", [snapshot_id, *sc])
+        with self.write_lock, self.db:
+            self.db.execute(f"DELETE FROM claim_locations WHERE (snapshot_id, claim_id) IN (SELECT snapshot_id, claim_id FROM claims WHERE {where})", args)
+            n = self.db.execute(f"DELETE FROM claims WHERE {where}", args).rowcount
+        return int(n)
+
+    def set_snapshot_state(self, snapshot_id: str, state: str) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET state=? WHERE id=?", (state, snapshot_id))
+
+    def finish_snapshot(self, snapshot_id: str, *, extractor: dict[str, Any], languages: dict[str, int], frameworks: list[str],
+                        generated_paths: list[str], stats: dict[str, Any]) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET state='ready', extractor_json=?, languages_json=?, frameworks_json=?, generated_paths_json=?, "
+                            "stats_json=?, indexed_at=? WHERE id=?",
+                            (json.dumps(extractor, sort_keys=True), json.dumps(languages, sort_keys=True), json.dumps(frameworks),
+                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), snapshot_id))
+
+    def update_snapshot_stats(self, snapshot_id: str, stats: dict[str, Any]) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET stats_json=? WHERE id=?", (json.dumps(stats, sort_keys=True), snapshot_id))
+
+    def put_components(self, snapshot_id: str, components: Iterable[Any]) -> int:
+        """Replace the snapshot's deterministic components (traces.evidence.types.ComponentDef)."""
+        n = 0
+        with self.write_lock, self.db:
+            self.db.execute("DELETE FROM components WHERE snapshot_id=?", (snapshot_id,))
+            for c in components:
+                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule) VALUES (?,?,?,?,?,?,?)",
+                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule))
+                n += 1
+        return n
+
+    def list_components(self, snapshot_id: str) -> list[dict[str, Any]]:
+        return [dict(r) for r in self.db.execute("SELECT * FROM components WHERE snapshot_id=? ORDER BY component_id", (snapshot_id,))]
+
+    def add_run(self, run_id: str, snapshot_id: str, kind: str, run_dir: str, result: dict[str, Any], started_at: str) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("INSERT OR REPLACE INTO runs (id, snapshot_id, kind, run_dir, result_json, started_at, finished_at) VALUES (?,?,?,?,?,?,?)",
+                            (run_id, snapshot_id, kind, run_dir, json.dumps(result, sort_keys=True, default=str), started_at, now()))
+
+    def active_job(self, snapshot_id: str) -> dict[str, Any] | None:
+        r = self.db.execute("SELECT id FROM jobs WHERE snapshot_id=? AND state IN ('queued','running') ORDER BY created_at DESC LIMIT 1",
+                            (snapshot_id,)).fetchone()
+        return dict(r) if r else None
+
+    def unfinished_jobs(self) -> list[str]:
+        return [r[0] for r in self.db.execute("SELECT id FROM jobs WHERE state IN ('queued','running') ORDER BY created_at")]
+
     def get_claim(self, snapshot_id: str, claim_id: str) -> dict[str, Any] | None:
         r = self.db.execute("SELECT record_json FROM claims WHERE snapshot_id=? AND claim_id=?", (snapshot_id, claim_id)).fetchone()
         return json.loads(r[0]) if r else None

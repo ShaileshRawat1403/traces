@@ -7,12 +7,17 @@ const fs = require('fs'), path = require('path');
 const P = require('./ts_program.js');
 const [tasksPath, outPath] = process.argv.slice(2);
 const job = JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
-// one Program per repo tsconfig.json project (frontend/, packages/react-email/); each task uses the project that owns its file
-const CTXS = {frontend: P.build(job.root, job.sha, 'frontend'), 'packages/react-email': P.build(job.root, job.sha, 'packages/react-email')};
+// one Program per repo tsconfig.json project; each task uses the project that owns its file (longest prefix).
+// Task 002 default: frontend/ and packages/react-email/. The INDEX worker passes job.projects for other repos
+// ("" is the repo root; a project without tsconfig.json gets default compiler options over its .ts/.tsx files).
+const PROJECTS = Array.isArray(job.projects) ? job.projects : ['frontend', 'packages/react-email'];
+const CTXS = {}; for (const pr of PROJECTS) CTXS[pr] = P.build(job.root, job.sha, pr);
 for (const c of Object.values(CTXS)) if (c.blobMismatches.length) throw new Error('blob mismatch ' + JSON.stringify(c.blobMismatches));
-const ts = CTXS.frontend.ts;
-let ctx = CTXS.frontend, checker = ctx.checker;
-function useCtxFor(file) { ctx = file && file.startsWith('packages/react-email/') ? CTXS['packages/react-email'] : CTXS.frontend; checker = ctx.checker; }
+const DEFAULT_PROJ = PROJECTS[0];
+const ts = CTXS[DEFAULT_PROJ].ts;
+let ctx = CTXS[DEFAULT_PROJ], checker = ctx.checker;
+function projOf(file) { let best = DEFAULT_PROJ, n = -1; for (const pr of PROJECTS) { if ((pr === '' || (file || '').startsWith(pr + '/')) && pr.length > n) { best = pr; n = pr.length; } } return best; }
+function useCtxFor(file) { ctx = CTXS[projOf(file)]; checker = ctx.checker; }
 const VALIDATOR = {name: 'traces-ts-validator 1.0.0', version: 'typescript ' + ts.version, family: 'typescript-compiler'};
 const blobs = (() => { const m = new Map(); const out = require('child_process').execFileSync('git', ['-C', job.root, 'ls-tree', '-r', job.sha], {encoding: 'utf8', env: {...process.env, GIT_OPTIONAL_LOCKS: '0'}, maxBuffer: 1 << 26});
   for (const l of out.split('\n')) { const t = l.split('\t'); if (t.length === 2) m.set(t[1], t[0].split(' ')[2]); } return m; })();
@@ -469,7 +474,7 @@ function r3facts() {
 const results = {};
 for (const t of job.tasks) {
   try {
-    useCtxFor(t.file || (t.src ? (t.rel_kind === 'contains' ? t.tgt.file : t.src.file) : 'frontend/'));
+    useCtxFor(t.file || (t.src ? (t.rel_kind === 'contains' ? t.tgt.file : t.src.file) : DEFAULT_PROJ + '/'));
     let r;
     if (t.type === 'node') r = nodePresence(t);
     else if (t.type === 'unresolved') r = unresolvedPresence(t);

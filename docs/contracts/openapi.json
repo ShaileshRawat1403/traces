@@ -2147,6 +2147,7 @@
   },
   "/api/v1/repos/{repo_id}/index-jobs": {
    "post": {
+    "description": "Start an index job for `sha` (default: the latest discovered HEAD, discovered now if unknown). Returns the job\n(202); an index already queued or running for the same snapshot is returned instead of a duplicate. Poll\nGET /jobs/{id} with If-None-Match. Phases: fetching, checking_out, indexing, adapting, validating, storing, history.",
     "operationId": "create_index_job_api_v1_repos__repo_id__index_jobs_post",
     "parameters": [
      {
@@ -2190,6 +2191,16 @@
       },
       "description": "Not Found"
      },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "already_indexed (the snapshot is ready; send reindex=true)"
+     },
      "422": {
       "content": {
        "application/json": {
@@ -2200,7 +2211,7 @@
       },
       "description": "Unprocessable Content"
      },
-     "501": {
+     "429": {
       "content": {
        "application/json": {
         "schema": {
@@ -2208,7 +2219,27 @@
         }
        }
       },
-      "description": "Not implemented in this build (error.code = not_implemented)"
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Create Index Job",

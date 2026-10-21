@@ -16,9 +16,16 @@ function gitBlobSha(buf) { return crypto.createHash('sha1').update(`blob ${buf.l
 function build(root, sha, proj = 'frontend') {
   const fe = path.join(root, proj);
   const cfgPath = path.join(fe, 'tsconfig.json');
-  const cfg = ts.readConfigFile(cfgPath, ts.sys.readFile);
-  if (cfg.error) throw new Error('tsconfig: ' + ts.flattenDiagnosticMessageText(cfg.error.messageText, ' '));
-  const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, fe, {noEmit: true}, cfgPath);
+  let parsed;
+  if (proj === '' && !fs.existsSync(cfgPath)) {
+    // no tsconfig.json (INDEX worker, generic repos): default options over the project's tracked .ts/.tsx files
+    const names = [...blobMap(root, sha).keys()].filter(f => /\.(ts|tsx|mts|cts)$/.test(f) && !f.includes('node_modules/') && (proj === '' || f.startsWith(proj + '/'))).map(f => path.join(root, f));
+    parsed = {fileNames: names, options: {noEmit: true, allowJs: false, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, skipLibCheck: true}, errors: [], projectReferences: undefined};
+  } else {
+    const cfg = ts.readConfigFile(cfgPath, ts.sys.readFile);
+    if (cfg.error) throw new Error('tsconfig: ' + ts.flattenDiagnosticMessageText(cfg.error.messageText, ' '));
+    parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, fe, {noEmit: true}, cfgPath);
+  }
   const host = ts.createCompilerHost(parsed.options, true);
   host.writeFile = () => { throw new Error('write attempted'); };
   const program = ts.createProgram({rootNames: parsed.fileNames, options: parsed.options, host, projectReferences: parsed.projectReferences});
