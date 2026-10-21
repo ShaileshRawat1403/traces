@@ -1,6 +1,6 @@
 # History module contract (Traces v1)
 
-Status: DRAFT v1 for Architect1 review, 2026-10-21 (IST). Branch `ws/history-contract`, PR into `build/traces-v1`. Architect1 reviews and merges.
+Status: DRAFT v2, 2026-10-21 (IST). v2 folds in Architect1's answers to the v1 open items (section 20). Branch `ws/history-contract`, PR into `build/traces-v1`. Architect1 reviews and merges.
 Owner of this contract: Git intelligence seat (history). Owner of shared types: Traces seat (Evidence), `backend/traces/evidence`.
 Charter: issue #2, sections 1.4, 1.5, 4D, 4E, 5 and 7. Background: `research/foundation/FOUNDATION_REVIEW.md` section 5, `research/foundation/LAB_C_RESULTS.md`. Pattern followed: `research/task002/spec/ADAPTER_CONTRACT.md` (pins, fail closed, contract tests, isolation).
 
@@ -26,7 +26,7 @@ Non-goals:
 - No component identity. The Evidence seat owns the component map at a SHA; this module consumes it and carries it through time.
 - No writes to the analyzed repository, its refs, config, index or working tree. No hooks, no checkout, no fetch.
 - No claims of intent or causation. A change or co-change pattern is not proof of intent or causation (charter 4D).
-- No `verified` status on any history record (section 6.3).
+- No `verified` status on any history record (section 6.1).
 - No Code Maat code, translated code or line-by-line ports. Formulas only, from published descriptions. No GitNexus code or artifacts.
 - No reuse of Lab C scripts as code. This is a clean rewrite with tests; Lab C's techniques and measured results are reused as requirements and regression baselines.
 - Issue and Discussion threads are deferred past v1.
@@ -54,10 +54,10 @@ Non-goals:
 | `backend/traces/history/cache.py` | per-repo, per-commit parse cache |
 | `backend/traces/history/errors.py` | `HistoryError` and codes (section 13) |
 | `backend/traces/history/__main__.py` | worker entry point: `python -m traces.history <manifest.json>` |
-| `backend/tests/history/` | pytest suite (section 18), synthetic repo builders, regression baselines |
+| `tests/history/` | pytest suite (section 18), synthetic repo builders, regression baselines. Placed under the repo-level `tests/` to match `pyproject.toml` `testpaths` on `build/traces-v1` |
 | `docs/contracts/history.md` | this file |
 
-Python: 3.14 (CPython 3.14.8, the pin in `research/task002/spec/EVIDENCE_SCHEMA.md` section 6), managed with uv, stdlib only at runtime. Tests: pytest. Git: minimum 2.47 (the version Lab C measured); the run records `git --version`.
+Python: 3.14 (CPython 3.14.8, as pinned in `.python-version` and `pyproject.toml` on `build/traces-v1`), managed with uv, stdlib only at runtime. Tests: pytest. Git: minimum 2.47 (the version Lab C measured); the run records `git --version`.
 
 ## 3. Inputs
 
@@ -68,7 +68,7 @@ Python: 3.14 (CPython 3.14.8, the pin in `research/task002/spec/EVIDENCE_SCHEMA.
 | `repo_sha` | 40-hex string | yes | pinned commit. Abbreviations and ref names are refused (`E_SHA`). |
 | `config` | `HistoryConfig` | no | defaults in section 12. Every value is echoed in outputs. |
 | `component_map` | `ComponentMap` | no | from the Evidence seat, keyed by the SHA it was built at. Without it, component-level outputs are skipped and the report says so. |
-| `generated_paths` | set of paths at `repo_sha` | no | generated-file flags from the Evidence seat (for example CodeGraph `generated = 1`). Added to the generated filter. |
+| `generated_paths` | set of paths at `repo_sha` | no | supplied by the Evidence seat (D-H8): CodeGraph `generated = 1` files and output directories detected from generator config (for example the openapi-ts client dir). History consumes them and adds them to the generated filter; it does not detect generators itself. |
 | `evidence_sets` | mapping SHA to `EvidenceSet` | no | Evidence pipeline output at milestone SHAs, for snapshot diffs |
 | `pr_provider` | `PrContextProvider` | no | cached PR JSON. `None` means offline with no PR context. |
 | `cache_dir` | path | no | history parse cache (section 15) |
@@ -128,12 +128,13 @@ One Traces-owned schema. The Evidence seat owns the change in `backend/traces/ev
 | `provenance` pattern | `codegraph:*`, `external:*`, `fixture:*` | `git:(log|diff-tree|ls-tree|cat-file)`, `history:(replay|lifecycle|cochange|churn|hotspot|revert-match|manifest-diff|alias-suggest|milestone|snapshot-diff|impact)`, `github-cache:(pr-body|pr-review-comment|pr-metadata)` |
 | endpoint | `{symbol, file, ...}`, `file` required | optional `entity` enum `symbol`, `file`, `commit`, `component`, `dependency`, `repo`; `file` required only when `entity` is `symbol` or `file` or absent. Symbol forms below. |
 | check `method` | 9 methods | `git_object_check` (re-reads the cited objects with plumbing independent of the ingest parse; establishes `presence`), `git_recount` (recomputes a statistic from the cited commits; establishes `presence` of the counts, never `relationship`), `quote_match` (quote bytes equal a slice of the commit message or cached JSON with matching sha256; establishes `presence`) |
-| check `validator.family` | includes `git`, `text` | no change; `independent` rule extended: a `git` or `text` family check is independent when it does not read the history module's parsed output and uses a separate Git call path (`cat-file`, `diff-tree` per commit) from the ingest stream (`log`) |
-| new field `citations` | none | array of citation objects (section 7.1). Required, `minItems 1`, when `evidence_scope` is `history` or `documented`. For those records `locations` may be empty; file-level claims also carry whole-file `locations` at the cited blob. |
+| check `validator.family` | includes `git`, `text` | no change; `independent` rule extended (D-H2): a `git` family check using plumbing (`cat-file`, `ls-tree`, `diff-tree`, `rev-list` recount) that does not read the log parse counts as independent for git-object facts and recounts. A `text` family `quote_match` establishes only that the quote exists at the cited commit or PR, nothing about intent |
+| new field `citations` | none | array of citation objects (section 7.1). `locations` may be empty for history and documented records. Schema rule (D-H3): every record has at least one entry in `locations` or `citations`. History and documented records always carry citations; file-level claims also carry whole-file `locations` at the cited blob. |
+| new field `review_state` | none | `{state: none|confirmed|disputed, reviewer, at}` (D-H4). Separate from `status`; never promotes or demotes status. Default `{state: none, reviewer: null, at: null}`. |
 | new field `parameters` | none | `{digest, values}`: the exact config subset that affected the record (thresholds, filters, rename settings) and its sha256 |
 | new field `metrics` | none | numeric results for `history_pattern` records (section 6) |
 | `flags` | 6 values | `bot_commit`, `generated_path`, `merge_commit`, `similarity_rename`, `rename_detection_limited`, `non_utf8_path`, `complexity_proxy`, `component_map_missing`, `pr_sha_mismatch` |
-| status rules | `observed` relationships only for `imports` with qualifier | `observed` also allowed for the relationship kinds marked observed in section 6, each with its required `qualifier`; `verified` forbidden for every 0.4 history class |
+| status rules | `observed` relationships only for `imports` with qualifier | `observed` also allowed for the relationship kinds marked observed in section 6, each with its required `qualifier`; `verified` forbidden for every 0.4 history class; `locations` `minItems 1` rule replaced by "at least one of `locations` or `citations`" |
 
 Endpoint symbol forms for non-code entities (they already match `^[^:]+::.+$`; the `entity` field removes any ambiguity with code symbols):
 
@@ -160,28 +161,30 @@ Max status is the highest status the record may reach. `observed` requires the i
 | `copied_to` | relationship | file | `git_object_fact` | history | observed | `copy detected, score <n>%` | `git_object_check` |
 | `dependency_added`, `dependency_removed`, `dependency_version_changed` | relationship | dependency | `git_object_fact` | history | observed | `manifest entry change` | `git_object_check` (both manifest blobs re-read and re-parsed with `json` or `tomllib`) |
 | `component_added`, `component_removed`, `continues_as` | relationship | component | `history_inferred` | history | unvalidated | none | none; depends on the component map and on rename chaining |
-| `alias_of` | relationship | file or component | `history_inferred` | history | unvalidated | none | reviewer confirmation is a `human_review` check and sets flag-free `status_reason` `alias confirmed by <reviewer>`; it never establishes anything |
+| `alias_of` | relationship | file or component | `history_inferred` | history | unvalidated | none | none; reviewer confirmation sets `review_state` (D-H4) and leaves status unchanged |
 | `prefix_moved` (bulk move) | relationship | path | `history_pattern` | history | observed | `grouped renames, <k> files` | `git_recount` |
-| `co_changed_with` | relationship | file or component | `history_pattern` | history | observed | `changed together in <N> of <M> commits` | `git_recount` |
-| `file_history_metrics`, `component_history_metrics` (node: revisions, churn, authors, age, hotspot score) | node | file or component | `history_pattern` | history | observed | `history pattern` (hotspot adds `complexity is an indentation proxy`) | `git_recount` |
+| `co_changed_with` | relationship | file or component | `history_pattern` | history | observed (the counts only) | `changed together in <N> of <M> commits` | `git_recount` (D-H1) |
+| `file_history_metrics`, `component_history_metrics` (node: revisions, churn, authors, age, hotspot score) | node | file or component | `history_pattern` | history | observed (the metric values only) | `history pattern` (hotspot adds `complexity is an indentation proxy`) | `git_recount` (D-H1) |
 | `deleted_soon_after_add` | relationship | file | `history_pattern` | history | observed | `deleted <d> days after add` | `git_recount` |
 | `reverts` | relationship | commit | `history_inferred` | history | unvalidated | none | none; message text is quoted, the claim that one commit undoes another is not established in v1 |
 | `merged_as` (PR to commit) | relationship | commit | `documented_rationale` | documented | observed | `cached PR metadata` | `quote_match` on cached JSON, and cached `merge_commit_sha` equals the local commit; mismatch keeps `unvalidated` with flag `pr_sha_mismatch` |
-| `documents_rationale` (commit message or PR text to commit) | relationship | commit | `documented_rationale` | documented | observed | `quoted rationale, not proof of intent` | `quote_match` |
+| `documents_rationale` (commit message or PR text to commit) | relationship | commit | `documented_rationale` | documented | observed (the quote exists, nothing more) | `quoted rationale, not proof of intent` | `quote_match` (D-H2) |
 | `milestone` (node) | node | commit | `history_pattern` | history | observed | `selected milestone: <reasons>` | `git_object_check` on the commit |
 | `snapshot_added`, `snapshot_removed` | relationship | as the underlying claim | `snapshot_diff` | history | the lower of the underlying claim's statuses at the two SHAs, capped at observed | `present at <sha_b>, absent at <sha_a>` or the reverse | set difference recomputed from the two evidence sets by `claim identity` (section 9.8) |
-| `history_impact_candidate` | relationship | file or component | `history_pattern` | history | observed | `history signal: changed together in <N> of <M> commits` | inherits the `co_changed_with` check it derives from |
+| `history_impact_candidate` | relationship | file or component | `history_pattern` | history | unvalidated | `history signal: changed together in <N> of <M> commits` | none; "may be affected" is an interpretation of coupling (D-H1). It cites the observed `co_changed_with` record it derives from |
 
 Rules that apply to all kinds:
 
 - No history record is ever `verified`. Co-change, coupling, hotspots and churn are `history_pattern` and never `verified`.
+- `observed` on a `history_pattern` record means the counts were reproduced by an independent recount. It says nothing about why files changed together. Any coupling, "related" or "may be affected" interpretation is a separate record or sentence and stays `unvalidated` (D-H1).
+- `review_state` records reviewer confirmation or dispute. It never changes `status` (D-H4).
 - `documented_rationale` records quote; they never state a motive in Traces' own words. `statement` reads "Commit <sha> message says: \"<quote>\"", never "The team chose X because Y".
 - `injected` is always `false` in production output. Negative controls live only in test inputs, as in Task 002.
 - Bot-authored commits are kept as `git_object_fact` records with flag `bot_commit`; filters only remove them from pattern computations (section 12).
 
 ### 6.2 Common fields
 
-Every record carries the 0.3 required fields plus, for history: `citations`, `parameters`, and `metrics` on `history_pattern` records. `originator` is `{"name": "traces-history", "version": "<package version>", "role": "history_analyzer"}`. `repo_sha` is the pinned analysis SHA. `status_history` starts at `null -> unvalidated` and appends the check outcome.
+Every record carries the 0.3 required fields plus, for history: `citations`, `parameters`, `review_state`, and `metrics` on `history_pattern` records. `originator` is `{"name": "traces-history", "version": "<package version>", "role": "history_analyzer"}`. `repo_sha` is the pinned analysis SHA. `status_history` starts at `null -> unvalidated` and appends the check outcome.
 
 ### 6.3 Examples
 
@@ -279,7 +282,8 @@ In the example, `M` (union) and the two revision counts are placeholders; the re
   "to": {"entity": "file", "symbol": "file::backend/app/crud.py", "file": "backend/app/crud.py"},
   "statement": "Suggested alias: content of backend/app/crud/crud_user.py appears to continue in backend/app/crud.py after commit 2d0f774 (#622). Git recorded a delete and an add, not a rename.",
   "metrics": {"line_set_jaccard": 0.0, "lines_moved": 0, "method": "normalized line-set overlap"},
-  "status": "unvalidated", "label": "inferred", "status_reason": "suggestion from content similarity; identity not established by Git"
+  "status": "unvalidated", "label": "inferred", "status_reason": "suggestion from content similarity; identity not established by Git",
+  "review_state": {"state": "none", "reviewer": null, "at": null}
 }
 ```
 
@@ -356,7 +360,7 @@ The paths and `metrics` above are placeholders until the HT13 run fixes them.
 ```
 
 - Same family as Task 002 claim_id v3 (canonical JSON, sha256, `c_` prefix). The inputs differ because history claims are anchored to a commit or range, not to a source line.
-- Git-object facts anchor to their own commit, not to `repo_sha`. The same fact keeps its id when the pinned SHA moves forward, which lets the cache reuse records. Pattern records anchor to the range they were computed over, so a new pinned SHA gives new ids and the old records stay with `supersedes` links.
+- Git-object facts anchor to their own commit, not to `repo_sha` (D-H6). The same fact keeps its id when the pinned SHA moves forward, which lets the cache reuse records. This differs from Task 002 claim_id v3, which hashes `repo_sha`; see section 20. Pattern records anchor to the range they were computed over, so a new pinned SHA gives new ids and the old records stay with `supersedes` links.
 - Symmetric kinds (`co_changed_with`) order `from` and `to` by the byte order of their symbols before hashing.
 - Paths are normalized before hashing: repo-relative, `/` separated, no leading `./`, decoded from `-z` output as UTF-8. Non-UTF-8 bytes are percent-encoded and the record gets flag `non_utf8_path`.
 - `parameters_digest` covers every config value the kind reads: thresholds, filter criteria, rename and copy thresholds, rename limit, mailmap source, component map digest where used. Changing a threshold changes the id.
@@ -461,7 +465,11 @@ class Milestone:
     sha: Sha
     reasons: tuple[str, ...]           # e.g. "first commit", "bulk move 247 files", "dependency change: +sqlmodel"
 
-def select_milestones(log: HistoryLog, *, max_milestones: int = 20, components: ComponentMap | None = None) -> Sequence[Milestone]: ...
+MAX_MILESTONES_DEFAULT = 8      # index worker automatic run (D-H9)
+MAX_MILESTONES_ON_DEMAND = 20   # hard cap for on-demand compare (D-H9)
+
+def select_milestones(log: HistoryLog, *, max_milestones: int = MAX_MILESTONES_DEFAULT, components: ComponentMap | None = None) -> Sequence[Milestone]: ...
+    # max_milestones above MAX_MILESTONES_ON_DEMAND raises E_CONFIG
 def snapshot_compare(log: HistoryLog, base: Sha, head: Sha, *, components: ComponentMap | None = None) -> HistoryResult: ...
     # tree-level: files and components present at each, from ls-tree; no parsing
 def evidence_set_diff(base: EvidenceSet, head: EvidenceSet, *, aliases: Sequence[EvidenceRecord] = ()) -> HistoryResult: ...
@@ -517,7 +525,7 @@ def run(repo: RepoRef, config: HistoryConfig, *, components: ComponentMap | None
 
 ### 9.2 Lifecycle
 
-- Per-path events come from every non-merge commit that changed the path, so a change made on a side branch is cited at the commit that made it.
+- Per-path events come from every non-merge commit that changed the path, so a change made on a side branch is cited at the commit that made it. This is the confirmed meaning of "all commits" (D-H5).
 - File set replay along the first-parent chain, diffing each merge against its first parent, must equal `git ls-tree -r --name-only <repo_sha>`. A mismatch is `E_REPLAY` (fail closed).
 - Rename chains follow `R` entries newest to oldest to map historical paths to HEAD paths. Copies do not move identity; the source path keeps its own lifecycle.
 - Bulk moves: rename pairs in one commit grouped by common-suffix stripping into `old_prefix -> new_prefix`, at least `bulk_move_min_files` files.
@@ -554,7 +562,7 @@ def run(repo: RepoRef, config: HistoryConfig, *, components: ComponentMap | None
 
 - On the first-parent chain only.
 - Candidates: the first commit, `repo_sha`, bulk moves, commits with large directory births or deaths, dependency add or remove events, explicit reverts, and the last first-parent commit of each calendar year. Bot-authored commits are not candidates unless they change a manifest's dependency set.
-- Ranked by number of distinct reasons, then commit time. Capped at `max_milestones`. Deterministic for a given log and config.
+- Ranked by number of distinct reasons, then commit time. Capped at `max_milestones`: default 8 for the index worker's automatic run; an on-demand compare requested by a user may raise it, up to a hard cap of 20 (D-H9). Deterministic for a given log and config.
 - History hands the milestone list to the index worker. The worker runs the Evidence pipeline at each milestone SHA. History does not parse source at any SHA.
 
 ### 9.8 Evidence-set diff
@@ -592,17 +600,17 @@ Defaults (all configurable; the values used are echoed in `report.json` and in e
 | Setting | Default |
 |---|---|
 | Bot author filter (regex, case-insensitive, on `%aN` and `%aE`) | `\[bot\]`, `dependabot`, `renovate`, `github-actions`, `pre-commit-ci` |
-| Generated path filter (globs, any depth unless rooted) | lockfiles: `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `bun.lockb`, `uv.lock`, `poetry.lock`, `Pipfile.lock`, `Cargo.lock`, `go.sum`, `composer.lock`, `Gemfile.lock`; `*.gen.*`; generated client dirs `**/__generated__/**`, `**/generated/**`, plus paths flagged generated by the Evidence seat; minified `*.min.js`, `*.min.css`; `vendor/**`, `dist/**`, `build/**` |
+| Generated path filter (globs, any depth unless rooted) | lockfiles: `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `bun.lockb`, `uv.lock`, `poetry.lock`, `Pipfile.lock`, `Cargo.lock`, `go.sum`, `composer.lock`, `Gemfile.lock`; `*.gen.*`; generated client dirs `**/__generated__/**`, `**/generated/**`, plus `generated_paths` from the Evidence seat, including generator-config-detected output dirs (D-H8); minified `*.min.js`, `*.min.css`; `vendor/`, `dist/`, `build/` at any depth, matching whole directory segments only (D-H7): `web/dist/app.js` and `build/x.o` match, `distance/x.py`, `rebuild/x.py` and `build.py` do not |
 | Where filters apply | co-change, churn, hotspots, quick deletes, milestone candidates, revert detection (bots). Never to commit facts or lifecycle: those keep every commit and carry flags `bot_commit` and `generated_path` |
 | Co-change thresholds | `min_revs` 5, `min_shared_revs` 5, `min_coupling` 0.30, `max_changeset_size` 30 |
 | Rename and copy detection | `-M50%`, `-C50%`, rename limit 10,000 |
 | Quick delete window | 30 days |
 | Bulk move minimum | 3 files |
 | Alias suggestion minimum similarity | 0.5 normalized line-set overlap |
-| Timeline and milestones | first-parent |
+| Timeline and milestones | first-parent; milestone cap 8 for the index worker, 20 hard cap on demand |
 | Lifecycle events and churn | all non-merge commits; replay check along first-parent with merges diffed against the first parent |
 
-Every user-facing filtered view states what was filtered and how many commits or paths were removed, by rule.
+Every user-facing filtered view states what was filtered and how many commits or paths were removed, by rule. The criteria (patterns, globs, segment rule, source of `generated_paths`) are echoed verbatim in `report.json` and in each affected record's `parameters`.
 
 ## 13. Error codes and fail-closed behavior
 
@@ -657,12 +665,13 @@ Not errors (report warnings, run continues): no `.mailmap`; no component map (co
 - Every co-change, churn or hotspot sentence ends with, or sits under, the label "history pattern". Co-change is not evidence of a code dependency, and its absence is not evidence of independence (Lab C: backend API to generated client co-change was 0.14 because client regenerations often land in separate commits).
 - Rationale appears only as a quote with commit or PR link: "PR #694 description says: ...". Traces never restates a motive as fact.
 - Similarity renames show their score: "renamed (Git similarity 87%)".
-- Alias suggestions read "suggested, not confirmed" until a reviewer confirms, and "confirmed by <reviewer>" after.
+- Alias suggestions read "suggested, not confirmed" while `review_state` is `none`, "confirmed by <reviewer>" when `confirmed`, and "disputed by <reviewer>" when `disputed`. The label stays "inferred" in all three.
+- `observed` on a co-change or metric record is shown as "count checked against Git", never as "confirmed relationship".
 - Impact answers keep "Code dependencies" and "History signals" as separate sections, each with its known gaps.
 
 ## 18. Test plan
 
-pytest under `backend/tests/history/`. Synthetic repos are built by test fixtures with Git plumbing in a temp dir, under the same isolated environment as `gitcmd`. Regression tests on the real repo use `fastapi/full-stack-fastapi-template` at `b1125d8839482cb7bbae603ddc6d0081bf87532e`, cloned read-only by the test harness, never executed. Names: `test_ht<N>_<short_name>`.
+pytest under `tests/history/`. Synthetic repos are built by test fixtures with Git plumbing in a temp dir, under the same isolated environment as `gitcmd`. Regression tests on the real repo use `fastapi/full-stack-fastapi-template` at `b1125d8839482cb7bbae603ddc6d0081bf87532e`, cloned read-only by the test harness, never executed. Names: `test_ht<N>_<short_name>`.
 
 **HT1. Rename-aware churn baseline.** Given fsft at `b1125d8`, bot filter off, generated filter off (the Lab C setting). When `churn` runs. Then `backend/app/api/routes/users.py` has 43 revisions and 1,188 churn, and its revisions equal the count from `git log --follow` (43, re-checked 2026-10-21). Pass: exactly 43 and 1,188. The values with default filters are recorded and frozen as a second baseline on first run.
 
@@ -686,13 +695,13 @@ pytest under `backend/tests/history/`. Synthetic repos are built by test fixture
 
 **HT11. Mailmap.** Given a synthetic repo where one person commits under two emails, a `.mailmap` at the pinned SHA that joins them, and a later commit beyond the pinned SHA that changes the mailmap. Then authors are counted once; the later mailmap has no effect; with `mailmap: none` the two identities stay separate and the report says so. Pass: all hold.
 
-**HT12. Bot and generated filters.** Given a synthetic repo with commits by `dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`, `pre-commit-ci[bot]` and a human, and changes to `package-lock.json`, `src/client/sdk.gen.ts`, `dist/app.min.js` and source files. Then bot commits and generated paths are excluded from co-change, churn and hotspots, are present as commit facts with flags, and the report lists each rule with its removal counts. Pass: all hold, and turning a filter off changes the pattern outputs and their claim ids.
+**HT12. Bot and generated filters.** Given a synthetic repo with commits by `dependabot[bot]`, `renovate[bot]`, `github-actions[bot]`, `pre-commit-ci[bot]` and a human, and changes to `package-lock.json`, `src/client/sdk.gen.ts`, `dist/app.min.js` and source files. Then bot commits and generated paths are excluded from co-change, churn and hotspots, are present as commit facts with flags, and the report lists each rule with its removal counts. Also: `web/dist/app.js` and `build/out.o` are filtered; `distance/calc.py`, `rebuild/run.py` and `build.py` are not (whole-segment rule); a path in `generated_paths` is filtered. Pass: all hold, and turning a filter off changes the pattern outputs and their claim ids.
 
 **HT13. Alias suggestion.** Given fsft. When `alias_suggestions` runs. Then a suggestion links paths under `backend/app/crud/` to `backend/app/crud.py` at `2d0f774` (#622), status `unvalidated`, class `history_inferred`, with its similarity metric. Pass: present, not `observed`, not `verified`.
 
 **HT14. Manifest history.** Given fsft. When `manifest_changes` runs. Then `dependency_added` for `sqlmodel` appears at the #558 commit, before the #559 commit (Lab C ordering). Pass: present, ordered.
 
-**HT15. Status ceilings.** Given all records from a full fsft run and from the synthetic repos. Then no history record is `verified`; every `observed` record has the check and qualifier its kind requires (section 6.1); every record validates against `traces-evidence/0.4`. Pass: 0 violations, 100% valid.
+**HT15. Status ceilings.** Given all records from a full fsft run and from the synthetic repos. Then no history record is `verified`; every `observed` record has the check and qualifier its kind requires (section 6.1); every `history_impact_candidate`, `alias_of`, `continues_as` and `reverts` record is `unvalidated`; every record has at least one entry in `locations` or `citations`; every record validates against `traces-evidence/0.4`. Pass: 0 violations, 100% valid.
 
 **HT16. Hooks and drivers never run.** Given a synthetic repo whose local config and `.gitattributes` define a textconv driver, an external diff, an fsmonitor command, and hooks, each of which would create a sentinel file. When a full run executes. Then no sentinel file exists. Pass: none created.
 
@@ -706,22 +715,37 @@ pytest under `backend/tests/history/`. Synthetic repos are built by test fixture
 
 **HT21. Limits and rename limit.** Given a synthetic commit renaming more files than `rename_limit`, and a run with `max_commits` below the history size. Then the first gives flag `rename_detection_limited` on that commit's records; the second gives `E_LIMIT` and no records. Pass: both.
 
-**HT22. Milestones.** Given fsft. When `select_milestones` runs twice. Then the lists are identical, all SHAs lie on the first-parent chain, the first commit and `b1125d8` are included, and every milestone has at least one reason. Pass: all hold.
+**HT22. Milestones.** Given fsft. When `select_milestones` runs twice. Then the lists are identical, all SHAs lie on the first-parent chain, the first commit and `b1125d8` are included, every milestone has at least one reason, and the default list has at most 8 entries. With `max_milestones=20` the list has at most 20; `max_milestones=21` raises `E_CONFIG`. Pass: all hold.
 
 **HT23. Impact separation.** Given co-change records for a target file. When `history_impact` runs. Then results appear only under `history:*` keys, `known_gaps` is non-empty, and no code-dependency record is present. Pass: all hold.
 
-## 19. Open items for Architect1
+**HT24. Review state never changes status.** Given an `alias_of` record. When `review_state` is set to `confirmed` and then `disputed`. Then `status`, `label`, `class` and `claim_id` are unchanged and `status_history` gains no entry. Pass: all unchanged.
 
-1. **Schema ownership and timing.** Section 5 lists requested 0.4 additions. The Evidence seat decides final names. History codes against the names in this document until 0.4 lands, then follows the merged schema.
-2. **`observed` for patterns.** This draft lets `history_pattern` records reach `observed` once an independent `git_recount` reproduces the counts, with label text "history pattern". The alternative is to cap patterns at `unvalidated`, which would show every co-change as "inferred". Needs a ruling.
-3. **Check methods and independence.** `git_object_check`, `git_recount` and `quote_match` extend the independence rule to the `git` and `text` families. Task 002 limited independent checks to `cpython-ast` and `typescript-compiler`. Needs a ruling.
-4. **`locations` versus `citations`.** The draft adds `citations` and allows empty `locations` for history and documented records. An alternative is a `commit` range kind inside `locations`. Evidence seat to choose.
-5. **Alias confirmation.** Under 0.3, `human_review` establishes nothing, so a confirmed alias stays `unvalidated` with a reason. If the UX needs a distinct "confirmed" state, it needs a schema field (for example `review_state`).
-6. **"All commits" for lifecycle and churn.** Interpreted as all non-merge commits for events and churn, with the replay along first-parent diffing merges against the first parent. This avoids double counting merges. Confirm.
-7. **`claim_id` anchor.** Git-object facts anchor to their commit, not `repo_sha`, so ids are stable across re-pins. This differs from Task 002 v3, which includes `repo_sha`. Confirm.
-8. **Generated defaults.** `dist/` and `build/` at any depth can hide real source in some repos. The draft applies them at any depth and echoes them. Confirm, or restrict to root.
-9. **`frontend/src/client/`** in fsft is not matched by the default globs except through `*.gen.*` and the Evidence seat's generated flags. Confirm that the Evidence seat supplies `generated_paths`.
-10. **Milestone budget.** Default `max_milestones` 20. Each milestone costs one Evidence pipeline run (Task 001: about 1.4 s per CodeGraph index on fsft, larger repos not measured). The index worker may need a lower cap.
-11. **Lab C code.** This contract follows decision 5 (clean rewrite). Lab C scripts stay outside the repo and are not vendored.
-12. **Python pin.** 3.14 via uv per the foundation; exact patch pinned in the backend lockfile by the Traces seat.
-13. **Discussions.** Deferred. Charter open question 10 stays open.
+**HT25. Independent checks.** Given a synthetic repo. When the ingest parse is deliberately corrupted for one commit in a test double (wrong blob SHA, wrong count). Then the `git_object_check` or `git_recount` built on `cat-file`, `ls-tree`, `diff-tree` or `rev-list` fails for that record, which stays `unvalidated` with the failing check, and a `quote_match` pass never sets anything beyond `observed` on a `documented_rationale` record. Pass: all hold.
+
+## 19. Open items
+
+Closed in v2 by Architect1's answers (section 20): v1 items 2 to 10.
+
+Still open:
+
+1. **Schema names.** Section 5 lists requested 0.4 additions. The Evidence seat decides final names in `backend/traces/evidence/schema/evidence_record.schema.json`. History codes against the names in this document until 0.4 lands, then follows the merged schema.
+2. **Decision log location.** Architect1 asked for the claim_id anchor difference (D-H6) to be recorded in DECISIONS.md. `build/traces-v1` has no `docs/DECISIONS.md` at the time of this draft, and it is not this seat's file, so the entry is requested in the PR body and recorded here in section 20 meanwhile.
+3. **Lab C code.** Clean rewrite. Lab C scripts stay outside the repo and are not vendored.
+4. **Discussions and issue threads.** Deferred past v1. Charter open question 10 stays open.
+
+## 20. Decisions (Architect1, 2026-10-21 IST)
+
+Binding. They supersede any conflicting text above.
+
+| Id | Decision | Where applied |
+|---|---|---|
+| D-H1 | Co-change, churn and hotspot metric values may reach `observed` after an independent recount, because the count is a Git fact. Class stays `history_pattern`, never `verified`. Any coupling or "related" interpretation stays `unvalidated`. | 6.1, 6.1 rules, 17, HT15 |
+| D-H2 | Git plumbing checks (`cat-file`, `ls-tree`, `diff-tree`, `rev-list` recount) that do not read the log parse count as independent checks for git-object facts. `quote_match` establishes only that a quote exists at the cited commit or PR, nothing about intent. | 5, 6.1, HT25 |
+| D-H3 | New `citations` field. `locations` may be empty for history records. The schema requires at least one of `locations` or `citations`. | 5, 7.1, HT15 |
+| D-H4 | New `review_state` `{state: none|confirmed|disputed, reviewer, at}`, separate from `status`. It never promotes status. | 5, 6.1, 6.2, 17, HT24 |
+| D-H5 | "All commits" for lifecycle and churn means all non-merge commits for events and churn; the file-set replay runs along first-parent with merges diffed against the first parent. | 9.2, 9.3, 12 |
+| D-H6 | Git-object fact `claim_id`s anchor to their commit, not `repo_sha`. Difference from Task 002 claim_id v3: v3 hashes `repo_sha`, so the same source claim at a new pinned SHA gets a new id and the old one is linked by `supersedes`. A Git-object fact is immutable once its commit exists, so anchoring to the commit keeps its id stable across re-pins and lets the cache reuse it. Pattern records still anchor to their computed range and change id when the range changes. Requested as a DECISIONS.md entry (section 19 item 2). | 7.2 |
+| D-H7 | Generated filter applies `dist/` and `build/` at any depth, matching whole directory segments only. Configurable and echoed in the criteria. | 12, HT12 |
+| D-H8 | The Evidence seat supplies `generated_paths`, including output dirs detected from generator config (for example the openapi-ts client). History consumes them. | 3, 12, HT12 |
+| D-H9 | Milestone cap: default 8 for the index worker; on-demand compare capped at 20. | 8.3, 9.7, 12, HT22 |
