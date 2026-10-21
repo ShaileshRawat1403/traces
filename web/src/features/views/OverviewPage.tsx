@@ -24,24 +24,26 @@ function SnapshotCounts() {
   const ext = s.extractor as Record<string, string>;
   return (
     <Card className="mb-4">
-      <h2 className="mb-2 font-semibold">Evidence in this snapshot</h2>
-      <ul className="flex flex-wrap gap-x-4 gap-y-2" data-testid="snapshot-counts">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold">Evidence in this snapshot</h2>
+        <p className="text-xs text-muted">Schema {s.evidence_schema}</p>
+      </div>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="snapshot-counts">
         {shown.map(([st, n]) => (
-          <li key={st} className="flex items-center gap-2 text-sm">
+          <li key={st} className="rounded-md border border-line bg-canvas px-3 py-2">
             <StatusChip status={st} label={LABEL_FOR[st] ?? null} />
-            <span className="tabular-nums">{n.toLocaleString("en-US")}</span>
-            <span className="text-muted">{st}</span>
+            <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{n.toLocaleString("en-US")}</p>
+            <p className="text-xs text-muted">{st.replace("_", " ")}</p>
           </li>
         ))}
       </ul>
       {rejected ? (
-        <p className="mt-2 text-sm text-ink-2">
-          {rejected.toLocaleString("en-US")} rejected claims are kept for audit in the <Link to={`${snapshotBase(repoId, sha)}/review`}>reviewer view</Link>.
+        <p className="mt-3 text-sm text-ink-2">
+          {rejected.toLocaleString("en-US")} rejected claims stay in the audit trail. They are hidden from the graph and the trace. Open the{" "}
+          <Link to={`${snapshotBase(repoId, sha)}/review`}>reviewer view</Link> to see them.
         </p>
       ) : null}
-      <p className="mt-2 text-xs text-muted">
-        Schema {s.evidence_schema} · extractor {Object.entries(ext).map(([k, v]) => `${k} ${v}`).join(", ")} · state {s.state}
-      </p>
+      <p className="mt-3 text-xs text-muted">Extractor {Object.entries(ext).map(([k, v]) => `${k} ${v}`).join(", ")}</p>
     </Card>
   );
 }

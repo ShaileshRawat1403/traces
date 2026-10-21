@@ -3,7 +3,17 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "../../ui/States";
 import { nextInDirection, type Direction, type ElementData } from "./graphModel";
 
-const C = { verified: "#0f5e63", observed: "#475569", inferred: "#8a5300", unknown: "#5b21b6", ink: "#1d1b18", line: "#c9c3b8", focus: "#1c64d8", comp: "#f2f0ec" };
+const C = {
+  verified: "#8fd9cf",
+  observed: "#d5e2ea",
+  inferred: "#f0c27a",
+  unknown: "#d4c4f5",
+  ink: "#f4faf7",
+  line: "#6f8f86",
+  focus: "#7eb6ff",
+  comp: "#14302c",
+  node: "#d7fff8",
+};
 
 const KEY_DIR: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
@@ -31,13 +41,12 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
 
   useEffect(() => {
     if (!box.current) return;
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const cy = cytoscape({
       container: box.current,
       elements,
       style: [
-        { selector: "node", style: { label: "data(label)", "font-size": 11, color: C.ink, "background-color": "#ffffff", "border-width": 1.5, "border-color": C.line, "text-valign": "bottom", "text-margin-y": 4, width: 16, height: 16, "text-max-width": "130px", "text-wrap": "ellipsis", "min-zoomed-font-size": 7 } },
-        { selector: "node:parent", style: { "background-color": C.comp, "background-opacity": 0.7, "border-color": C.line, "text-valign": "top", "text-margin-y": -4, "font-weight": "bold", padding: "14px", shape: "round-rectangle" } },
+        { selector: "node", style: { label: "data(label)", "font-size": 12, color: C.ink, "background-color": C.node, "border-width": 2, "border-color": C.verified, "text-valign": "bottom", "text-margin-y": 4, width: 18, height: 18, "text-max-width": "140px", "text-wrap": "ellipsis", "min-zoomed-font-size": 6 } },
+        { selector: "node:parent", style: { "background-color": C.comp, "background-opacity": 0.55, "border-width": 1, "border-color": C.verified, "text-valign": "top", "text-margin-y": -2, "font-weight": "bold", padding: "14px", shape: "round-rectangle" } },
         { selector: 'node[entity = "component"]', style: { shape: "round-rectangle", width: 26, height: 20, "font-weight": "bold" } },
         { selector: "edge", style: { width: 1.8, "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 0.8 } },
         { selector: 'edge[tone = "verified"]', style: { "line-color": C.verified, "target-arrow-color": C.verified } },
@@ -49,7 +58,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
         { selector: ".sel", style: { "border-width": 3, "border-color": C.focus, "line-color": C.focus, "target-arrow-color": C.focus, "z-index": 10 } },
         { selector: ".dim", style: { opacity: 0.35 } },
       ],
-      layout: { name: "cose", animate: !reduced, nodeDimensionsIncludeLabels: true, padding: 24 },
+      layout: { name: "cose", animate: false, nodeDimensionsIncludeLabels: true, padding: 24 },
       wheelSensitivity: 0.3,
       boxSelectionEnabled: false,
       selectionType: "single",
@@ -58,6 +67,11 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
     cy.on("dbltap", "node", (ev) => handlers.current.onExpand(ev.target.id() as string));
     cy.on("tap", "edge", (ev) => handlers.current.onEdge(ev.target.id() as string));
     cy.on("tap", (ev) => ev.target === cy && handlers.current.onSelect(null));
+    cy.one("layoutstop", () => {
+      if (cy.destroyed()) return;
+      const comps = cy.nodes().filter('[entity = "component"]');
+      cy.fit(comps.length ? comps : cy.elements(), 36);
+    });
     cyRef.current = cy;
     return () => {
       cy.destroy();
@@ -133,7 +147,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
         aria-roledescription="graph"
         aria-label="Architecture graph. Use arrow keys to move between nodes, Enter to expand, Escape to clear. The list and cards views show the same data."
         onKeyDown={onKeyDown}
-        className="h-[58vh] min-h-80 w-full touch-none rounded-lg border border-line bg-surface"
+        className="h-[min(68vh,40rem)] min-h-80 w-full touch-none rounded-lg border border-line bg-[#070b0a]"
         data-testid="graph-canvas"
       />
       <p className="sr-only" aria-live="polite" data-testid="graph-announce">

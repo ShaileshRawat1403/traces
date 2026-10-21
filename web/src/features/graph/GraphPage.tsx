@@ -282,9 +282,7 @@ export default function GraphPage() {
 
   return (
     <>
-      <PageHeader title="Architecture graph">
-        Components first; expand one to load its symbols. Inferred relationships are dashed and off by default. Rejected claims are never drawn.
-      </PageHeader>
+      <PageHeader title="Architecture graph">Components first. Expand a node to load the symbols inside it.</PageHeader>
 
       <div className="mb-3 flex flex-col gap-2">
         <form onSubmit={submitSearch} role="search" className="flex gap-2">

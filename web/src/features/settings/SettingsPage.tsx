@@ -14,7 +14,7 @@ export function SettingsPage() {
             "Remember on this device"), is sent only to the provider you configure, and never reaches the Traces API or its logs. Before anything leaves the browser you will see
             exactly which snippets would be sent.
           </p>
-          <p className="mt-2 text-sm text-muted">Provider setup arrives with the explain and chat milestone.</p>
+          <p className="mt-2 text-sm text-muted">Explain on a snapshot already answers from stored evidence and needs no key. A chat key is not collected in this build.</p>
         </Card>
         <Card>
           <h2 className="mb-2 font-semibold">This build</h2>
