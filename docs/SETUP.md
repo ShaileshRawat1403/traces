@@ -39,6 +39,9 @@ cd web && npm run check:api                      # generated TS types match docs
 | `TRACES_MAX_CLONE_MB` | 1024 | clone size cap, measured while `git clone` runs (D-021) |
 | `TRACES_CLONE_TIMEOUT_S` | 900 | clone wall-clock cap |
 | `TRACES_MAX_FILES`, `TRACES_MAX_TREE_MB` | 100000, 1024 | checkout caps, checked from Git objects before checkout |
+| `TRACES_MAX_RSS_MB` | 6144 | index worker memory cap (RSS watchdog over the sandboxed process tree, D-022) |
+| `TRACES_INDEX_TIMEOUT_S` | 1800 | wall-clock cap per sandboxed index step |
+| `TRACES_INDEX_WORKERS` | 1 | concurrent index jobs |
 | `TRACES_NETWORK_TESTS` | unset | `1` runs the live GitHub ingest checks in `tests/unit/test_ingest.py` |
 | `TRACES_API_PORT`, `TRACES_WEB_PORT` | 8000, 5173 | start script ports |
 

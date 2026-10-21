@@ -108,7 +108,7 @@ Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "d
 | | `GET /repos`, `GET /repos/{id}` | list, get | implemented |
 | | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`); cached 60 s, rate limited | implemented |
 | 4.3 | `GET /repos/{id}/snapshots`, `GET S` | snapshots and metadata | implemented |
-| 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job) | 501, Traces, INDEX |
+| 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job, `Location`); active job for the same snapshot is returned; ready snapshot without `reindex` -> 409 `already_indexed` (D-022) | implemented |
 | | `GET /jobs/{job_id}` | poll; `ETag` = job version, `If-None-Match` gives 304; poll 1-2 s; no SSE | implemented |
 | 4.5 | `GET S/overview` | business / architecture / implementation facts, each tagged fact, interpretation or unknown, with claim ids | 501, Traces, VIEWS |
 | 4.6 | `GET S/components` | deterministic components and layers with claim counts | 501, Traces, VIEWS |

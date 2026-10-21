@@ -39,6 +39,7 @@ from traces.api.models import (
     TraceResponse,
 )
 from traces.core.config import get_settings
+from traces.evidence.jobs import IndexJobRunner
 from traces.evidence.migrate import CURRENT, SCHEMAS
 from traces.evidence.store import Store, get_job, now
 from traces.ingest.errors import IngestError
@@ -114,6 +115,19 @@ def get_head_probe() -> HeadProbe:
 ProbeDep = Annotated[HeadProbe, Depends(get_head_probe)]
 
 
+@lru_cache(maxsize=1)
+def _default_runner() -> IndexJobRunner:
+    return IndexJobRunner(_default_store())
+
+
+def get_index_runner() -> IndexJobRunner:
+    """In-process index job runner bound to the default store (tests inject one with a stub pipeline)."""
+    return _default_runner()
+
+
+RunnerDep = Annotated[IndexJobRunner, Depends(get_index_runner)]
+
+
 def _repo(st: Store, repo_id: str) -> dict[str, Any]:
     r = st.get_repo(repo_id)
     if r is None:
@@ -154,7 +168,7 @@ def meta() -> Meta:
                 validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api"},
                 isolation="none" if s.isolation == "none" else "unshare",
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
-                              "index_jobs": False, "head": True, "overview": False, "components": False, "routes": False,
+                              "index_jobs": True, "head": True, "overview": False, "components": False, "routes": False,
                               "graph": False, "source": False, "trace": False, "history": False, "compare": False,
                               "explain": False, "chat_bundle": False})
 
@@ -217,10 +231,40 @@ def get_snapshot(repo_id: str, sha: str, st: StoreDep) -> Snapshot:
 
 
 # ------------------------------------------------------------------------------------------------ jobs
-@app.post(f"{API}/repos/{{repo_id}}/index-jobs", response_model=Job, status_code=202, responses=NI, tags=["jobs"])
-def create_index_job(repo_id: str, body: IndexJobCreate, st: StoreDep) -> Job:
-    _repo(st, repo_id)
-    not_implemented("Index jobs", "Traces", "INDEX")
+def _job_out(j: dict[str, Any]) -> Job:
+    err = ErrorBody(code=j["error_code"], message=j["error_detail"] or j["error_code"], owner=None, milestone=None, detail=None) if j["error_code"] else None
+    return Job(id=j["id"], repo_id=j["repo_id"], snapshot_id=j["snapshot_id"], kind=j["kind"], state=j["state"], phase=j["phase"],
+               progress=j["progress"], message=j["message"], error=err, version=j["version"], created_at=j["created_at"],
+               updated_at=j["updated_at"], events=j["events"])
+
+
+@app.post(f"{API}/repos/{{repo_id}}/index-jobs", response_model=Job, status_code=202,
+          responses={409: {"model": ErrorResponse, "description": "already_indexed (the snapshot is ready; send reindex=true)"}, **UPSTREAM},
+          tags=["jobs"])
+def create_index_job(repo_id: str, body: IndexJobCreate, st: StoreDep, probe: ProbeDep, runner: RunnerDep, response: Response) -> Job:
+    """Start an index job for `sha` (default: the latest discovered HEAD, discovered now if unknown). Returns the job
+    (202); an index already queued or running for the same snapshot is returned instead of a duplicate. Poll
+    GET /jobs/{id} with If-None-Match. Phases: fetching, checking_out, indexing, adapting, validating, storing, history."""
+    r = _repo(st, repo_id)
+    ref = parse_repo_url(r["url"])
+    if body.sha is not None:
+        try:
+            sha = require_sha(body.sha)
+        except ValueError as e:
+            raise ApiError(422, "invalid_sha", str(e)) from None
+    else:
+        sha = r["latest_discovered_sha"]
+        if not sha:
+            head = probe.head(ref)
+            st.record_remote_head(repo_id, head.sha, head.default_branch, head.checked_at)
+            sha = head.sha
+    snap = st.get_snapshot(f"{repo_id}@{sha}")
+    if snap and snap["state"] == "ready" and not body.reindex and not st.active_job(snap["id"]):
+        raise ApiError(409, "already_indexed", f"{snap['id']} is already indexed; send reindex=true to index it again",
+                       detail={"snapshot_id": snap["id"]})
+    j = runner.submit(ref, sha, "reindex" if body.reindex else "index")
+    response.headers["Location"] = f"{API}/jobs/{j['id']}"
+    return _job_out(get_job(st, j["id"]) or j)
 
 
 @app.get(f"{API}/jobs/{{job_id}}", response_model=Job, responses={304: {"description": "Not modified (If-None-Match matched the ETag)"}, **ERR},
@@ -236,10 +280,7 @@ def poll_job(job_id: str, st: StoreDep, response: Response,
         return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
     response.headers["ETag"] = etag
     response.headers["Cache-Control"] = "no-cache"
-    err = ErrorBody(code=j["error_code"], message=j["error_detail"] or j["error_code"], owner=None, milestone=None, detail=None) if j["error_code"] else None
-    return Job(id=j["id"], repo_id=j["repo_id"], snapshot_id=j["snapshot_id"], kind=j["kind"], state=j["state"], phase=j["phase"],
-               progress=j["progress"], message=j["message"], error=err, version=j["version"], created_at=j["created_at"],
-               updated_at=j["updated_at"], events=j["events"])
+    return _job_out(j)
 
 
 # ------------------------------------------------------------------------------------------------ claims and export
