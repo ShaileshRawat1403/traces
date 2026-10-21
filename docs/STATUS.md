@@ -10,7 +10,7 @@ Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/trace
 | --- | --- |
 | Traces | evidence, ingest, index, views and API (`backend/traces/{evidence,adapter,validators,ingest,core,api}`, `workers/`, `toolchain/`) |
 | Traces Lab | CI, e2e harness, security, second repo, acceptance (`ci/` and `.github/workflows/`, `tests/e2e`, security tests) |
-| Traces History | `backend/traces/history` (and `docs/contracts/history.md`) |
+| Traces History | `backend/traces/history`, `tests/history/` (and `docs/contracts/history.md`) |
 | Traces UI | `web/` and explain (`backend/traces/explain`) |
 | Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, integration merges |
 
@@ -34,7 +34,19 @@ Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/trace
 | OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
 | CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
 | Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
-| History module | not started | Traces History | `backend/traces/history/interface.py` holds the hook points |
+| History module | core merged (#5); steps 7-11 in progress | Traces History | steps 1-6 (gitcmd, ingest/cache, filters, records/verify, facts, lifecycle, churn, hotspots, co-change); 7-11 (milestones, snapshot diffs, reverts, manifests, aliases, impact, PR context, HistoryRunner) pending. Deviations: see note below |
+
+## History core deviations (PR #5)
+
+Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/pull/5) ("Deviations from the contract"); the PR body is authoritative. In short:
+1. Ingest uses `diff-tree --stdin` (raw and numstat) over a rev-list instead of one log stream; independent checks use separate plumbing.
+2. Cache: corrupt or mismatched entries are discarded and recomputed; the E_CACHE recompute-and-compare path is not implemented.
+3. Hotspots skip blobs over `max_blob_bytes` with a warning instead of raising E_LIMIT.
+4. Component maps only at the pinned SHA; `component_removed` and `continues_as` deferred; component-level churn and co-change stay unvalidated in v1.
+5. Recount mismatches give an inconclusive check; the record stays unvalidated with the reason; nothing is marked rejected.
+6. Added `HistoryConfig.verify` (default True); with it off nothing reaches observed.
+7. Hotspot records use node_kind `file_history_metrics` and differ from churn records by parameters, so their claim_ids differ.
+8. Test gaps against section 18: HT4 separate id-recompute test, HT21 rename_limit synthetic test, HT12 combined synthetic repo.
 
 ## Open items
 
