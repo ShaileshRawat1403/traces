@@ -19,6 +19,7 @@ export type Component = Schemas["Component"];
 export type RouteItem = Schemas["RouteItem"];
 export type SourceView = Schemas["SourceView"];
 export type TraceResponse = Schemas["TraceResponse"];
+export type TraceHop = Schemas["TraceHop"];
 export type ExplainRequest = Schemas["ExplainRequest"];
 export type ExplainResponse = Schemas["ExplainResponse"];
 export type IndexJobCreate = Schemas["IndexJobCreate"];

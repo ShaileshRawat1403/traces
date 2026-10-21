@@ -3,7 +3,10 @@ import { useId, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useCapability } from "../../api/queries";
-import { Button, Card, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { snapshotBase } from "../../app/nav";
+import { Button, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
+import { TraceView } from "./TraceView";
 
 export function TracePage() {
   const { repoId = "", sha = "" } = useParams();
@@ -15,6 +18,14 @@ export function TracePage() {
   const ids = { f: useId(), t: useId() };
   const cap = useCapability("trace");
   const q = useQuery({ queryKey: ["trace", repoId, sha, from, to], queryFn: () => api.trace(repoId, sha, from, to || undefined), enabled: !!from });
+  const claim = sp.get("claim");
+  const setClaim = (id: string | null) =>
+    setSp((p) => {
+      const n = new URLSearchParams(p);
+      if (id) n.set("claim", id);
+      else n.delete("claim");
+      return n;
+    });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const n = new URLSearchParams();
@@ -52,10 +63,9 @@ export function TracePage() {
       ) : q.isError ? (
         <ErrorState error={q.error} what="Trace" />
       ) : (
-        <Card>
-          <p role="status">The API returned a trace with {q.data.hops.length} hops. The trace renderer is scheduled for the next UI checkpoint.</p>
-        </Card>
+        <TraceView t={q.data} reviewHref={`${snapshotBase(repoId, sha)}/review`} onEvidence={setClaim} />
       )}
+      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setClaim(null)} />
     </>
   );
 }
