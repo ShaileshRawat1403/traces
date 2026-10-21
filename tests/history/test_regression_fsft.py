@@ -20,6 +20,7 @@ from traces.history import (
     ingest,
     lifecycle,
 )
+from traces.history.manifests import manifest_changes
 from traces.history.records import recompute_claim_id
 
 from ._schema import assert_valid
@@ -133,3 +134,20 @@ def test_zero_collisions_and_regenerable(fsft_repo: RepoRef, tmp_path_factory: p
     assert len(ids) == len(set(ids)) == 6460 + 9 + 235 + 145 + 144
     b = run(RunContext("h-again", "2026-10-23T09:00:00+05:30", CTX.repo, CTX.repo_sha))
     assert canonical_hash(sorted(a, key=lambda r: r["claim_id"])) == canonical_hash(sorted(b, key=lambda r: r["claim_id"]))
+
+
+def test_ht14_sqlmodel_added_at_558_before_559(log_default: HistoryLog) -> None:
+    res = manifest_changes(log_default, ctx=CTX)
+    assert_valid(res.records)
+    assert res.report["unparseable"] == []
+    assert len(res.records) == 653 and res.report["events_by_kind"] == {
+        "dependency_added": 198, "dependency_version_changed": 334, "dependency_removed": 121}
+    assert all(r["status"] == "observed" for r in res.records)
+    added = [r for r in res.records if r["relationship_kind"] == "dependency_added"
+             and r["provenance_raw"]["name"] == "sqlmodel"]
+    first = min(added, key=lambda r: log_default.by_sha[r["citations"][0]["commit"]].committer_time)
+    c558 = log_default.by_sha[first["citations"][0]["commit"]]
+    assert c558.sha.startswith("e4877b7a") and "(#558)" in c558.subject
+    c559 = next(c for c in log_default.commits if "(#559)" in c.subject)
+    assert c558.committer_time < c559.committer_time
+    assert first["to"]["symbol"] == "dep::pypi:backend/pyproject.toml:poetry:sqlmodel"
