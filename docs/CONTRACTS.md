@@ -69,7 +69,7 @@ SQLite at `$TRACES_DATA_DIR/traces.sqlite3` (default `.traces-data/`). Migration
 
 | Table | Purpose |
 | --- | --- |
-| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch |
+| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch; 0002: `visibility_checked_at`, `external_ai_consent` (D-021) |
 | `snapshots` | id, repo_id, sha, state (`pending`/`indexing`/`ready`/`failed`), evidence_schema, extractor pins, languages, frameworks, `generated_paths`, stats |
 | `jobs` | id, repo, snapshot, kind, state, phase, progress, message, error code/detail, `version` (ETag), timestamps |
 | `job_events` | append-only progress log per job |
@@ -97,16 +97,16 @@ The index worker (milestone INDEX) runs: validate URL, resolve SHA, `ensure_pinn
 
 Base path `/api/v1`. JSON. Read-only except repo registration and job creation. Generated OpenAPI: [contracts/openapi.json](contracts/openapi.json); a test fails if it is stale, and the UI's TypeScript types are generated from it (`web/src/api/schema.d.ts`, `npm run check:api`).
 
-Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "detail"}}`. Codes: `invalid_request` (422), `invalid_repo_url` (422), `invalid_sha` (422), `not_found` (404), `not_implemented` (501, with the owning seat and milestone). Stubs never return placeholder data.
+Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "detail"}}`. Codes: `invalid_request` (422), `invalid_repo_url` (422), `invalid_sha` (422), `not_found` (404), `not_implemented` (501, with the owning seat and milestone); ingest (D-021): `repo_not_public`, `repo_empty`, `sha_not_found` (422), `too_large`, `too_many_files` (413), `rate_limited` (429, `Retry-After`), `upstream_unavailable`, `fetch_failed` (502), `fetch_timeout` (504). Stubs never return placeholder data.
 
 `S` = `/repos/{repo_id}/snapshots/{sha}`.
 
 | # | Method and path | Purpose | Build status |
 | --- | --- | --- | --- |
 | 4.1 | `GET /health`, `GET /meta` | liveness, versions, schema, pins, isolation mode, capability flags | implemented |
-| 4.2 | `POST /repos` `{url, sha?}` | validate and register a public GitHub repo (no fetch) | implemented |
+| 4.2 | `POST /repos` `{url, sha?}` | validate, confirm public with an anonymous `ls-remote`, register, pin a `pending` snapshot at `sha` or HEAD (no clone; D-021) | implemented |
 | | `GET /repos`, `GET /repos/{id}` | list, get | implemented |
-| | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`) | 501, Traces, INGEST |
+| | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`); cached 60 s, rate limited | implemented |
 | 4.3 | `GET /repos/{id}/snapshots`, `GET S` | snapshots and metadata | implemented |
 | 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job) | 501, Traces, INDEX |
 | | `GET /jobs/{job_id}` | poll; `ETag` = job version, `If-None-Match` gives 304; poll 1-2 s; no SSE | implemented |

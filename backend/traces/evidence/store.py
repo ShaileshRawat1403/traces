@@ -129,6 +129,25 @@ class Store:
                             (sid, repo_id, sha, state, CURRENT, json.dumps(extractor or {}), json.dumps(stats or {}), json.dumps(generated_paths or []), now()))
         return sid
 
+    def record_remote_head(self, repo_id: str, sha: str, default_branch: str | None, checked_at: str) -> None:
+        """Store the latest anonymously discovered HEAD; a successful anonymous probe also confirms visibility=public."""
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE repos SET latest_discovered_sha=?, latest_discovered_at=?, default_branch=coalesce(?, default_branch), "
+                            "visibility_checked_at=? WHERE id=?", (sha, checked_at, default_branch, checked_at, repo_id))
+
+    def newest_ready_snapshot(self, repo_id: str) -> dict[str, Any] | None:
+        r = self.db.execute("SELECT * FROM snapshots WHERE repo_id=? AND state='ready' ORDER BY coalesce(indexed_at, created_at) DESC, created_at DESC "
+                            "LIMIT 1", (repo_id,)).fetchone()
+        return dict(r) if r else None
+
+    def ensure_snapshot(self, repo_id: str, sha: str) -> str:
+        """Pin a snapshot (state `pending`) unless it already exists; never downgrades an indexed snapshot."""
+        sid = f"{repo_id}@{sha}"
+        with self.write_lock, self.db:
+            self.db.execute("INSERT INTO snapshots (id, repo_id, sha, state, evidence_schema, created_at) VALUES (?,?,?,?,?,?) "
+                            "ON CONFLICT(id) DO NOTHING", (sid, repo_id, sha, "pending", CURRENT, now()))
+        return sid
+
     def list_repos(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self.db.execute("SELECT * FROM repos ORDER BY id")]
 

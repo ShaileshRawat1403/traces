@@ -36,6 +36,10 @@ cd web && npm run check:api                      # generated TS types match docs
 | `TRACES_TOOLCHAIN_DIR` | `toolchain` | CodeGraph and TypeScript install |
 | `TRACES_ISOLATION` | `auto` | `unshare` or `none` (fallback; CT15 then fails by design) |
 | `TRACES_LIMIT_AS_KB` | unset | opt-in address-space limit (breaks CodeGraph today, D-006) |
+| `TRACES_MAX_CLONE_MB` | 1024 | clone size cap, measured while `git clone` runs (D-021) |
+| `TRACES_CLONE_TIMEOUT_S` | 900 | clone wall-clock cap |
+| `TRACES_MAX_FILES`, `TRACES_MAX_TREE_MB` | 100000, 1024 | checkout caps, checked from Git objects before checkout |
+| `TRACES_NETWORK_TESTS` | unset | `1` runs the live GitHub ingest checks in `tests/unit/test_ingest.py` |
 | `TRACES_API_PORT`, `TRACES_WEB_PORT` | 8000, 5173 | start script ports |
 
 If `unshare -rn true` fails on Ubuntu 24.04+, allow unprivileged user namespaces: `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`.
