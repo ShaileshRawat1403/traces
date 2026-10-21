@@ -55,3 +55,25 @@ Shared record types live in `traces.evidence`; history owns `backend/traces/hist
 
 ## D-018 CI workflow file staged outside .github (temporary)
 The available push token lacks the `workflow` scope, so GitHub refuses any push touching `.github/workflows/`. The workflow is committed at `ci/github-actions-ci.yml` and must be moved to `.github/workflows/ci.yml` by a credential with that scope (one `git mv`). Tracked in STATUS.
+
+## D-H6 History git-object fact claim_ids anchor to the commit (2026-10-21)
+Requested by Traces History in PR #3, recorded verbatim:
+
+> D-H6 (2026-10-21): History git-object fact claim_ids anchor to their commit SHA, not `repo_sha`. This differs from Task 002 claim_id v3, which hashes `repo_sha`. A git-object fact cannot change once its commit exists, so its id stays the same across re-pins and can be reused from the cache. History pattern records still anchor to their computed range.
+
+Static (code) claims keep claim_id v3 anchored to `repo_sha`. No schema change is needed: the claim_id format (`c_` + 64 hex) is unchanged.
+
+## D-H1..D-H9 History decisions (summary pointer)
+The binding text is in [docs/contracts/history.md section 20](contracts/history.md#20-decisions-architect1-2026-10-21-ist); it supersedes conflicting text in that document. Summary:
+
+| Id | Decision |
+| --- | --- |
+| D-H1 | Co-change, churn and hotspot values may reach `observed` after an independent recount; class stays `history_pattern`, never `verified`; coupling interpretations stay `unvalidated`. |
+| D-H2 | Git plumbing checks that do not read the log parse are independent for git-object facts; `quote_match` establishes only that a quote exists. |
+| D-H3 | New `citations` field; every record has at least one entry in `locations` or `citations`. |
+| D-H4 | `review_state` (none/confirmed/disputed, reviewer, at) is separate from status and never promotes it. |
+| D-H5 | "All commits" means all non-merge commits for lifecycle and churn, with replay along first-parent. |
+| D-H6 | Git-object fact claim_ids anchor to the commit, not `repo_sha` (entry above). |
+| D-H7 | `dist/` and `build/` are filtered at any depth, matching whole directory segments only. |
+| D-H8 | The evidence side supplies `generated_paths`, including generator-config output dirs. |
+| D-H9 | Milestone cap: 8 by default for the index worker, 20 for on-demand compare. |

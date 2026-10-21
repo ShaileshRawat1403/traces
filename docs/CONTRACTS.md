@@ -129,7 +129,7 @@ Rejected claims: graph, trace and claim lists exclude them by default and report
 
 ## 5. History interface and hook points
 
-The history module's contract is `docs/contracts/history.md`, written and owned by Traces History in its own PR. This document only links it and fixes the hook points; the stand-in signatures are in `backend/traces/history/interface.py`.
+The history module's contract is [docs/contracts/history.md](contracts/history.md), written and owned by Traces History (merged from PR #3). This document only links it and fixes the hook points; the stand-in signatures are in `backend/traces/history/interface.py`.
 
 | Hook | Direction | Contract |
 | --- | --- | --- |
@@ -145,7 +145,7 @@ History owns its hardened git runner (`backend/traces/history/gitcmd`). Shared r
 | Seat | Owns |
 | --- | --- |
 | Traces | `backend/traces/evidence` (schema, migrations, store, pipeline), `adapter`, `validators`, `ingest`, `core`, `api` (endpoints and models), `workers/`, `toolchain/` |
-| Traces History | `backend/traces/history` (including `gitcmd`), `docs/contracts/history.md`, history migrations 0100-0199 |
+| Traces History | `backend/traces/history` (including `gitcmd`), [`docs/contracts/history.md`](contracts/history.md), history migrations 0100-0199 |
 | Traces UI | `web/`, `backend/traces/explain`, explain migrations 0200-0299 |
 | Traces Lab | `tests/e2e` (Playwright), CI workflow, security tests, second-repo acceptance |
 | Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, integration branch, merges into `build/traces-v1` |
