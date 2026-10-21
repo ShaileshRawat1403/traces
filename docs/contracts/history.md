@@ -434,6 +434,8 @@ class CachedPr:
 
 class PrContextProvider(Protocol):
     def get(self, pr_number: int) -> CachedPr | None: ...
+    def artifact_bytes(self, pr_number: int) -> bytes | None:   # optional, default None (D-H10)
+        return None
 
 @dataclass(frozen=True)
 class HistoryLog:            # parsed, immutable, cacheable
@@ -504,13 +506,146 @@ def history_impact(target: str, cochange_records: Sequence[EvidenceRecord], *, a
 # 8.10 PR context
 def pr_context(log: HistoryLog, provider: PrContextProvider | None) -> HistoryResult: ...
 
-# 8.11 Whole run (used by the worker)
-def run(repo: RepoRef, config: HistoryConfig, *, components: ComponentMap | None = None,
+# 8.11 Whole run (used by the worker): frozen signature, see section 8.11 below
+def run(repo: HistoryRepoRef, config: HistoryConfig, *,
+        budget: RunBudget | None = None,
+        components: ComponentMap | None = None,
         evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
-        pr_provider: PrContextProvider | None = None, cache_dir: Path | None = None) -> HistoryResult: ...
+        pr_provider: PrContextProvider | None = None,
+        cache_dir: Path | None = None,
+        max_milestones: int = MAX_MILESTONES_DEFAULT,
+        run_id: str | None = None,
+        at: str | None = None) -> HistoryResult: ...
 ```
 
 `history_impact` never reads or returns code-dependency edges. The API or Explanation seat may show it next to CodeGraph and framework-rule impact, under its own heading. An empty result returns `known_gaps`, never a bare empty list.
+
+### 8.11 Whole run (frozen 2026-10-21, phase 1)
+
+This is the single entry point the INDEX job's `history` step calls (hook H1). The signature, the budget shape, the stage order, the stage statuses and reasons, and the report layout below are frozen. `backend/traces/history/runner.py` holds them as code, and `tests/history/test_runner_signature.py` pins them. Phase 1 ships the types and input validation only: `run()` validates and then raises `NotImplementedError`. Phase 2 implements the pipeline without changing this surface.
+
+```python
+# backend/traces/history/runner.py
+from traces.evidence.types import ComponentMap, EvidenceSet, Sha
+from traces.history.config import HistoryConfig, MAX_MILESTONES_DEFAULT        # 8
+from traces.history.interface import HistoryRepoRef, HistoryResult, PrContextProvider
+
+RUN_REPORT_VERSION = "traces-history-run/1"
+
+STAGE_ORDER = ("ingest", "commit_facts", "lifecycle", "churn", "hotspots", "cochange_file",
+               "cochange_component", "manifests", "reverts", "aliases", "milestones",
+               "snapshot_compare", "evidence_set_diff", "pr_context")
+FINALIZE_STAGE = "finalize"     # always runs last, outside the budgeted stages
+
+StageStatus = Literal["completed", "truncated", "skipped", "aborted"]
+
+BUDGET_REASONS = {"budget_time", "budget_memory", "budget_records"}
+INPUT_REASONS = {"no_component_map", "no_evidence_sets", "no_pr_provider", "not_in_v1",
+                 "too_few_milestones", "dependency_not_completed"}
+TRUNCATION_REASONS = {"milestone_cap", "rename_detection_limited",
+                      "evidence_sets_missing_for_some_milestones", "pr_data_missing_for_some_prs"}
+
+@dataclass(frozen=True)
+class RunBudget:
+    time_s: float = 600.0              # wall clock, monotonic, from run() entry, git subprocesses included
+    memory_mb: int = 1024              # RSS growth of the calling process over its value at run() entry
+    max_records: int = 250_000         # records kept across all stages
+    finalize_reserve_s: float = 30.0   # a stage does not start when less than this remains
+    on_exhausted: Literal["partial", "fail"] = "partial"
+    def validate(self) -> "RunBudget": ...       # E_CONFIG on any bad value
+    def as_dict(self) -> dict[str, object]: ...
+
+@dataclass(frozen=True)
+class StageOutcome:
+    stage: str                  # one of STAGE_ORDER
+    status: StageStatus
+    reason: str | None          # None only when completed; else one of the reason sets above
+    detail: str                 # plain text, no paths outside the repo, no credentials
+    records: int                # records kept from this stage (0 when skipped or aborted)
+
+def run(repo: HistoryRepoRef, config: HistoryConfig, *,
+        budget: RunBudget | None = None,                       # None means RunBudget()
+        components: ComponentMap | None = None,
+        evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
+        pr_provider: PrContextProvider | None = None,          # None: offline, pr_context skipped
+        cache_dir: Path | None = None,                         # ingest cache, never inside the repo
+        max_milestones: int = MAX_MILESTONES_DEFAULT,          # 2..20; the worker uses 8
+        run_id: str | None = None,                             # volatile; generated when None
+        at: str | None = None) -> HistoryResult: ...           # volatile ISO 8601 with offset; now when None
+
+class GitHistoryRunner:                                        # satisfies interface.HistoryRunner (H1)
+    def __init__(self, config: HistoryConfig | None = None, budget: RunBudget | None = None, *,
+                 max_milestones: int = MAX_MILESTONES_DEFAULT) -> None: ...
+    def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
+                          components: ComponentMap | None = None) -> Sequence[Milestone]: ...
+    def run(self, repo: HistoryRepoRef, *, components: ComponentMap | None = None,
+            evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
+            pr_provider: PrContextProvider | None = None,
+            cache_dir: Path | None = None) -> HistoryResult: ...  # delegates to run() with its config and budget
+```
+
+**Inputs.** `repo` carries the clone path (full history, made by `traces.ingest.fetch`), the display identity and the pinned SHA. `config` is required so the worker always states the thresholds and filters it ran with. `components` must be built at `repo.sha` (v1). `evidence_sets` maps milestone SHAs to the Evidence seat's sets for those SHAs (hook H3); every key must be a SHA that `select_milestones(max_milestones)` returns for the same inputs, else `E_EVIDENCE_SET`. `GitHistoryRunner` fixes config, budget and milestone cap at construction so the worker's `select_milestones()` call and its `run()` call agree on the milestone SHAs.
+
+**Stages.** Fixed order, `STAGE_ORDER`. Inputs, config and budget never reorder them. Each stage is all or nothing: its records are kept only if it finishes, so a partial run is always a prefix-closed subset of whole stages.
+
+| # | Stage | Function | Needs | Skipped with |
+|---|---|---|---|---|
+| 1 | `ingest` | `ingest(repo, config, cache_dir)` | | |
+| 2 | `commit_facts` | `commit_facts` | ingest | |
+| 3 | `lifecycle` | `lifecycle(components)` | ingest | |
+| 4 | `churn` | `churn` | ingest | |
+| 5 | `hotspots` | `hotspots` | ingest | |
+| 6 | `cochange_file` | `cochange(level="file")` | ingest | |
+| 7 | `cochange_component` | `cochange(level="component")` | ingest, component map | `no_component_map` |
+| 8 | `manifests` | `manifest_changes` | ingest | |
+| 9 | `reverts` | `reverts` (reverts and quick deletes) | ingest | |
+| 10 | `aliases` | `alias_suggestions` (8.8) | ingest | `not_in_v1` (always in v1) |
+| 11 | `milestones` | `select_milestones(max_milestones)` and `milestone_records` | ingest | |
+| 12 | `snapshot_compare` | `snapshot_compare` over consecutive milestone pairs, oldest first | milestones | `too_few_milestones` |
+| 13 | `evidence_set_diff` | `evidence_set_diff` over consecutive milestone pairs that both have a set | milestones, evidence sets | `no_evidence_sets` |
+| 14 | `pr_context` | `pr_context(provider)` | ingest, provider | `no_pr_provider` |
+| | `finalize` | cross-stage `E_COLLISION`, `E_SCHEMA` (0.4), sort by `claim_id`, records digest | always runs | never skipped |
+
+A stage whose dependency did not complete (completed or truncated both count as complete) is skipped with `dependency_not_completed`. `history_impact` is a query-time API and is not a run stage.
+
+**Statuses.** `completed`: ran in full. `truncated`: ran in full but a deterministic cap or limit bounded its output (reasons in `TRUNCATION_REASONS`, for example `milestone_cap`, `rename_detection_limited`); its records are kept. `skipped`: did not start (an input reason, a dependency, or a budget reason). `aborted`: started, hit the budget, and its records were discarded.
+
+**Budget semantics.**
+- Time: a monotonic clock starts at `run()` entry. Before each stage the runner checks the remaining time; when it is below `finalize_reserve_s` the stage and every later stage are `skipped` with `budget_time`. Inside a stage the runner checks at cooperative points (between commits, pairs, files or PRs) and caps each git call's timeout at the remaining time; a hit makes that stage `aborted` with `budget_time` and every later stage `skipped` with `budget_time`. A per-call timeout from `Limits.git_call_timeout_s` that fires while budget remains is still `E_TIMEOUT` (an error, section 13).
+- Memory: resident set size growth of the calling process over its value at `run()` entry, read from `/proc/self/statm` at the same check points (falling back to `getrusage` peak when `/proc` is absent). Over `memory_mb`, or a `MemoryError` inside a stage, makes that stage `aborted` with `budget_memory`; its records are dropped, and every later stage is `skipped` with `budget_memory`. Git child processes are bounded by `Limits` (output bytes, blob size), not by `memory_mb`.
+- Records: when a finished stage would bring the kept total above `max_records`, that stage is `aborted` with `budget_records` and every later stage is `skipped` with `budget_records`. This one is deterministic.
+- Once any budget reason fires, no later stage runs, even one that would fit, so the set of kept stages is always a prefix of `STAGE_ORDER` minus input skips.
+- `finalize` always runs on the kept stages, inside the reserve.
+- `on_exhausted="fail"`: the first budget hit raises `E_TIMEOUT` (time) or `E_LIMIT` (memory, records) and nothing is published.
+
+**Partial results.** A run is partial when any stage has a reason in `BUDGET_REASONS`. Input skips and truncations do not make a run partial; they are listed. Partial results are published with `report["complete"] = False`; consumers must show which stages are missing and why.
+
+**Report layout** (`HistoryResult.report`, `traces-history-run/1`):
+
+```text
+report_version     "traces-history-run/1"
+repo, repo_sha     from HistoryRepoRef
+history_version    package version (EXTRACTOR.version)
+git_version        resolved Git version
+config_digest      HistoryConfig digest; config echoed under "config"
+budget             RunBudget.as_dict()
+inputs             {components_digest | null, evidence_set_shas: [sorted], pr_provider: bool, max_milestones}
+complete           bool: no stage has a budget reason
+partial_reasons    [{stage, reason, detail}] for budget reasons, in stage order (empty when complete)
+stage_order        STAGE_ORDER
+stages             [StageOutcome.as_dict()] one per stage in STAGE_ORDER, plus each stage's own report under "report"
+milestones         [{sha, reasons}] oldest first ([] when the stage did not complete)
+records            total kept
+records_digest     canonical_hash over the kept records (run_id and at excluded)
+warnings           [str] in stage order (non-error conditions of section 13)
+volatile           {run_id, at, elapsed_s, stage_elapsed_s: {stage: s}, rss_growth_mb}   excluded from determinism
+```
+
+**Errors.** Contract errors fail closed: `run()` raises `HistoryError(code, detail, stage)` with a code from section 13 and returns nothing, so no records are published. Preflight (before any Git call): `E_CONFIG` (config or budget invalid, `max_milestones` outside 2..20, wrong argument types), `E_SHA` (`repo.sha` not 40 lowercase hex), `E_COMPONENT_MAP`, `E_EVIDENCE_SET` (a set not keyed by its own SHA). In the ingest stage: `E_REPO`, `E_SHA` (rev-parse), `E_SHALLOW`, `E_MISSING_OBJECT`, `E_GIT_VERSION`, `E_GIT`, `E_TIMEOUT`, `E_LIMIT`, `E_CACHE`. In later stages: `E_EVIDENCE_SET` (a key that is not a selected milestone, a schema or repo mismatch), `E_REPLAY`, `E_PATH`. In finalize: `E_COLLISION`, `E_SCHEMA`. Budget exhaustion is not an error unless `on_exhausted="fail"`. `NotImplementedError` is raised only by the phase 1 stub.
+
+**Safety.** `run()` makes no network call and imports no network library; `gitcmd` is its only subprocess path, with transports, hooks, textconv, external diff and lazy fetch disabled (sections 11 and 16). It never executes target repository code, installs nothing, and writes only under `cache_dir`. PR data arrives only through `pr_provider`.
+
+**Determinism.** For the same repository objects, `repo.sha`, `config`, `components`, `evidence_sets`, `max_milestones`, provider data and package and Git versions: the same stages complete, and the kept records and `records_digest` are byte-identical (excluding `run_id` and `at`). Given the same set of kept stages, the records are identical whatever the budget was, because stages are all or nothing and run in a fixed order. `budget_records` outcomes are deterministic; `budget_time` and `budget_memory` outcomes depend on the machine and are always flagged in `partial_reasons`. Only `report["volatile"]` and the `run_id` and `at` fields vary between runs.
 
 ## 9. Computation rules
 
@@ -614,7 +749,7 @@ Every user-facing filtered view states what was filtered and how many commits or
 
 ## 13. Error codes and fail-closed behavior
 
-On any error below: write `errors.json` (`{code, detail, stage, at}`), write no `records.jsonl`, exit nonzero. Partial output is never published.
+On any error below: write `errors.json` (`{code, detail, stage, at}`), write no `records.jsonl`, exit nonzero. Output from an errored run is never published. A run cut short by its budget is not an error: it publishes the stages it completed, flagged partial (section 8.11), unless `on_exhausted="fail"`.
 
 | Code | When |
 |---|---|
@@ -644,6 +779,7 @@ Not errors (report warnings, run continues): no `.mailmap`; no component map (co
 - Records sorted by `claim_id`. Inside a record: `citations` by commit time then SHA, `paths` by path bytes, `derived_from` sorted.
 - No dependence on dict ordering, locale, time zone, wall clock or filesystem order. Ties in ranking break by SHA.
 - Floats rounded to 4 decimals before hashing and output.
+- `run()`: stage order is fixed and stages are all or nothing, so kept records depend only on the inputs and on which stages completed (section 8.11).
 
 ## 15. Caching
 
@@ -749,3 +885,6 @@ Binding. They supersede any conflicting text above.
 | D-H7 | Generated filter applies `dist/` and `build/` at any depth, matching whole directory segments only. Configurable and echoed in the criteria. | 12, HT12 |
 | D-H8 | The Evidence seat supplies `generated_paths`, including output dirs detected from generator config (for example the openapi-ts client). History consumes them. | 3, 12, HT12 |
 | D-H9 | Milestone cap: default 8 for the index worker; on-demand compare capped at 20. | 8.3, 9.7, 12, HT22 |
+| D-H10 | `PrContextProvider.artifact_bytes(pr_number) -> bytes \| None` is an optional Protocol method in `interface.py`, default `None`, backward compatible. With bytes, history verifies sha256 and quote_match against the artifact; with `None` the PR's records stay unvalidated. | 8, 9.9, HT18 |
+| D-H11 | No new check method in v1. `evidence_set_diff` keeps `git_recount` (family `text`); a dedicated method is deferred to schema 0.5. | 5, 9.8 |
+| D-H12 | Proposed by Traces History, pending Architect1 review of this PR: `run()` signature, `RunBudget`, `STAGE_ORDER`, stage statuses and reasons, and report layout frozen (phase 1). | 8.11, 13, 14 |

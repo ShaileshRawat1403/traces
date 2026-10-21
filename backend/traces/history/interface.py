@@ -51,6 +51,14 @@ class PrContextProvider(Protocol):
     """Implemented by the API/ingest layer (GitHub client, token, cache, rate limits); injected into history."""
     def get(self, pr_number: int) -> CachedPr | None: ...
 
+    def artifact_bytes(self, pr_number: int) -> bytes | None:
+        """Optional (Architect1, 2026-10-21): the exact bytes of the cached JSON artifact for `pr_number`, whose
+        sha256 is CachedPr.sha256, so history can verify it and quote_match against it. Default None means "not
+        offered": that PR's records stay unvalidated with the reason. Providers that subclass this Protocol inherit
+        the default; structural providers without the method are accepted at runtime (history looks it up with
+        getattr), so existing providers keep working unchanged."""
+        return None
+
 
 @dataclass(frozen=True)
 class Milestone:
