@@ -86,6 +86,20 @@ def claim_id(*, claim_kind: str, kind: str, granularity: str, frm: Mapping[str, 
     return "c_" + hashlib.sha256(canon(ident).encode("utf-8")).hexdigest()
 
 
+def recompute_claim_id(rec: Mapping[str, Any]) -> str:
+    """Recompute a record's claim_id from its own content (HT4): kind, granularity, endpoint symbols, the anchor kept
+    in provenance_raw.claim_anchor, the extractor in originator and parameters.digest. Symmetric records already
+    store from/to in byte order, so no reordering is needed."""
+    kind = rec.get("relationship_kind") or rec.get("node_kind")
+    ident = {"family": "traces-history", "claim_kind": rec["claim_kind"], "kind": kind,
+             "granularity": rec["granularity"],
+             "subject": {"from": (rec.get("from") or {}).get("symbol"), "to": (rec.get("to") or {}).get("symbol")},
+             "anchor": dict(rec["provenance_raw"]["claim_anchor"]),
+             "extractor": {"name": rec["originator"]["name"], "version": rec["originator"]["version"]},
+             "parameters_digest": rec["parameters"]["digest"]}
+    return "c_" + hashlib.sha256(canon(ident).encode("utf-8")).hexdigest()
+
+
 def make_check(cid: str, *, method: str, establishes: str, result: str, detail: str, ctx: RunContext,
                inputs: Sequence[Any] = (), family: str = "git", independent: bool = True) -> dict[str, Any]:
     validator = dict(GIT_VALIDATOR)
@@ -133,7 +147,7 @@ def make_record(ctx: RunContext, *, claim_kind: str, kind: str, granularity: str
     rec: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION, "claim_id": cid, "run_id": ctx.run_id, "repo": ctx.repo,
         "repo_sha": ctx.repo_sha, "claim_kind": claim_kind, "granularity": granularity, "statement": statement,
-        "class": cls, "originator": dict(ORIGINATOR), "provenance_raw": dict(provenance_raw),
+        "class": cls, "originator": dict(ORIGINATOR), "provenance_raw": {**provenance_raw, "claim_anchor": dict(anchor)},
         "provenance": provenance, "origin": dict(origin), "injected": False, "evidence_scope": evidence_scope,
         "qualifier": qualifier, "citations": [dict(c) for c in citations], "locations": [], "checks": checks,
         "status": status, "label": label, "status_history": hist, "visible_to_reviewer": True,

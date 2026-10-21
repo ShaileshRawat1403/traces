@@ -35,6 +35,29 @@ def resolve_blobs(runner: GitRunner, items: Sequence[tuple[str, bytes]]) -> dict
     return out
 
 
+def read_objects(runner: GitRunner, names: Sequence[bytes], *, want: bytes = b"blob") -> dict[bytes, bytes | None]:
+    """Read object contents with `cat-file --batch -Z`. Names are object ids or `<rev>:<path>` (path bytes). A name
+    that is missing or not of type `want` maps to None."""
+    out: dict[bytes, bytes | None] = {}
+    uniq = sorted(set(names))
+    if not uniq:
+        return out
+    data = runner.run("cat-file", ["--batch", "-Z"], stdin=b"".join(n + b"\0" for n in uniq))
+    i = 0
+    for n in uniq:
+        j = data.index(b"\0", i)
+        head = data[i:j]
+        if head.endswith(b" missing") or head.endswith(b" ambiguous") or head.count(b" ") != 2:
+            out[n] = None
+            i = j + 1
+            continue
+        _, typ, size = head.split(b" ")
+        k = int(size)
+        out[n] = data[j + 1:j + 1 + k] if typ == want else None
+        i = j + 1 + k + 1
+    return out
+
+
 def read_commit_parents(runner: GitRunner, shas: Sequence[str]) -> dict[str, tuple[str, ...] | None]:
     """Parents read from the raw commit objects (`cat-file --batch -Z`), independent of log/rev-list."""
     out: dict[str, tuple[str, ...] | None] = {}

@@ -21,7 +21,7 @@ from .model import Change, Commit, HistoryLog, RepoRef, decode_path
 META_FIELDS = 7  # %H %P %aN %aE %at %ct %B
 _RAW_HEAD = re.compile(rb"^:(\d{6}) (\d{6}) ([0-9a-f]{40}) ([0-9a-f]{40}) ([A-Z])(\d*)$")
 _NULL = "0" * 40
-_RENAME_LIMIT_WARN = re.compile(rb"(inexact rename detection was skipped|only found copies from modified paths)")
+_RENAME_LIMIT_WARN = re.compile(rb"(rename detection was skipped|only found copies from modified paths|diff\.renameLimit)")
 
 
 def open_runner(repo: RepoRef, config: HistoryConfig) -> GitRunner:

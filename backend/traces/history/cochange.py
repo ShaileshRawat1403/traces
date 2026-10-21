@@ -133,6 +133,7 @@ def cochange(log: HistoryLog, *, level: Literal["file", "component"] = "file", c
     recs = finalize(out)
     report = {"stage": "cochange", "level": level, "records": len(recs), "commits_considered": considered,
               "skipped_commits": dict(skipped), "parameters": params, "filters": flt.criteria(),
+              "filter_removals": flt.removals(log.commits),
               "observed": sum(1 for r in recs if r["status"] == "observed"),
               "wording": "changed together in N of M commits; never causation"}
     return HistoryResult(recs, report)

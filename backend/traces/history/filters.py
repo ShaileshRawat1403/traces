@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from collections import Counter
+from collections.abc import Iterable
 from functools import cached_property
+from typing import Any
 
 from .config import FilterSpec
 
@@ -19,6 +22,36 @@ class Filters:
 
     def is_bot(self, name: str, email: str) -> bool:
         return any(r.search(name) or r.search(email) for r in self._bot_res)
+
+    def bot_rule(self, name: str, email: str) -> str | None:
+        """The first bot pattern that matches the author, or None."""
+        for p, r in zip(self.spec.bot_author_patterns, self._bot_res, strict=True):
+            if r.search(name) or r.search(email):
+                return p
+        return None
+
+    def removals(self, commits: Iterable[Any]) -> dict[str, Any]:
+        """Per-rule removal counts over non-merge commits, for reports (contract section 12: every filtered view
+        states what was removed and how much, by rule). Counts are reported even when a filter is switched off,
+        with `applied` telling whether the pattern stages used it."""
+        bots: Counter[str] = Counter()
+        gen: Counter[str] = Counter()
+        gen_paths: set[str] = set()
+        for c in commits:
+            if len(c.parents) > 1:
+                continue
+            rule = self.bot_rule(c.author_name, c.author_email)
+            if rule is not None:
+                bots[rule] += 1
+            for ch in c.changes:
+                g = self.generated_rule(ch.path)
+                if g is not None:
+                    gen[g] += 1
+                    gen_paths.add(ch.path)
+        return {"bot_commits_by_pattern": dict(sorted(bots.items())), "bot_commits": sum(bots.values()),
+                "bot_filter_applied": self.spec.exclude_bots_from_patterns,
+                "generated_changes_by_rule": dict(sorted(gen.items())), "generated_paths": len(gen_paths),
+                "generated_filter_applied": self.spec.exclude_generated_from_patterns}
 
     def generated_rule(self, path: str) -> str | None:
         """Return the rule that marks `path` as generated, or None. Directory rules match whole segments only:
