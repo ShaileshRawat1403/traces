@@ -303,3 +303,13 @@ def test_run_inside_network_namespace(built: Any) -> None:
     p = subprocess.run([unshare, "-rn", sys.executable, "-c", code], capture_output=True, env=env, timeout=300)
     assert p.returncode == 0, p.stderr.decode()[-800:]
     assert p.stdout.decode().split() == [outside, "True"]
+
+
+def test_runtime_finalize_uses_stdlib_validator_only() -> None:
+    import ast
+
+    tree = ast.parse(Path(R.__file__).read_text())
+    mods = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+    mods |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+    assert not any(m.split(".")[0] == "jsonschema" for m in mods)
+    assert R.VALIDATE_EVERY_RECORD is True

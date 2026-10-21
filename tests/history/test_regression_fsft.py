@@ -242,6 +242,7 @@ def test_run_end_to_end_totals(fsft_repo: RepoRef, tmp_path_factory: pytest.Temp
     rep = res.report
     st = {s["stage"]: (s["status"], s["reason"], s["records"]) for s in rep["stages"]}
     assert rep["complete"] is True and rep["records"] == len(res.records) == 8402
+    assert_valid(res.records)  # CI cross-check of every record with jsonschema and stdlib (option C, D-H13)
     assert {k: v[2] for k, v in st.items() if v[2]} == {
         "commit_facts": 6460, "lifecycle": 9, "churn": 235, "hotspots": 145, "cochange_file": 144,
         "manifests": 653, "reverts": 54, "milestones": 8, "snapshot_compare": 694}

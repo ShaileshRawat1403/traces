@@ -141,7 +141,7 @@ class StageOutcome:
 # Tunables kept in one place so Architect1's open-question answers stay easy to change.
 GIT_AS_HEADROOM_MB: Final = 512        # RLIMIT_AS per git child = budget.memory_mb + this
 GIT_CPU_CEILING_S: int | None = None   # optional fixed RLIMIT_CPU per git child; always capped by remaining time
-VALIDATE_EVERY_RECORD: Final = True    # finalize validates every record (Architect1 answer 5)
+VALIDATE_EVERY_RECORD: Final = True    # finalize validates every record, stdlib validator (option C, D-H13)
 
 
 # Probes (clock, RSS) are module state so tests can inject fakes without touching the frozen signature.
@@ -364,33 +364,31 @@ def _input_skip(stage: str, st: _State) -> tuple[str, str] | None:
     return None
 
 
-_VALIDATORS: tuple[Any, Any] | None = None
+_VALIDATOR: Any = None
 
 
-def _validators() -> tuple[Any, Any]:
-    global _VALIDATORS
-    if _VALIDATORS is None:
+def _validator() -> Any:
+    """The Traces seat's stdlib 0.4 validator (option C, D-H13). The jsonschema cross-check of every record runs in
+    tests/history, not in the worker."""
+    global _VALIDATOR
+    if _VALIDATOR is None:
         import importlib
-
-        import jsonschema
 
         from traces.evidence.migrate import V04, load_schema
 
-        # Imported by name: traces.evidence.schema_check (Traces seat) is not annotated for mypy's strict settings,
-        # and following it would report its errors under history's mypy run. Requested as a shared-file fix.
-        validator_cls = importlib.import_module("traces.evidence.schema_check").Validator
-        schema = load_schema(V04)
-        _VALIDATORS = (validator_cls(schema),
-                       jsonschema.Draft202012Validator(schema, format_checker=jsonschema.FormatChecker()))
-    return _VALIDATORS
+        # Loaded by module name: traces.evidence.schema_check (Traces seat) is not annotated for mypy's strict
+        # settings, and following it would report its errors under history's mypy run. Follow-up: switch to a normal
+        # import once the API lane adds the annotations.
+        _VALIDATOR = importlib.import_module("traces.evidence.schema_check").Validator(load_schema(V04))
+    return _VALIDATOR
 
 
 def _finalize(records: list[Record]) -> list[Record]:
     out = finalize(records)  # sort by claim_id, E_COLLISION on one id with two contents
     if VALIDATE_EVERY_RECORD:
-        std, js = _validators()
+        std = _validator()
         for r in out:
-            errs = [str(e) for e in std.errors(r)] + [e.message for e in js.iter_errors(r)]
+            errs = [str(e) for e in std.errors(r)]
             if errs or r.get("status") == "verified":
                 why = errs[0] if errs else "history records never reach verified"
                 raise HistoryError(E_SCHEMA, f"{r.get('claim_id')}: {why[:300]}", FINALIZE_STAGE)
