@@ -1,6 +1,8 @@
 """Regression for the shared-connection bug: `traces serve` returned occasional 500s (sqlite3.InterfaceError in
-Store.get_repo) because one SQLite connection was shared across the API's worker threads. These tests drive a real
-uvicorn server over a file-backed store with about 200 parallel requests and require zero 5xx responses."""
+Store.get_repo) and false 404s ("repo not found" for a registered repo: a read on the shared connection returned no
+row while another thread was mid-statement), because one SQLite connection was shared across the API's worker threads.
+These tests drive a real uvicorn server over a file-backed store with about 200 parallel requests to resources that
+all exist, and require every response to be 200: zero 5xx and zero false 404s."""
 from __future__ import annotations
 
 import copy
@@ -77,10 +79,14 @@ def test_parallel_requests_never_5xx(server):
     w.start()
     with httpx.Client(base_url=url, timeout=30) as c, ThreadPoolExecutor(max_workers=32) as ex:
         statuses = list(ex.map(lambda i: c.get(paths[i % len(paths)]).status_code, range(210)))
+        # direct store reads from many threads must never report an existing repo as missing
+        missing = sum(1 for r in ex.map(lambda _: st.get_repo(RID), range(400)) if r is None)
+    assert missing == 0
     stop.set()
     w.join()
     assert len(statuses) == 210
-    assert [s for s in statuses if s >= 500] == []
+    assert [s for s in statuses if s >= 500] == [], "5xx under concurrent requests"
+    assert [s for s in statuses if s == 404] == [], "false 404 (existing repo/snapshot/claim/job reported not found)"
     assert set(statuses) == {200}
 
 
