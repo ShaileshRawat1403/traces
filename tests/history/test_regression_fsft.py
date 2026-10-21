@@ -227,3 +227,34 @@ def test_pr_context_links_and_offline(log_default: HistoryLog) -> None:
     assert_valid(res.records)
     assert len(res.records) == 2 and all(r["status"] == "observed" for r in res.records)
     assert len(res.report["prs_missing"]) == len(links) - 1
+
+
+def test_run_end_to_end_totals(fsft_repo: RepoRef, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """run() on fsft. 8402 = the 8136 of the all-stage collision test, minus 12 impact candidates (impact is a
+    query-time API, not a run stage), minus 416 first..head snapshot records, plus 694 records from the 7
+    consecutive milestone pairs that run() compares (section 8.11)."""
+    from traces.history.milestones import milestone_records as _mr
+    from traces.history.records import finalize
+    from traces.history.runner import run
+
+    res = run(fsft_repo, HistoryConfig(), cache_dir=tmp_path_factory.mktemp("rcache"),
+              run_id=CTX.run_id, at=CTX.at)
+    rep = res.report
+    st = {s["stage"]: (s["status"], s["reason"], s["records"]) for s in rep["stages"]}
+    assert rep["complete"] is True and rep["records"] == len(res.records) == 8402
+    assert {k: v[2] for k, v in st.items() if v[2]} == {
+        "commit_facts": 6460, "lifecycle": 9, "churn": 235, "hotspots": 145, "cochange_file": 144,
+        "manifests": 653, "reverts": 54, "milestones": 8, "snapshot_compare": 694}
+    assert st["milestones"][:2] == ("truncated", "milestone_cap")
+    log = ingest(fsft_repo, HistoryConfig())
+    ms = select_milestones(log)
+    assert [m["sha"] for m in rep["milestones"]] == [m.sha for m in ms]
+    direct: list[dict] = []
+    for fn in (commit_facts, lifecycle, churn, hotspots, cochange, manifest_changes, reverts):
+        direct += list(fn(log, ctx=CTX).records)
+    direct += list(_mr(log, ms, ctx=CTX).records)
+    for a, b in zip(ms, ms[1:], strict=False):
+        direct += list(snapshot_compare(log, a.sha, b.sha, ctx=CTX).records)
+    assert rep["records_digest"] == canonical_hash(finalize(direct))
+    v = rep["volatile"]
+    assert v["finalize_s"] > 0 and v["elapsed_s"] >= v["finalize_s"]

@@ -2,7 +2,7 @@
 
 Read-only, no network. Implemented so far: gitcmd, ingest and cache, filters and config, commit facts, lifecycle,
 churn and hotspots, co-change, manifests, reverts, milestones, snapshot compare and evidence-set diff, history impact and PR context (injected provider only).
-The whole-run entry point run()/GitHistoryRunner has a frozen signature (section 8.11); its pipeline is phase 2.
+The whole-run entry point run()/GitHistoryRunner (section 8.11) runs every stage under a RunBudget.
 """
 
 from .churn import churn, hotspots

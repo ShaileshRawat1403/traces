@@ -133,7 +133,7 @@ The history module's contract is [docs/contracts/history.md](contracts/history.m
 
 | Hook | Direction | Contract |
 | --- | --- | --- |
-| H1 | index worker -> history | `HistoryRunner.run(repo=HistoryRepoRef(path, repo, sha), components=..., evidence_sets=..., pr_provider=..., cache_dir=...)` with a full-history clone made by `traces.ingest.fetch` and a pinned SHA. Returns `HistoryResult(records, report)`; records are 0.4 with `evidence_scope` history or documented. |
+| H1 | index worker -> history | `HistoryRunner.run(repo=HistoryRepoRef(path, repo, sha), config=..., budget=..., components=..., evidence_sets=..., pr_provider=..., cache_dir=...)` with a full-history clone made by `traces.ingest.fetch` and a pinned SHA; `config` (`HistoryConfig`) and `budget` (`RunBudget`) default to the runner's own. Concrete runner: `traces.history.GitHistoryRunner(config, budget, max_milestones=8)`, or the function `traces.history.run(repo, config, budget=...)`. Returns `HistoryResult(records, report)`; records are 0.4 with `evidence_scope` history or documented; report is `traces-history-run/1` with per-stage status and partial flags (docs/contracts/history.md section 8.11). |
 | H2 | evidence -> history | `traces.evidence.types.ComponentMap` (deterministic, with digest) for the snapshot SHA. |
 | H3 | history -> index worker | `select_milestones()` returns up to 8 SHAs (20 on demand). The worker runs the evidence pipeline at each and passes `{sha: EvidenceSet}` back through `evidence_sets`. |
 | H4 | API/ingest -> history | `PrContextProvider.get(pr_number) -> CachedPr`. The GitHub client, token, cache and rate limits live in the API/ingest layer; history never touches the network or a token. |

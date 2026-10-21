@@ -94,7 +94,7 @@ def test_stage_order_and_reason_sets_frozen() -> None:
                            "detail": "alias suggestions are not in v1", "records": 0}
 
 
-def test_preflight_fails_closed_then_phase2_stub() -> None:
+def test_preflight_fails_closed() -> None:
     cfg = HistoryConfig()
     cases = [
         (lambda: run(REPO, cfg, budget=RunBudget(time_s=-1)), "E_CONFIG"),
@@ -114,7 +114,15 @@ def test_preflight_fails_closed_then_phase2_stub() -> None:
         with pytest.raises(HistoryError) as ei:
             fn()
         assert ei.value.code == code
-    with pytest.raises(NotImplementedError):
-        run(REPO, cfg)
-    with pytest.raises(NotImplementedError):
-        GitHistoryRunner().run(REPO)
+    for fn in (lambda: run(REPO, cfg), lambda: GitHistoryRunner().run(REPO)):
+        with pytest.raises(HistoryError) as ei:
+            fn()
+        assert ei.value.code == "E_REPO"  # preflight passed; the ingest stage fails closed on the missing path
+
+
+def test_protocol_has_config_and_budget() -> None:
+    names = [n for n, *_ in _shape(iface.HistoryRunner.run)]
+    assert names == ["self", "repo", "config", "budget", "components", "evidence_sets", "pr_provider", "cache_dir"]
+    assert [n for n, *_ in _shape(iface.HistoryRunner.select_milestones)] == [
+        "self", "repo", "max_milestones", "components", "config"]
+    assert [n for n, *_ in _shape(iface.NotImplementedHistory.run)] == names

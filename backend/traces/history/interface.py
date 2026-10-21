@@ -5,7 +5,7 @@ is authoritative for history's public API. This file pins only what other seats 
 API can be written against it before history lands. The History seat may move these names into its package as long
 as the signatures below keep working (CONTRACTS.md section 6).
 
-H1  index worker -> history:  HistoryRunner.run(repo=HistoryRepoRef(clone path, sha), ...)
+H1  index worker -> history:  HistoryRunner.run(repo=HistoryRepoRef(clone path, sha), config=..., budget=..., ...)
 H2  evidence -> history:      ComponentMap (traces.evidence.types) passed as `components`
 H3  history -> index worker:  select_milestones(...) returns SHAs; the worker runs the evidence pipeline at each
                               and passes the resulting EvidenceSets back as `evidence_sets`
@@ -16,9 +16,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from traces.evidence.types import ComponentMap, EvidenceRecord, EvidenceSet, Sha
+
+if TYPE_CHECKING:  # annotations only; avoids an import cycle with the history package
+    from traces.history.config import HistoryConfig
+    from traces.history.runner import RunBudget
 
 
 @dataclass(frozen=True)
@@ -73,10 +77,16 @@ class HistoryResult:
 
 
 class HistoryRunner(Protocol):
-    def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
-                          components: ComponentMap | None = None) -> Sequence[Milestone]: ...
+    """Hook H1. `config` and `budget` default to the runner's own (set at construction); a `config` passed here
+    must be the same one used for select_milestones, or the evidence_sets keys will not match (E_EVIDENCE_SET).
+    `max_milestones` may be lower than the runner's cap, never higher (E_CONFIG)."""
 
-    def run(self, repo: HistoryRepoRef, *, components: ComponentMap | None = None,
+    def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
+                          components: ComponentMap | None = None,
+                          config: HistoryConfig | None = None) -> Sequence[Milestone]: ...
+
+    def run(self, repo: HistoryRepoRef, *, config: HistoryConfig | None = None, budget: RunBudget | None = None,
+            components: ComponentMap | None = None,
             evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
             pr_provider: PrContextProvider | None = None, cache_dir: Path | None = None) -> HistoryResult: ...
 
@@ -85,10 +95,12 @@ class NotImplementedHistory:
     """Placeholder until the History seat merges; every call fails explicitly (no fake data)."""
 
     def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
-                          components: ComponentMap | None = None) -> Sequence[Milestone]:
+                          components: ComponentMap | None = None,
+                          config: HistoryConfig | None = None) -> Sequence[Milestone]:
         raise NotImplementedError("history: not implemented (owner: Traces History, see docs/contracts/history.md)")
 
-    def run(self, repo: HistoryRepoRef, *, components: ComponentMap | None = None,
+    def run(self, repo: HistoryRepoRef, *, config: HistoryConfig | None = None, budget: RunBudget | None = None,
+            components: ComponentMap | None = None,
             evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
             pr_provider: PrContextProvider | None = None, cache_dir: Path | None = None) -> HistoryResult:
         raise NotImplementedError("history: not implemented (owner: Traces History, see docs/contracts/history.md)")
