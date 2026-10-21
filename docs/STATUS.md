@@ -31,6 +31,11 @@ Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/trace
 | API: history endpoints, compare | 501 | Traces History | HISTORY |
 | API: explain, chat bundle | 501 | Traces UI | EXPLAIN |
 | Web UI shell | merged (#6) | Traces UI | working screens: repos list and register, repo page, claims, reviewer view, evidence page, job polling (ETag). Overview, components, routes, graph, trace, source, history and ask call their real endpoints and show the 501 state. Bundle: main 120 kB gzip, graph chunk 140 kB gzip (lazy-loaded). Playwright e2e in `web/e2e` (not yet in CI; Traces Lab owns the harness) |
+| UI overview | merged (#7) | Traces UI | grounded, interpretation and unknown layers; renders the overview endpoint once it exists (501 today) |
+| UI graph + evidence drawer | merged (#10) | Traces UI | Cytoscape graph (lazy chunk) with list fallback and evidence drawer; pinned source lines highlighted with shiki |
+| UI trace | merged (#12) | Traces UI | ordered steps with explicit gap and library_contract items (inferred, with reason) |
+| UI explain / Ask (deterministic) | merged (#13) | Traces UI | `backend/traces/explain` engine (no LLM) + Ask screen; `POST .../explain` in the API is still 501 until the API lane wires it |
+| Web dependencies | | Traces UI | new: shiki 4.5.0 (MIT, with @shikijs/langs and @shikijs/themes 4.5.0), @radix-ui/react-tabs 1.2.1 (MIT); full list in `web/DEPENDENCIES.md`. Bundle after #13: main 131 kB gzip, graph chunk 144 kB gzip (lazy), shiki grammars lazy per language |
 | OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
 | CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
 | Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
@@ -54,6 +59,6 @@ Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/
 
 1. CI activation: waiting on Shailesh to add the `workflow` scope to the push token (D-018); until then CI has not run.
 2. Memory cap for the indexer: `ulimit -v` breaks CodeGraph's WebAssembly; choose cgroup v2 or container limits (D-006).
-3. Bug (owner: Traces): concurrent API requests cause intermittent 500s, `sqlite3.InterfaceError: bad parameter or other API misuse` in `Store.get_repo` (`backend/traces/evidence/store.py`): one `sqlite3` connection opened with `check_same_thread=False` is shared across request threads without a lock. Reported by Traces UI in PR #6 (7 times in about 300 e2e page loads).
+3. Closed by #8 (per-thread SQLite connections, WAL, busy_timeout, write lock): the concurrent-request `sqlite3.InterfaceError` 500s in `Store.get_repo`. Regression test `tests/api/test_store_concurrency.py`; Playwright e2e with 4 workers: 0 API 500s.
 4. `starlette.testclient` warns that `httpx` is deprecated in favor of `httpx2`; switch when FastAPI's test client does.
 5. Index worker, HEAD discovery and the GitHub client (with token, cache, rate limits) are not built (INGEST/INDEX).
