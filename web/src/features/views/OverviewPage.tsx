@@ -21,7 +21,6 @@ function SnapshotCounts() {
   const by = (s.stats as { by_status?: Record<string, number> }).by_status ?? {};
   const shown = Object.entries(by).filter(([st]) => !presentStatus({ status: st, label: LABEL_FOR[st] }, "default").hidden);
   const rejected = by.rejected ?? 0;
-  const ext = s.extractor as Record<string, string>;
   return (
     <Card className="mb-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -43,7 +42,6 @@ function SnapshotCounts() {
           <Link to={`${snapshotBase(repoId, sha)}/review`}>reviewer view</Link> to see them.
         </p>
       ) : null}
-      <p className="mt-3 text-xs text-muted">Extractor {Object.entries(ext).map(([k, v]) => `${k} ${v}`).join(", ")}</p>
     </Card>
   );
 }
