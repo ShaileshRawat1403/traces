@@ -1,4 +1,4 @@
-"""INDEX worker: one index job for one public repository at one pinned SHA (CONTRACTS.md section 3.2, D-020).
+"""INDEX worker: one index job for one public repository at one pinned SHA (CONTRACTS.md section 3.2, D-022).
 
 Phases (job.phase), each a step of the job state machine:
   fetching      safe pinned clone into the per-repo cache (traces.ingest.fetch: no hooks, no LFS smudge, no submodules,

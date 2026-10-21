@@ -1,4 +1,4 @@
-"""In-process index job runner (D-020). Jobs run on a small thread pool (default one at a time, so indexes never
+"""In-process index job runner (D-022). Jobs run on a small thread pool (default one at a time, so indexes never
 compete for memory); state lives in the store, so pollers see every change through GET /jobs/{id} (ETag = version).
 Jobs left queued or running by a previous process are marked failed (`interrupted`) on startup: terminal states are
 final and a reindex is a new job (CONTRACTS.md 3.2)."""
