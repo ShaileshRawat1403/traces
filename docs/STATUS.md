@@ -2,6 +2,20 @@
 
 Updated 2026-10-21 IST. Milestone: FOUNDATION.
 
+## Seat assignments
+
+Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/traces-v1`. A seat does not modify another seat's owned paths.
+
+| Seat | Owns |
+| --- | --- |
+| Traces | evidence, ingest, index, views and API (`backend/traces/{evidence,adapter,validators,ingest,core,api}`, `workers/`, `toolchain/`) |
+| Traces Lab | CI, e2e harness, security, second repo, acceptance (`ci/` and `.github/workflows/`, `tests/e2e`, security tests) |
+| Traces History | `backend/traces/history` (and `docs/contracts/history.md`) |
+| Traces UI | `web/` and explain (`backend/traces/explain`) |
+| Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, integration merges |
+
+## Progress
+
 | Area | State | Owner | Notes |
 | --- | --- | --- | --- |
 | Integration branch, draft PR | done | Architect | `build/traces-v1`; draft PR "Traces v1 (integration, do not merge)" |
@@ -13,17 +27,18 @@ Updated 2026-10-21 IST. Milestone: FOUNDATION.
 | API: health, meta, repos, snapshots, claims, export, jobs | done | Traces | |
 | API: head, index jobs | 501 | Traces | INGEST, INDEX |
 | API: overview, components, routes, graph, source, trace | 501 | Traces | VIEWS |
-| API: history endpoints, compare | 501 | Traces History | after `docs/contracts/history.md` PR |
+| History contract | done | Traces History | [docs/contracts/history.md](contracts/history.md), merged from PR #3 |
+| API: history endpoints, compare | 501 | Traces History | HISTORY |
 | API: explain, chat bundle | 501 | Traces UI | EXPLAIN |
 | Web scaffold | done | Traces UI | repos, snapshots, claims, reviewer view; other views show explicit not-implemented |
 | OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
-| CI workflow | staged | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Move to `.github/workflows/ci.yml` with a token that has it. No CI run yet. |
+| CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
 | Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
-| History module | not started here | Traces History | `backend/traces/history/interface.py` holds the hook points |
+| History module | not started | Traces History | `backend/traces/history/interface.py` holds the hook points |
 
 ## Open items
 
-1. Workflow file needs a push with `workflow` scope (D-018); until then CI has not run.
+1. CI activation: waiting on Shailesh to add the `workflow` scope to the push token (D-018); until then CI has not run.
 2. Memory cap for the indexer: `ulimit -v` breaks CodeGraph's WebAssembly; choose cgroup v2 or container limits (D-006).
 3. Web bundle is one 600+ kB chunk (Cytoscape); code-split the graph view when it lands.
 4. `starlette.testclient` warns that `httpx` is deprecated in favor of `httpx2`; switch when FastAPI's test client does.
