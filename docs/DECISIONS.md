@@ -56,6 +56,12 @@ Shared record types live in `traces.evidence`; history owns `backend/traces/hist
 ## D-018 CI workflow file staged outside .github (temporary)
 The available push token lacks the `workflow` scope, so GitHub refuses any push touching `.github/workflows/`. The workflow is committed at `ci/github-actions-ci.yml` and must be moved to `.github/workflows/ci.yml` by a credential with that scope (one `git mv`). Tracked in STATUS.
 
+## D-019 Evidence-set diff keeps the git_recount check family in v1 (2026-10-21)
+For v1, `evidence_set_diff` records (`snapshot_added` / `snapshot_removed`) keep using the `git_recount` check method for their independent check. A dedicated evidence-set recount check method is deferred to schema 0.5. No schema change in v1. Raised by Traces History in PR #11.
+
+## D-020 PrContextProvider gains optional artifact_bytes (2026-10-21)
+`PrContextProvider` gains an optional `artifact_bytes(pr_number) -> bytes | None`. When a provider offers it, history verifies the cached artifact's sha256 and quoted PR text can reach `observed` via `quote_match`; without it, PR quotes stay `unvalidated` with a reason. The real GitHub provider (client, token, cache, rate limits) will be wired by the API lane (Traces seat). Raised by Traces History in PR #11.
+
 ## D-H6 History git-object fact claim_ids anchor to the commit (2026-10-21)
 Requested by Traces History in PR #3, recorded verbatim:
 
