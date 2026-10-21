@@ -8,10 +8,10 @@ returns a `CachedPr` or None. Records: `merged_as` (PR to local commit) and `doc
 each review comment that is non-empty after trimming. Quotes are byte-exact slices of the cached text and are
 observed via `quote_match` only, which establishes that the quote exists, never intent.
 
-The sha256 of the cached artifact can only be checked when the provider also offers the artifact bytes
-(`artifact_bytes(pr_number) -> bytes | None`, optional, see PrArtifactSource). Without them the records stay
-unvalidated with that reason. A PR that fails its shape check, its sha256 check or whose artifact does not contain
-its own text is skipped with a warning; the run continues.
+The sha256 of the cached artifact can only be checked when the provider offers the artifact bytes through the
+optional `PrContextProvider.artifact_bytes(pr_number) -> bytes | None` (interface.py, default None). None, or a
+provider without the method, means "not offered": the records stay unvalidated with that reason. A PR that fails its
+shape check or its sha256 check, or whose artifact is not UTF-8 JSON, is skipped with a warning; the run continues.
 """
 
 from __future__ import annotations
@@ -40,7 +40,8 @@ RATIONALE_QUALIFIER = "quoted rationale, not proof of intent"
 
 @runtime_checkable
 class PrArtifactSource(Protocol):
-    """Optional extra capability of a provider: the exact cached artifact bytes, so history can verify sha256."""
+    """Kept for compatibility with #11. The capability now lives on PrContextProvider.artifact_bytes (optional,
+    default None); pr_context looks it up with getattr and does not use this Protocol."""
 
     def artifact_bytes(self, pr_number: int) -> bytes | None: ...
 
@@ -125,7 +126,7 @@ def pr_context(log: HistoryLog, provider: PrContextProvider | None, *, ctx: RunC
     mismatched: list[int] = []
     unverified: list[int] = []
     used = 0
-    can_bytes = isinstance(provider, PrArtifactSource)
+    fetch_bytes = getattr(provider, "artifact_bytes", None)
     for number, shas in links.items():
         pr = provider.get(number)
         if pr is None:
@@ -133,10 +134,10 @@ def pr_context(log: HistoryLog, provider: PrContextProvider | None, *, ctx: RunC
             continue
         problem = _shape_problem(pr, number)
         strings: set[str] | None = None
-        if problem is None and can_bytes:
-            raw = provider.artifact_bytes(number)  # type: ignore[attr-defined]
-            if raw is None:
-                problem = "provider offers artifact bytes but returned none for this PR"
+        raw = fetch_bytes(number) if problem is None and callable(fetch_bytes) else None
+        if raw is not None:
+            if not isinstance(raw, bytes):
+                problem = "artifact_bytes returned something other than bytes"
             elif hashlib.sha256(raw).hexdigest() != pr.sha256:
                 problem = "cached artifact bytes do not match their sha256"
             else:

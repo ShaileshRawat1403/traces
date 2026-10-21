@@ -2,6 +2,7 @@
 
 Read-only, no network. Implemented so far: gitcmd, ingest and cache, filters and config, commit facts, lifecycle,
 churn and hotspots, co-change, manifests, reverts, milestones, snapshot compare and evidence-set diff, history impact and PR context (injected provider only).
+The whole-run entry point run()/GitHistoryRunner (section 8.11) runs every stage under a RunBudget.
 """
 
 from .churn import churn, hotspots
@@ -20,10 +21,12 @@ from .model import Change, Commit, HistoryLog, RepoRef
 from .pr_context import PrArtifactSource, link_prs, pr_context
 from .records import RunContext, canonical_hash, claim_id
 from .reverts import find_reverts, reverts
+from .runner import GitHistoryRunner, RunBudget, StageOutcome, run
 from .shapes import ComponentDef, ComponentMap, Record, default_context, validate_component_map
 
 __all__ = [
     "Change", "Commit", "ComponentDef", "ComponentMap", "HistoryRepoRef", "FilterSpec", "GitRunner", "HistoryConfig", "HistoryError", "HistoryLog",
     "HistoryResult", "Limits", "Record", "RepoRef", "RunContext", "Thresholds", "canonical_hash", "churn", "claim_id",
     "cochange", "commit_facts", "default_context", "hotspots", "ingest", "lifecycle", "manifest_changes", "manifest_events", "evidence_set_diff", "find_reverts", "link_prs", "pr_context", "PrArtifactSource", "history_impact", "ImpactResult", "milestone_records", "select_milestones", "snapshot_compare", "reverts", "validate_component_map",
+    "GitHistoryRunner", "RunBudget", "StageOutcome", "run",
 ]
