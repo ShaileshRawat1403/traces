@@ -93,9 +93,9 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
         </ul>
       </details>
 
-      <div className="mt-3 rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold">Where the cited evidence comes from</h2>
-        <dl className="mt-2 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-sm" data-testid="categories">
+      <details className="mt-3 rounded-lg border border-line bg-surface">
+        <summary className="tap flex cursor-pointer items-center px-4 text-sm font-semibold">Where the cited evidence comes from</summary>
+        <dl className="mt-0 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 border-t border-line p-4 text-sm" data-testid="categories">
           {cats.map((k) => (
             <div key={k} className="contents">
               <dt>
@@ -106,7 +106,7 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
             </div>
           ))}
         </dl>
-      </div>
+      </details>
 
       {r.prompt_bundle || r.outbound_manifest.length ? (
         <section className="mt-3 rounded-lg border border-inferred/50 bg-surface p-4" aria-label="What would be sent" data-testid="outbound">

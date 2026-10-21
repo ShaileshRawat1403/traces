@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { describe, expect, it } from "vitest";
 import { cochangeSample, hotspotsSample, HISTORY_SHAS, historyRecords, milestonesSample, timelineSample } from "../../testing/samples";
@@ -74,8 +75,9 @@ describe("history renderers", () => {
     expect(rows[2]!.textContent).toContain("not reported");
     expect((await axe.run(container)).violations.map((v) => v.id)).toEqual([]);
   });
-  it("prints record parameters verbatim as the criteria echo", () => {
+  it("prints record parameters verbatim as the criteria echo", async () => {
     render(<Criteria endpoint="GET history/cochange" records={cochangeSample.items.map((i) => rec(i.claim_id))} loading={false} />);
+    await userEvent.click(screen.getByText(/Criteria used/));
     const pre = screen.getByLabelText("Parameters, verbatim");
     expect(JSON.parse(pre.textContent!)).toEqual((historyRecords[cochangeSample.items[0]!.claim_id]!.parameters as { values: unknown }).values);
   });

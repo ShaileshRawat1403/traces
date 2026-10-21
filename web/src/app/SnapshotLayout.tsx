@@ -120,10 +120,10 @@ export function SnapshotLayout() {
             </span>
           ) : null}
         </div>
-        <p className="mb-1 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-ink-2" data-testid="static-disclaimer">
+        <p className="mb-1 rounded-md border border-line bg-sunken px-3 py-1.5 text-xs text-ink-2" data-testid="static-disclaimer">
           {STATIC_DISCLAIMER}
         </p>
-        <p className="mb-4 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>
+        <p className="mb-3 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>
         <Outlet />
       </main>
       <nav aria-label="Snapshot sections, bottom bar" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface md:hidden">

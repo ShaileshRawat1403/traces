@@ -7,7 +7,7 @@ import { distinctParameters, type HistoryExtras } from "./historyRecord";
 export function Criteria({ endpoint, records, loading }: { endpoint: string; records: readonly (HistoryExtras | null | undefined)[]; loading: boolean }) {
   const sets = distinctParameters(records);
   return (
-    <details className="rounded-lg border border-line bg-surface" data-testid="criteria" open>
+    <details className="rounded-lg border border-line bg-surface" data-testid="criteria">
       <summary className="tap flex cursor-pointer flex-wrap items-center gap-x-1 px-3 text-sm font-semibold">
         Criteria used <code className="min-w-0 break-all font-normal text-xs">{endpoint}</code>
       </summary>

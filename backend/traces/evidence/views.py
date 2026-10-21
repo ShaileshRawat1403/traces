@@ -431,15 +431,25 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
         nodes_eps.setdefault(src, src_ep)
         nodes_eps.setdefault(dst, dst_ep)
 
+    by_comp = {c["id"]: c for c in comps}
     chosen = edges_all
     focus_id: str | None = None
     focus_ep: dict[str, Any] | None = None
     if focus:
         focus_id = _resolve(focus, set(nodes_eps))
-        focus_ep = nodes_eps.get(focus_id) if focus_id else None
-        if focus_id is None:
+        comp_focus = by_comp.get(focus) if focus_id is None else None
+        if focus_id is None and comp_focus is None:
             chosen = []
+        elif comp_focus is not None:
+            members = {sym for sym, ep in nodes_eps.items() if file_comp.get(ep.get("file")) == comp_focus["id"]}
+            chosen = [
+                r for r in edges_all
+                if (r.get("from") or {}).get("symbol") in members or (r.get("to") or {}).get("symbol") in members
+            ]
+            focus_id = None
         else:
+            assert focus_id is not None
+            focus_ep = nodes_eps.get(focus_id)
             depth = max(0, min(4, depth))
             seen = {focus_id}
             frontier = {focus_id}

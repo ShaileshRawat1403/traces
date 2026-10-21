@@ -151,6 +151,9 @@ def test_graph_hides_rejected_and_history(client):
     focused = http.get(f"{BASE}/graph", params={"focus": "a.py::foo", "depth": 1, "status": ["verified"]}).json()
     assert {e["id"] for e in focused["edges"]} == {_id(1)}
     assert any(n["id"] == "component::pkg" for n in focused["nodes"])
+    by_component = http.get(f"{BASE}/graph", params={"focus": "component::pkg", "depth": 1, "status": ["verified"]}).json()
+    assert _id(1) in {e["id"] for e in by_component["edges"]}
+    assert any(n["id"] == "component::pkg" for n in by_component["nodes"])
 
 
 def test_trace_uses_library_hop_and_not_the_rejected_shortcut(client):

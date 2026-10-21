@@ -105,6 +105,7 @@ export interface ElementData {
   label: string;
   parent?: string;
   entity?: string;
+  layer?: string;
   source?: string;
   target?: string;
   tone?: string;
@@ -126,6 +127,19 @@ export function canvasElements<T extends { data: ElementData }>(elements: readon
   return [...comps, ...edges];
 }
 
+/** Unfocused canvas: every stored component, plus any component-to-component edges already on the page. */
+export function openingMap(components: readonly { id: string; name: string; layer: string }[], elements: readonly { data: ElementData }[]): { data: ElementData }[] {
+  if (components.length === 0) return canvasElements(elements, false);
+  const ids = new Set(components.map((c) => c.id));
+  const nodes = components.map((c) => ({ data: { id: c.id, label: c.name, entity: "component", layer: c.layer } }));
+  const edges = elements.filter((e) => {
+    const src = e.data.source;
+    const tgt = e.data.target;
+    return !!src && !!tgt && ids.has(src) && ids.has(tgt);
+  });
+  return [...nodes, ...edges];
+}
+
 /** Cytoscape elements: component nodes become compound parents of the symbol nodes inside their paths. */
 export function toElements(data: GraphResponse, components: readonly Component[]): { data: ElementData }[] {
   const ids = new Set(data.nodes.map((n) => n.id));
@@ -134,7 +148,7 @@ export function toElements(data: GraphResponse, components: readonly Component[]
     const c = componentForFile(n.file, components);
     return c && ids.has(c.id) ? c.id : undefined;
   };
-  const nodes = data.nodes.map((n) => ({ data: { id: n.id, label: n.label, entity: n.entity, parent: parentOf(n) } }));
+  const nodes = data.nodes.map((n) => ({ data: { id: n.id, label: n.label, entity: n.entity, layer: n.layer || undefined, parent: parentOf(n) } }));
   const { edges } = drawableEdges(data);
   return [
     ...nodes,

@@ -1,16 +1,16 @@
 // Code-split route: this module and Cytoscape load only when the graph route opens.
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Component, type GraphEdge, type GraphNode, type GraphResponse } from "../../api/client";
 import { splitSymbol } from "../../api/record";
 import { snapshotBase } from "../../app/nav";
 import { HiddenCounts } from "../../ui/HiddenCounts";
-import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { Button, Empty, ErrorState, Loading } from "../../ui/States";
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas } from "./GraphCanvas";
-import { LAYERS, STATUS_FILTERS, canvasElements, countsFor, drawableEdges, graphQuery, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
+import { LAYERS, STATUS_FILTERS, canvasElements, countsFor, drawableEdges, graphQuery, openingMap, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
@@ -184,7 +184,11 @@ function SelectionPanel({
       </div>
       <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
       {mine.length === 0 ? (
-        <p className="text-sm text-muted">None with the current filters.</p>
+        <p className="text-sm text-muted">
+          {node.entity === "component"
+            ? "The lines on the map connect symbols inside this component, not the component itself. Select a symbol to open its evidence. The boundary is a stored path rule, not a runtime edge."
+            : "None with the current filters."}
+        </p>
       ) : (
         <ul className="mt-1 flex max-h-72 flex-col gap-2 overflow-y-auto">
           {mine.slice(0, 50).map((e) => (
@@ -240,6 +244,7 @@ export default function GraphPage() {
   const mode: Mode = sp.get("view") === "list" ? "list" : sp.get("view") === "cards" ? "cards" : "graph";
   const claim = sp.get("claim");
   const [selected, setSelected] = useState<string | null>(state.focus);
+  const picked = useRef(false);
   const [q, setQ] = useState(state.q);
   const searchId = useId();
   const query = graphQuery(state);
@@ -248,7 +253,20 @@ export default function GraphPage() {
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const components = useMemo(() => comps.data ?? [], [comps.data]);
   const elements = useMemo(() => (graph.data ? toElements(graph.data, components) : []), [graph.data, components]);
-  const drawn = useMemo(() => canvasElements(elements, !!state.focus), [elements, state.focus]);
+  const drawn = useMemo(() => (state.focus ? canvasElements(elements, true) : openingMap(components, elements)), [elements, state.focus, components]);
+  // A component id has no incident edges: the relationships belong to its symbols. Don't preselect it, or the panel
+  // says "0" and the canvas dims the neighborhood the user came to see. A symbol focus stays selected (list view).
+  useEffect(() => {
+    if (picked.current || !graph.data || !selected) return;
+    const node = graph.data.nodes.find((n) => n.id === selected);
+    if (node?.entity !== "component") return;
+    const incident = drawableEdges(graph.data).edges.some((e) => e.source === selected || e.target === selected);
+    if (!incident) setSelected(null);
+  }, [graph.data, selected]);
+  const choose = useCallback((id: string | null) => {
+    picked.current = true;
+    setSelected(id);
+  }, []);
 
   const setState = (s: GraphState) => setSp(writeGraphState(s, sp));
   const setParam = (k: string, v: string | null) =>
@@ -283,16 +301,28 @@ export default function GraphPage() {
 
   return (
     <>
-      <PageHeader title="Architecture graph">Components first. Expand a node to load the symbols inside it.</PageHeader>
+      <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 className="text-xl font-semibold tracking-tight">Architecture graph</h1>
+        <p className="text-sm text-muted">Components first. Expand one to load the symbols inside it.</p>
+      </header>
 
-      <div className="mb-3 flex flex-col gap-2">
-        <form onSubmit={submitSearch} role="search" className="flex gap-2">
-          <label htmlFor={searchId} className="sr-only">
-            Search nodes
-          </label>
-          <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="tap min-w-0 flex-1 rounded-md border border-line-strong px-3" />
-          <Button type="submit">Search</Button>
-        </form>
+      <div className="mb-2 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 gap-2">
+            <label htmlFor={searchId} className="sr-only">
+              Search nodes
+            </label>
+            <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="tap min-w-0 flex-1 rounded-md border border-line-strong px-3" />
+            <Button type="submit">Search</Button>
+          </form>
+          <div role="group" aria-label="View as" className="inline-flex rounded-md border border-line-strong">
+            {(["graph", "list", "cards"] as const).map((m) => (
+              <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
+                {m === "graph" ? "Graph" : m === "list" ? "List" : "Cards"}
+              </button>
+            ))}
+          </div>
+        </div>
         <Filters state={state} onChange={setState} />
         {state.focus ? (
           <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="focus-bar">
@@ -308,45 +338,47 @@ export default function GraphPage() {
         <ErrorState error={graph.error} what="The architecture graph" />
       ) : (
         <>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div role="group" aria-label="View as" className="inline-flex rounded-md border border-line-strong">
-              {(["graph", "list", "cards"] as const).map((m) => (
-                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
-                  {m === "graph" ? "Graph" : m === "list" ? "List" : "Cards"}
-                </button>
-              ))}
-            </div>
-            <span className="text-sm text-muted" data-testid="graph-summary">
-              {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
-              {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
-            </span>
-            {!state.focus && drawn.length < elements.length ? (
-              <span className="text-xs text-muted">Canvas shows components. Expand one to load symbols.</span>
-            ) : null}
-          </div>
-          <div className="mb-3 flex flex-col gap-2">
-            <HiddenCounts counts={graph.data.hidden_counts} extra={drawableEdges(graph.data).hidden} reviewHref={`${snapshotBase(repoId, sha)}/review`} />
-            <Legend />
-            {comps.isError ? <p className="text-xs text-muted">Component counts are not available from the API yet.</p> : null}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
+          <div className="grid items-start gap-3 lg:grid-cols-[1fr_18rem]">
             <div className="min-w-0">
               {graph.data.nodes.length === 0 ? (
                 <Empty title="Nothing matches these filters">Try including inferred relationships or clearing the search.</Empty>
               ) : mode === "graph" ? (
-                <GraphCanvas elements={drawn} selected={selected} onSelect={setSelected} onExpand={(id) => setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 })} onEdge={openEvidence} describe={describe} />
+                <GraphCanvas
+                  elements={drawn}
+                  selected={selected}
+                  onSelect={choose}
+                  onExpand={(id) => {
+                    const node = graph.data?.nodes.find((n) => n.id === id);
+                    if (!node || node.entity === "component") {
+                      picked.current = false;
+                      setSelected(null);
+                    }
+                    setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 });
+                  }}
+                  onEdge={openEvidence}
+                  describe={describe}
+                />
               ) : mode === "list" ? (
                 <ListView data={graph.data} selected={selected} onEvidence={openEvidence} />
               ) : (
-                <CardsView data={graph.data} components={components} onSelect={setSelected} onFocus={(id) => setState({ ...state, focus: id, depth: 1 })} />
+                <CardsView data={graph.data} components={components} onSelect={choose} onFocus={(id) => setState({ ...state, focus: id, depth: 1 })} />
               )}
             </div>
-            <div className="min-w-0">
+            <div className="flex min-w-0 flex-col gap-2">
+              <p className="text-sm text-muted" data-testid="graph-summary">
+                {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
+                {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
+              </p>
+              {!state.focus && drawn.length < elements.length ? <p className="text-xs text-muted">The map shows components. Expand one to load symbols.</p> : null}
+              {state.focus ? <p className="text-xs text-muted">Drag to move. Names stay large enough to read. List shows every relationship.</p> : null}
               {selected && graph.data.nodes.some((n) => n.id === selected) ? (
-                <SelectionPanel data={graph.data} components={components} selected={selected} state={state} onState={setState} onEvidence={openEvidence} onClear={() => setSelected(null)} />
+                <SelectionPanel data={graph.data} components={components} selected={selected} state={state} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
               ) : (
                 <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a node to see its relationships and open their evidence.</p>
               )}
+              <Legend />
+              <HiddenCounts counts={graph.data.hidden_counts} extra={drawableEdges(graph.data).hidden} reviewHref={`${snapshotBase(repoId, sha)}/review`} />
+              {comps.isError ? <p className="text-xs text-muted">Component counts are not available from the API yet.</p> : null}
             </div>
           </div>
         </>
