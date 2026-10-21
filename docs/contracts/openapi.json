@@ -2403,7 +2403,6 @@
       "schema": {
        "anyOf": [
         {
-         "pattern": "^(node|relationship)$",
          "type": "string"
         },
         {

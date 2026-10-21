@@ -208,7 +208,7 @@ SNAP = f"{API}/repos/{{repo_id}}/snapshots/{{sha}}"
 @app.get(f"{SNAP}/claims", response_model=ClaimPage, responses=ERR, tags=["evidence"])
 def list_claims(repo_id: str, sha: str, st: StoreDep,
                 status: Annotated[list[Status] | None, Query()] = None,
-                claim_kind: Annotated[str | None, Query(pattern="^(node|relationship)$")] = None,
+                claim_kind: str | None = None,
                 kind: str | None = None, symbol: str | None = None, file: str | None = None,
                 include_rejected: bool = False,
                 offset: Annotated[int, Query(ge=0)] = 0, limit: Annotated[int, Query(ge=1, le=500)] = 100) -> ClaimPage:
