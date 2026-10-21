@@ -8,6 +8,7 @@ from __future__ import annotations
 import pytest
 
 from traces.history import (
+    FilterSpec,
     HistoryConfig,
     HistoryLog,
     RepoRef,
@@ -22,6 +23,7 @@ from traces.history import (
 )
 from traces.history.manifests import manifest_changes
 from traces.history.records import recompute_claim_id
+from traces.history.reverts import reverts
 
 from ._schema import assert_valid
 from .conftest import NO_FILTERS
@@ -151,3 +153,16 @@ def test_ht14_sqlmodel_added_at_558_before_559(log_default: HistoryLog) -> None:
     c559 = next(c for c in log_default.commits if "(#559)" in c.subject)
     assert c558.committer_time < c559.committer_time
     assert first["to"]["symbol"] == "dep::pypi:backend/pyproject.toml:poetry:sqlmodel"
+
+
+def test_reverts_and_quick_deletes(log_default: HistoryLog, fsft_repo: RepoRef) -> None:
+    res = reverts(log_default, ctx=CTX)
+    assert_valid(res.records)
+    rv = [r for r in res.records if r["relationship_kind"] == "reverts"]
+    assert len(rv) == 3 and all(r["status"] == "unvalidated" for r in rv)
+    assert res.report["skipped"] == {"bot": 1} and res.report["unresolved"] == []
+    qd = [r for r in res.records if r["relationship_kind"] == "deleted_soon_after_add"]
+    assert len(qd) == 51 and all(r["status"] == "observed" for r in qd)
+    # Lab C false revert: the Dependabot body quoting an upstream changelog resolves to nothing when bots are kept
+    off = reverts(ingest(fsft_repo, HistoryConfig(filters=FilterSpec(exclude_bots_from_patterns=False))), ctx=CTX)
+    assert [u["commit"][:8] for u in off.report["unresolved"]] == ["eb0b2c2f"]
