@@ -18,7 +18,7 @@ All jobs run on free GitHub-hosted `ubuntu-latest` runners with `permissions: co
 | `target` | restores or fills the cache of `fastapi/full-stack-fastapi-template` at `b1125d8839482cb7bbae603ddc6d0081bf87532e` (hardened git fetch via `traces.evidence.pipeline.target_checkout`), checks the pinned HEAD | |
 | `contract` | toolchain `npm ci --ignore-scripts`, user namespaces on, `pytest tests/contract` (CT1-CT16, fresh baseline under `unshare -rn`) | `target` |
 | `regression` | same setup, `pytest tests/regression` (RT1-RT8, baseline distribution, canonical hashes, 0.4 migration) | `target` |
-| `e2e` | placeholder with `if: false`, so GitHub shows it as skipped, never as passed. The Playwright harness PR (tests/e2e) turns it on. | `api`, `web-build`, `target` |
+| `e2e` | placeholder that runs only on a manual `workflow_dispatch` with `e2e=true` (and then fails until tests/e2e exists), so push and PR runs show it as skipped, never as passed. The Playwright harness PR replaces it. | `api`, `web-build`, `target` |
 
 Target cache: `actions/cache` with key `target-fastapi-full-stack-fastapi-template-<full sha>-v1` on the exact checkout path under `.cache/targets/`. `contract` and `regression` restore it with `fail-on-cache-miss: true`, so the baseline jobs never fetch from the network themselves. Bump the `-v1` suffix to invalidate.
 

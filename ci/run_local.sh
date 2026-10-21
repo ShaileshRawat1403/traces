@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329  # job_* and helpers are invoked indirectly via "job_${name}"
 # Local equivalent of ci/github-actions-ci.yml without act or Docker. Same jobs, same commands, run on this machine.
 #
 #   ci/run_local.sh                 # all jobs: lint types unit api web-build target contract regression e2e
@@ -11,7 +12,7 @@
 # Differences from GitHub-hosted runners: the local Node and uv versions are used and recorded (CI: Node 22, uv from
 # astral-sh/setup-uv); uv and npm use their local caches; the target cache is .cache/targets as in CI.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 2
 ROOT=$(pwd)
 
 PYTHON_VERSION="3.14.8"
@@ -52,7 +53,7 @@ need_target()   { [ -d "$TARGET_PATH/.git" ] || { echo "target cache missing (ru
 job_contract()  { need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/contract; }
 job_regression(){ need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/regression; }
 job_e2e() {
-  # Mirrors the CI placeholder (`if: false`): reported as SKIP until the Playwright harness lands.
+  # Mirrors the CI placeholder (skipped on push and PR): reported as SKIP until the Playwright harness lands.
   [ -f tests/e2e/playwright.config.ts ] || return 77
   echo "tests/e2e exists but the e2e job is still a placeholder; wire it in ci/github-actions-ci.yml and here" >&2
   return 1

@@ -9,6 +9,11 @@ on:
   pull_request:
     branches: [build/traces-v1, main]
   workflow_dispatch:
+    inputs:
+      e2e:
+        description: "Run the e2e placeholder job (fails until tests/e2e lands)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -249,11 +254,12 @@ jobs:
           retention-days: 7
 
   e2e:
-    # Placeholder until tests/e2e (Playwright, desktop + Pixel-class mobile) lands. `if: false` makes GitHub report the
-    # job as skipped, never as passed. (hashFiles cannot be used in a job-level `if`.) The harness PR flips this to run.
+    # Placeholder until tests/e2e (Playwright, desktop + Pixel-class mobile) lands. It runs only on a manual dispatch with
+    # e2e=true, so push and PR runs report it as skipped, never as passed (hashFiles cannot be used in a job-level `if`).
+    # The harness PR replaces this condition and the steps.
     name: e2e (Playwright; placeholder, skipped until tests/e2e lands)
     needs: [api, web-build, target]
-    if: ${{ false }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.e2e }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
