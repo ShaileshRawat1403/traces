@@ -13,7 +13,9 @@ from traces.history import (
     RepoRef,
     RunContext,
     canonical_hash,
+    churn,
     commit_facts,
+    hotspots,
     ingest,
     lifecycle,
 )
@@ -69,3 +71,30 @@ def test_commit_facts_valid_unique_and_deterministic(log_off: HistoryLog, fsft_r
     b = commit_facts(ingest(fsft_repo, NO_FILTERS), ctx=RunContext("h-other", "2026-10-22T08:00:00+05:30",
                                                                   CTX.repo, CTX.repo_sha))
     assert canonical_hash(a.records) == canonical_hash(b.records)
+
+
+def test_users_py_revisions_and_churn(log_off: HistoryLog) -> None:
+    """HT1: backend/app/api/routes/users.py has 43 revisions and 1,188 lines of churn (filters off), matching
+    git log --follow --no-merges --numstat."""
+    res = churn(log_off, ctx=CTX)
+    u = next(r for r in res.records if r["from"]["file"] == "backend/app/api/routes/users.py")
+    assert (u["metrics"]["revisions"], u["metrics"]["churn"]) == (43, 1188)
+    assert (u["metrics"]["added"], u["metrics"]["deleted"]) == (710, 478)
+    assert u["status"] == "observed"
+    assert len(res.records) == 252
+    assert_valid(res.records)
+
+
+def test_churn_observed_or_explained(log_default: HistoryLog) -> None:
+    res = churn(log_default, ctx=CTX)
+    assert_valid(res.records)
+    for r in res.records:
+        assert r["status"] == "observed" or "recount" in r["status_reason"]
+    assert sum(r["status"] == "observed" for r in res.records) >= 0.9 * len(res.records)
+
+
+def test_hotspots_valid(log_default: HistoryLog) -> None:
+    res = hotspots(log_default, ctx=CTX)
+    assert_valid(res.records)
+    assert len(res.records) == 145
+    assert all("complexity_proxy" in r["flags"] for r in res.records)
