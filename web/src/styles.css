@@ -16,6 +16,8 @@
   --color-accent: #0f5e63;
   --color-accent-ink: #ffffff;
   --color-accent-soft: #e3f0f0;
+  /* Evidence line highlight: light enough that every Shiki token keeps 4.5:1 contrast. */
+  --color-hit: #eef7f7;
   --color-focus: #1c64d8;
 
   /* Status tones. Color is never the only signal: every chip carries its word and a line sample. */
