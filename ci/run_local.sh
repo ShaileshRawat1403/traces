@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # job_* and helpers are invoked indirectly via "job_${name}"
-# Local equivalent of ci/github-actions-ci.yml without act or Docker. Same jobs, same commands, run on this machine.
+# Local equivalent of .github/workflows/ci.yml without act or Docker. Same jobs, same commands, run on this machine.
 #
 #   ci/run_local.sh                 # all jobs: lint types unit api web-build target contract regression e2e
 #   ci/run_local.sh lint unit api   # selected jobs, in the order given
@@ -55,7 +55,7 @@ job_regression(){ need_target && py_env && toolchain_env && userns && TRACES_ISO
 job_e2e() {
   # Mirrors the CI placeholder (skipped on push and PR): reported as SKIP until the Playwright harness lands.
   [ -f tests/e2e/playwright.config.ts ] || return 77
-  echo "tests/e2e exists but the e2e job is still a placeholder; wire it in ci/github-actions-ci.yml and here" >&2
+  echo "tests/e2e exists but the e2e job is still a placeholder; wire it in .github/workflows/ci.yml and here" >&2
   return 1
 }
 

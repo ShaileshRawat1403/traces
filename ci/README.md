@@ -1,8 +1,8 @@
-# CI workflow (staged)
+# CI workflow
 
-`github-actions-ci.yml` is the CI workflow for this repository. It lives here because the token used to push `build/traces-v1` lacks GitHub's `workflow` scope, and GitHub refuses pushes that add files under `.github/workflows/` without it (docs/DECISIONS.md D-018).
+The workflow is `.github/workflows/ci.yml`. It was staged here as `ci/github-actions-ci.yml` because the push token lacked GitHub's `workflow` scope (docs/DECISIONS.md D-018); pushing this move needs a credential with that scope. Until a run exists on GitHub, nothing here may be reported as "CI passed".
 
-To activate: with a credential that has the `workflow` scope, run `git mv ci/github-actions-ci.yml .github/workflows/ci.yml`, commit and push. Until then no GitHub CI run exists, and nothing here may be reported as "CI passed".
+Triggers: push to `build/traces-v1` and `ws/**`, pull requests into `build/traces-v1` and `main`, and `workflow_dispatch`.
 
 ## Jobs
 

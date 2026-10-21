@@ -1,5 +1,5 @@
 # Traces CI. GitHub-hosted ubuntu-latest runners only (free tier for public repos). No secrets, no deploys, read-only token.
-# Staged at ci/github-actions-ci.yml until a credential with the `workflow` scope moves it to .github/workflows/ci.yml (D-018).
+# Activated at .github/workflows/ci.yml (previously staged at ci/github-actions-ci.yml, D-018).
 # Third-party actions are pinned to full commit SHAs (release tag in the trailing comment).
 # Local equivalent without act or Docker: ci/run_local.sh (same jobs, same commands). See ci/README.md.
 name: ci
