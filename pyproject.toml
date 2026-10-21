@@ -67,6 +67,6 @@ ignore = ["E501", "E701", "E702", "E731", "E741", "B023", "B008"]
 
 [tool.mypy]
 python_version = "3.14"
-files = ["backend/traces/core/config.py", "backend/traces/evidence/store.py", "backend/traces/evidence/migrate.py", "backend/traces/api", "backend/traces/history/interface.py", "backend/traces/ingest", "backend/traces/evidence/types.py", "backend/traces/explain", "backend/traces/cli.py"]
+files = ["backend/traces/core/config.py", "backend/traces/evidence/store.py", "backend/traces/evidence/migrate.py", "backend/traces/api", "backend/traces/history", "backend/traces/ingest", "backend/traces/evidence/types.py", "backend/traces/explain", "backend/traces/cli.py"]
 ignore_missing_imports = true
 check_untyped_defs = true
