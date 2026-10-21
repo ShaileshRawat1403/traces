@@ -40,7 +40,9 @@ from traces.api.models import (
 )
 from traces.core.config import get_settings
 from traces.evidence.migrate import CURRENT, SCHEMAS
-from traces.evidence.store import Store, get_job
+from traces.evidence.store import Store, get_job, now
+from traces.ingest.errors import IngestError
+from traces.ingest.remote import HeadProbe
 from traces.ingest.urls import parse_repo_url, require_sha
 
 API = "/api/v1"
@@ -58,6 +60,10 @@ def not_implemented(what: str, owner: str, milestone: str) -> NoReturn:
 
 
 ERR: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}}
+UPSTREAM: dict[int | str, dict[str, Any]] = {
+    429: {"model": ErrorResponse, "description": "rate_limited (HEAD discovery called too often; Retry-After set)"},
+    502: {"model": ErrorResponse, "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"},
+    504: {"model": ErrorResponse, "description": "fetch_timeout"}, **ERR}
 NI: dict[int | str, dict[str, Any]] = {501: {"model": ErrorResponse, "description": "Not implemented in this build (error.code = not_implemented)"}, **ERR}
 
 app = FastAPI(title="Traces API", version=__version__,
@@ -68,6 +74,13 @@ app = FastAPI(title="Traces API", version=__version__,
 @app.exception_handler(ApiError)
 async def _api_error(_: Request, e: ApiError) -> JSONResponse:
     return JSONResponse(e.body, status_code=e.status)
+
+
+@app.exception_handler(IngestError)
+async def _ingest_error(_: Request, e: IngestError) -> JSONResponse:
+    headers = {"Retry-After": str(int((e.detail or {}).get("retry_after_s", 5)) + 1)} if e.code == "rate_limited" else None
+    return JSONResponse({"error": {"code": e.code, "message": e.message, "owner": None, "milestone": None, "detail": e.detail}},
+                        status_code=e.http_status, headers=headers)
 
 
 @app.exception_handler(RequestValidationError)
@@ -86,6 +99,19 @@ def get_store() -> Store:
 
 
 StoreDep = Annotated[Store, Depends(get_store)]
+
+
+@lru_cache(maxsize=1)
+def _default_probe() -> HeadProbe:
+    return HeadProbe()
+
+
+def get_head_probe() -> HeadProbe:
+    """Anonymous, cached, rate-limited HEAD discovery (overridden in tests: they never touch the network)."""
+    return _default_probe()
+
+
+ProbeDep = Annotated[HeadProbe, Depends(get_head_probe)]
 
 
 def _repo(st: Store, repo_id: str) -> dict[str, Any]:
@@ -128,22 +154,30 @@ def meta() -> Meta:
                 validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api"},
                 isolation="none" if s.isolation == "none" else "unshare",
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
-                              "index_jobs": False, "head": False, "overview": False, "components": False, "routes": False,
+                              "index_jobs": False, "head": True, "overview": False, "components": False, "routes": False,
                               "graph": False, "source": False, "trace": False, "history": False, "compare": False,
                               "explain": False, "chat_bundle": False})
 
 
 # ------------------------------------------------------------------------------------------------ repos and snapshots
-@app.post(f"{API}/repos", response_model=Repo, status_code=201, responses=ERR, tags=["repos"])
-def register_repo(body: RepoCreate, st: StoreDep) -> Repo:
-    """Validate a public GitHub URL and register the repo. Does not fetch anything; indexing is a separate job."""
+@app.post(f"{API}/repos", response_model=Repo, status_code=201, responses=UPSTREAM, tags=["repos"])
+def register_repo(body: RepoCreate, st: StoreDep, probe: ProbeDep) -> Repo:
+    """Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the
+    default branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.
+    Nothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public."""
     try:
         ref = parse_repo_url(body.url)
-        if body.sha is not None:
-            require_sha(body.sha)
     except ValueError as e:
         raise ApiError(422, "invalid_repo_url", str(e)) from None
+    if body.sha is not None:
+        try:
+            require_sha(body.sha)
+        except ValueError as e:
+            raise ApiError(422, "invalid_sha", str(e)) from None
+    head = probe.head(ref, max_age_s=0)
     st.upsert_repo(ref.cache_key, ref.host, ref.owner, ref.name, f"https://github.com/{ref.slug}")
+    st.record_remote_head(ref.cache_key, head.sha, head.default_branch, head.checked_at)
+    st.ensure_snapshot(ref.cache_key, body.sha or head.sha)
     return Repo(**_repo(st, ref.cache_key))
 
 
@@ -157,11 +191,18 @@ def get_repo(repo_id: str, st: StoreDep) -> Repo:
     return Repo(**_repo(st, repo_id))
 
 
-@app.get(f"{API}/repos/{{repo_id}}/head", response_model=HeadInfo, responses=NI, tags=["repos"])
-def repo_head(repo_id: str, st: StoreDep) -> HeadInfo:
-    """Latest discovered commit on the default branch vs. the displayed snapshot (cached ls-remote, rate limited)."""
-    _repo(st, repo_id)
-    not_implemented("HEAD discovery", "Traces", "INGEST")
+@app.get(f"{API}/repos/{{repo_id}}/head", response_model=HeadInfo, responses=UPSTREAM, tags=["repos"])
+def repo_head(repo_id: str, st: StoreDep, probe: ProbeDep) -> HeadInfo:
+    """Latest discovered commit on the default branch vs. the displayed snapshot (the newest ready one). Anonymous
+    `git ls-remote`, cached for 60 s per repo and rate limited (429 rate_limited only when nothing is cached)."""
+    r = _repo(st, repo_id)
+    ref = parse_repo_url(r["url"])
+    head = probe.head(ref)
+    st.record_remote_head(repo_id, head.sha, head.default_branch, head.checked_at)
+    shown = st.newest_ready_snapshot(repo_id)
+    displayed = shown["sha"] if shown else None
+    return HeadInfo(repo_id=repo_id, default_branch=head.default_branch, latest_sha=head.sha, displayed_sha=displayed,
+                    behind=None if displayed is None else displayed != head.sha, checked_at=head.checked_at or now())
 
 
 @app.get(f"{API}/repos/{{repo_id}}/snapshots", response_model=list[Snapshot], responses=ERR, tags=["snapshots"])

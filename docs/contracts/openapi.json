@@ -298,7 +298,7 @@
     "additionalProperties": false,
     "properties": {
      "code": {
-      "description": "machine code, e.g. not_implemented, invalid_repo_url, not_found, rate_limited, too_large",
+      "description": "machine code, e.g. not_implemented, invalid_repo_url, invalid_sha, not_found, repo_not_public, repo_empty, sha_not_found, too_large, too_many_files, fetch_timeout, upstream_unavailable, rate_limited, fetch_failed",
       "title": "Code",
       "type": "string"
      },
@@ -1186,6 +1186,12 @@
       ],
       "title": "Default Branch"
      },
+     "external_ai_consent": {
+      "default": false,
+      "description": "repo-level consent to send source snippets to an external AI provider; always false in v1 (no endpoint sets it), so explain bundles need per-request consent",
+      "title": "External Ai Consent",
+      "type": "boolean"
+     },
      "host": {
       "title": "Host",
       "type": "string"
@@ -1232,6 +1238,18 @@
       "const": "public",
       "title": "Visibility",
       "type": "string"
+     },
+     "visibility_checked_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "when an anonymous (credential-free) ls-remote last confirmed the repo is public",
+      "title": "Visibility Checked At"
      }
     },
     "required": [
@@ -1832,7 +1850,7 @@
     ]
    },
    "post": {
-    "description": "Validate a public GitHub URL and register the repo. Does not fetch anything; indexing is a separate job.",
+    "description": "Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the\ndefault branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.\nNothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.",
     "operationId": "register_repo_api_v1_repos_post",
     "requestBody": {
      "content": {
@@ -1874,6 +1892,36 @@
        }
       },
       "description": "Unprocessable Content"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Register Repo",
@@ -2016,7 +2064,7 @@
   },
   "/api/v1/repos/{repo_id}/head": {
    "get": {
-    "description": "Latest discovered commit on the default branch vs. the displayed snapshot (cached ls-remote, rate limited).",
+    "description": "Latest discovered commit on the default branch vs. the displayed snapshot (the newest ready one). Anonymous\n`git ls-remote`, cached for 60 s per repo and rate limited (429 rate_limited only when nothing is cached).",
     "operationId": "repo_head_api_v1_repos__repo_id__head_get",
     "parameters": [
      {
@@ -2060,7 +2108,7 @@
       },
       "description": "Unprocessable Content"
      },
-     "501": {
+     "429": {
       "content": {
        "application/json": {
         "schema": {
@@ -2068,7 +2116,27 @@
         }
        }
       },
-      "description": "Not implemented in this build (error.code = not_implemented)"
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Repo Head",
