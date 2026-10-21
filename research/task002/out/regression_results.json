@@ -1,0 +1,121 @@
+{
+ "run_id": "t002-20261021T1356-002b-2",
+ "summary": {
+  "RT1_claim_id_unique_and_regenerable": "PASS",
+  "RT2_claim_id_synthetic": "PASS",
+  "RT3_exact_duplicates_consolidate_with_history": "PASS",
+  "RT4_eof_with_terminal_newline": "PASS",
+  "RT5_eof_without_terminal_newline_and_empty": "PASS",
+  "RT6_eof_never_an_evidence_location": "PASS",
+  "RT7_distribution": "PASS",
+  "RT8_class_independent_of_status": "PASS"
+ },
+ "pass": 8,
+ "total": 8,
+ "tests": {
+  "RT1_claim_id_unique_and_regenerable": {
+   "result": "PASS",
+   "detail": {
+    "evidence_records": 10016,
+    "distinct_ids": 10016,
+    "shared_ids_evidence": 0,
+    "shared_ids_adapter": 0,
+    "ids_not_regenerated_from_content": 0
+   }
+  },
+  "RT2_claim_id_synthetic": {
+   "result": "PASS",
+   "detail": {
+    "same content same id": true,
+    "other line other id": true,
+    "other column other id": true,
+    "other target name other id": true,
+    "other extractor version other id": true,
+    "other declared target range other id": true
+   }
+  },
+  "RT3_exact_duplicates_consolidate_with_history": {
+   "result": "PASS",
+   "detail": {
+    "consolidated_records": 34,
+    "rows_in_consolidated": 68,
+    "by_claim_kind": {
+     "unresolved_reference": 34
+    },
+    "adapter_input_rows": 10032,
+    "rows_covered_by_records": 10032,
+    "consolidated_in_evidence": 34,
+    "synthetic_merge_keeps_both_rows_and_history": true,
+    "distinct_content_same_id_refused_E_COLLISION": true
+   }
+  },
+  "RT4_eof_with_terminal_newline": {
+   "result": "PASS",
+   "detail": {
+    "line_count('a\\nb\\n') == 2": true,
+    "normalized [1,2], exclusive end 3, original end 3": true,
+    "L2 passes the normalized file range": true,
+    "L2 rejects a site on the EOF position (line 3)": true,
+    "L2 passes a site on line 2": true,
+    "L2 rejects an unnormalized file range ending at 3": true,
+    "real types.gen.ts: original end 948, normalized 947, exclusive 948": true
+   }
+  },
+  "RT5_eof_without_terminal_newline_and_empty": {
+   "result": "PASS",
+   "detail": {
+    "line_count('a\\nb') == 2": true,
+    "normalized [1,2], exclusive end 3, original end 2": true,
+    "L2 passes the file range": true,
+    "L2 passes a site on the last line 2": true,
+    "L2 rejects a site on line 3": true,
+    "empty blob: 0 lines, range [1,0], exclusive end 1, original end 1": true,
+    "empty blob: L2 passes the empty file range": true,
+    "empty blob: L2 rejects a site on line 1": true,
+    "indexed_files_without_terminal_newline": 0
+   }
+  },
+  "RT6_eof_never_an_evidence_location": {
+   "result": "PASS",
+   "detail": {
+    "locations_checked": 94472,
+    "file_ranges": 16959,
+    "violations": [],
+    "endpoint_violations": []
+   }
+  },
+  "RT7_distribution": {
+   "result": "PASS",
+   "detail": {
+    "edges": 4642,
+    "by_status": {
+     "verified": 4538,
+     "observed": 36,
+     "unvalidated": 59,
+     "rejected": 9
+    },
+    "observed_are_import_statements": true,
+    "rejected_total": 12,
+    "rejected_codegraph": 9,
+    "rejected_injected": 3,
+    "rejected_all_visible": true,
+    "old_class_name_present": 0
+   }
+  },
+  "RT8_class_independent_of_status": {
+   "result": "PASS",
+   "detail": {
+    "adapter_records": 9998,
+    "class_changed_by_validation": 0,
+    "verified_by_class": {
+     "analyzer_inference": 896,
+     "statically_derived": 3655
+    },
+    "observed_by_class": {
+     "source_backed_declaration": 5277,
+     "statically_derived": 36
+    }
+   }
+  }
+ }
+}

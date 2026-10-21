@@ -1,0 +1,26 @@
+$ bundled node --version
+v24.16.0
+b2959781cc5a74c357ffa02367efa8a0330cbb1c9cb347732fdfaaaca381cbcd  tools/node_modules/@colbymchenry/codegraph-linux-x64/node
+--: line 1: file: command not found
+#!/bin/sh
+# Resolve symlinks (e.g. the ~/.local/bin/codegraph link install.sh creates) so
+# we find the real bundle dir, not the symlink's location.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  target="$(readlink "$SELF")"
+  case "$target" in
+    /*) SELF="$target" ;;
+    *) SELF="$(dirname "$SELF")/$target" ;;
+  esac
+done
+DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
+# Thread the MCP host's pid to the server's orphan watchdog (issue #1185).
+# $PPID is our parent — the host itself when it launched this script directly;
+# an already-threaded value (the npm shim sets the true host pid) wins.
+CODEGRAPH_HOST_PPID="${CODEGRAPH_HOST_PPID:-$PPID}"
+export CODEGRAPH_HOST_PPID
+# --liftoff-only: avoid the V8 turboshaft WASM Zone OOM (issues #293/#298).
+# --disable-warning=ExperimentalWarning: mute node:sqlite's per-thread
+# "experimental feature" warning that otherwise interleaves with the progress UI.
+exec "$DIR/node" --liftoff-only --disable-warning=ExperimentalWarning "$DIR/lib/dist/bin/codegraph.js" "$@"
+codegraph-kernel.node

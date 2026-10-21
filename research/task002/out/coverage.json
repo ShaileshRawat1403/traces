@@ -1,0 +1,286 @@
+{
+ "run_id": "t002-20261021T1356-002b-2",
+ "records_total": 10016,
+ "by_originator": {
+  "codegraph": 9998,
+  "gitdiagram": 1,
+  "traces-lab-fixture": 15,
+  "traces-negative-control": 2
+ },
+ "injected": {
+  "false": 10013,
+  "true": 3
+ },
+ "codegraph": {
+  "records": 9998,
+  "by_claim_kind": {
+   "node": 2076,
+   "relationship": 4642,
+   "unresolved_reference": 3280
+  },
+  "by_status": {
+   "observed": 5313,
+   "rejected": 9,
+   "unvalidated": 138,
+   "verified": 4538
+  },
+  "by_label": {
+   "inferred": 147,
+   "observed": 5313,
+   "verified": 4538
+  },
+  "by_class": {
+   "analyzer_inference": 907,
+   "source_backed_declaration": 5356,
+   "statically_derived": 3735
+  },
+  "by_provenance": {
+   "codegraph:declaration": 2076,
+   "codegraph:name-match": 616,
+   "codegraph:resolved-framework": 12,
+   "codegraph:resolved-function-ref": 65,
+   "codegraph:resolved-import": 1628,
+   "codegraph:resolved-instance": 13,
+   "codegraph:resolved-qualified": 36,
+   "codegraph:structural": 1893,
+   "codegraph:synthesized:jsx-render": 288,
+   "codegraph:synthesized:tanstack-link": 3,
+   "codegraph:unresolved": 3280,
+   "codegraph:value-ref": 88
+  },
+  "by_claim_kind_status": {
+   "node|observed": 2075,
+   "node|unvalidated": 1,
+   "relationship|observed": 36,
+   "relationship|rejected": 9,
+   "relationship|unvalidated": 59,
+   "relationship|verified": 4538,
+   "unresolved_reference|observed": 3202,
+   "unresolved_reference|unvalidated": 78
+  },
+  "edges": {
+   "count": 4642,
+   "with_normalized_provenance": 4642,
+   "with_originator_and_version": 4642,
+   "with_location_after_validation": 4642,
+   "by_status": {
+    "observed": 36,
+    "rejected": 9,
+    "unvalidated": 59,
+    "verified": 4538
+   },
+   "by_label": {
+    "inferred": 68,
+    "observed": 36,
+    "verified": 4538
+   },
+   "by_kind_status": {
+    "calls|unvalidated": 34,
+    "calls|verified": 562,
+    "contains|unvalidated": 2,
+    "contains|verified": 1891,
+    "extends|verified": 6,
+    "imports|observed": 36,
+    "imports|rejected": 9,
+    "imports|verified": 1177,
+    "instantiates|verified": 47,
+    "navigates|unvalidated": 14,
+    "references|unvalidated": 5,
+    "references|verified": 571,
+    "renders|unvalidated": 4,
+    "renders|verified": 284
+   },
+   "by_provenance_status": {
+    "codegraph:name-match|rejected": 9,
+    "codegraph:name-match|unvalidated": 8,
+    "codegraph:name-match|verified": 599,
+    "codegraph:resolved-framework|unvalidated": 12,
+    "codegraph:resolved-function-ref|unvalidated": 4,
+    "codegraph:resolved-function-ref|verified": 61,
+    "codegraph:resolved-import|unvalidated": 26,
+    "codegraph:resolved-import|verified": 1602,
+    "codegraph:resolved-instance|verified": 13,
+    "codegraph:resolved-qualified|observed": 36,
+    "codegraph:structural|unvalidated": 2,
+    "codegraph:structural|verified": 1891,
+    "codegraph:synthesized:jsx-render|unvalidated": 4,
+    "codegraph:synthesized:jsx-render|verified": 284,
+    "codegraph:synthesized:tanstack-link|unvalidated": 3,
+    "codegraph:value-ref|verified": 88
+   },
+   "raw_provenance_unset": 4351,
+   "raw_provenance_unset_baseline_plan": 4351
+  },
+  "name_match_616_by_label": {
+   "inferred": 17,
+   "verified": 599
+  },
+  "name_match_616_by_status": {
+   "rejected": 9,
+   "unvalidated": 8,
+   "verified": 599
+  }
+ },
+ "fixture": {
+  "H1": {
+   "status": "unvalidated",
+   "label": "inferred"
+  },
+  "H2": {
+   "status": "unvalidated",
+   "label": "inferred"
+  },
+  "L1": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L2A": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L2B": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L3": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L4": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L5": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L6": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L7": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L7T1": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L7T2": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L8": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L9A": {
+   "status": "verified",
+   "label": "verified"
+  },
+  "L9B": {
+   "status": "verified",
+   "label": "verified"
+  }
+ },
+ "injected_records": {
+  "N1": {
+   "status": "rejected",
+   "label": "inferred",
+   "visible_to_reviewer": true
+  },
+  "N2a": {
+   "status": "rejected",
+   "label": "inferred",
+   "visible_to_reviewer": true
+  },
+  "N2b": {
+   "status": "rejected",
+   "label": "inferred",
+   "visible_to_reviewer": true
+  }
+ },
+ "recovery": {
+  "contains_total": 1893,
+  "R_contains_location_recovery_pass": 1893,
+  "R_contains_syntax_structure_pass": 1891,
+  "contains_with_locations": 1893,
+  "contains_by_status": {
+   "unvalidated": 2,
+   "verified": 1891
+  },
+  "expected": "all 1,893 gain a location; 1,891 verified; 2 exceptions unvalidated (EVIDENCE_SCHEMA 7)",
+  "contains_not_verified": [
+   {
+    "from": "frontend/src/client/core/serverSentEvents.gen.ts::createSseClient",
+    "to": "frontend/src/client/core/serverSentEvents.gen.ts::createSseClient::abortHandler",
+    "status": "unvalidated",
+    "reason": "transitive containment, immediate parent not a node"
+   },
+   {
+    "from": "frontend/src/components/ui/sidebar.tsx::SidebarProvider",
+    "to": "frontend/src/components/ui/sidebar.tsx::SidebarProvider::setOpen",
+    "status": "unvalidated",
+    "reason": "declaration line differs from extractor line"
+   }
+  ],
+  "value_ref": {
+   "total": 88,
+   "location_recovery_pass": 88,
+   "by_status": {
+    "verified": 88
+   }
+  },
+  "jsx_render_R_enclosing": {
+   "total": 288,
+   "location_recovery_pass": 284,
+   "by_status": {
+    "unvalidated": 4,
+    "verified": 284
+   }
+  }
+ },
+ "decision_002B": {
+  "eof": {
+   "records_with_normalized_file_range": 2968,
+   "file_range_locations_normalized": 3373,
+   "by_claim_kind_status": {
+    "node|file|observed": 152,
+    "relationship|calls|unvalidated": 2,
+    "relationship|calls|verified": 111,
+    "relationship|contains|verified": 1455,
+    "relationship|imports|observed": 36,
+    "relationship|imports|rejected": 9,
+    "relationship|imports|verified": 1177,
+    "relationship|references|verified": 26
+   },
+   "rule": "whole-file range [1, n] with exclusive end boundary n + 1; the EOF position after a final newline is never an addressable line or evidence location; original coordinates kept in location.original"
+  },
+  "import_statements_observed": {
+   "count": 36,
+   "by_language": {
+    "py": 31,
+    "tsx": 5
+   },
+   "qualifier": [
+    "observed import statement"
+   ]
+  },
+  "consolidation": {
+   "records": 34,
+   "rows": 68,
+   "by_claim_kind": {
+    "unresolved_reference": 34
+   }
+  },
+  "claim_id": {
+   "records": 10016,
+   "distinct": 10016,
+   "shared_ids": 0
+  }
+ },
+ "notes": {
+  "verified_without_independent_pass": 0,
+  "L2_line_count_rule": "Decision 002-B: L2 counts addressable lines (newline count, plus 1 when the blob does not end in a newline); whole-file ranges end on the last addressable line with an exclusive EOF boundary"
+ }
+}

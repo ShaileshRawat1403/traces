@@ -1,0 +1,6 @@
+## 2026-10-21T07:21:12+05:30
+$ npm init -y
+$ npm install --save-exact --ignore-scripts --no-audit --no-fund @colbymchenry/codegraph@1.6.2 typescript@5.9.3
+
+added 3 packages in 4s
+exit=0

@@ -1,0 +1,1375 @@
+{
+ "run_id": "t002-20261021T1356-002b-2",
+ "repo_sha": "b1125d8839482cb7bbae603ddc6d0081bf87532e",
+ "rule": "EXPECTED_CHAIN 'How a link reaches verified': fixture claim(s) verified and every CodeGraph claim for the same link verified or unvalidated with a stated reason",
+ "links": {
+  "L1": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_fa389aab94e0026972dca27dfba12b8e8e331ba71f3b25d460d2171721164702",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "renders",
+     "from": "frontend/src/routes/_layout/items.tsx::Items",
+     "to": "frontend/src/components/Items/AddItem.tsx::AddItem",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "frontend/src/routes/_layout/items.tsx:65 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_d4ce22342dbc3160da7f2610aa395093992bb77396537a984e227516c949e1f0",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "JsxSelfClosingElement <AddItem> at 65; enclosing declarations Items@57-70"
+      },
+      {
+       "check_id": "k_866c03992b94506d2b2f018f4048943ae0ca9f49cb267a6a1cf08e6353f0a758",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "tag resolves via frontend/src/routes/_layout/items.tsx:8-8 ImportClause -> frontend/src/components/Items/AddItem.tsx:143-143 ExportAssignment to frontend/src/components/Items/AddItem.tsx:40-141 VariableDeclaration; export default at line 143 names frontend/src/components/Items/AddItem.tsx:40-141 VariableDeclaration"
+      }
+     ],
+     "all_locations": [
+      "frontend/src/routes/_layout/items.tsx:65-65 site site originator",
+      "frontend/src/routes/_layout/items.tsx:8-8 input site originator",
+      "frontend/src/routes/_layout/items.tsx:57-70 from_decl declaration originator",
+      "frontend/src/components/Items/AddItem.tsx:40-141 to_decl declaration originator",
+      "frontend/src/components/Items/AddItem.tsx:143-143 input declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [
+    {
+     "claim_id": "c_d1c3ba794865a0995876a0c5f576048fad62864007ebb119995d5ca60994463c",
+     "originator": "codegraph",
+     "class": "analyzer_inference",
+     "provenance": "codegraph:synthesized:jsx-render",
+     "kind": "renders",
+     "from": "frontend/src/routes/_layout/items.tsx::Items",
+     "to": "frontend/src/components/Items/AddItem.tsx::AddItem",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:4661",
+     "sites": [
+      "frontend/src/routes/_layout/items.tsx:57 (enclosing_scope, originator)",
+      "frontend/src/routes/_layout/items.tsx:65 (site, validator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_c5c0240daf9627c67c3f1e3926eac7977f9969d74a790ee9ca13e62bd0d763d7",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "line 65: pass: 'AddItem' at frontend/src/routes/_layout/items.tsx:65 resolves via frontend/src/routes/_layout/items.tsx:8-8 ImportClause -> frontend/src/components/Items/AddItem.tsx:143-143 ExportAssignment to frontend/src/components/Items/AddItem.tsx:40-141 VariableDeclaration"
+      },
+      {
+       "check_id": "k_401e2c8841d561e0066bb805f6d5f9f695b72c5252dac36bc92a934bc6f3b07c",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 JSX element(s) <AddItem> at line(s) 65; enclosing declarations Items@57"
+      }
+     ]
+    }
+   ],
+   "codegraph_context": []
+  },
+  "L2": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_c8af9a2cec39de9659d91e4c55ffa7421bf41581b3a490d18c230ce56e01c488",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "binds_handler",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem",
+     "to": "frontend/src/components/Items/AddItem.tsx::AddItem::onSubmit",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:88 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_8b52582d61aacbd2bd63ba03a199dd2b03009344f971fcd1398d9ccb541b71f5",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "identifier onSubmit is argument 0 of form.handleSubmit(...) in JSX attribute onSubmit of <form>; enclosing AddItem@40"
+      },
+      {
+       "check_id": "k_cef24666f2b629a94238453f540b44c2f9558cec903ef6bbe44eb56d2e4873f3",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "resolves to frontend/src/components/Items/AddItem.tsx:68-70 VariableDeclaration stmt 68-70"
+      }
+     ],
+     "all_locations": [
+      "frontend/src/components/Items/AddItem.tsx:88-88 site site originator",
+      "frontend/src/components/Items/AddItem.tsx:68-70 to_decl declaration originator"
+     ]
+    },
+    {
+     "claim_id": "c_098c8cfe640d8208091e799bed9a074ba8017bcb1151298277cb9c6b95b3daac",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "calls",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem::onSubmit",
+     "to": "frontend/src/components/Items/AddItem.tsx::AddItem::mutation.mutate",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:69 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_2b8ccb4aab5909bf2b656421a1c7433a2140994bf38e5afbef751d3ff9794fe0",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "CallExpression mutation.mutate(...) at 69; enclosing onSubmit@68-70 > AddItem@40-141"
+      },
+      {
+       "check_id": "k_5d17e57640879605631f9445ec18dc3d62e46d9775deb77c4d5280552d6ef512",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "resolves to frontend/src/components/Items/AddItem.tsx:55-66 VariableDeclaration stmt 55-66"
+      }
+     ],
+     "all_locations": [
+      "frontend/src/components/Items/AddItem.tsx:69-69 site site originator",
+      "frontend/src/components/Items/AddItem.tsx:55-66 input declaration originator",
+      "frontend/src/components/Items/AddItem.tsx:68-70 from_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [
+    {
+     "claim_id": "c_e737ae71b86ba496de084941e79307ebe0df13a042fc765035a4128107039c60",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-function-ref",
+     "kind": "references",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem",
+     "to": "frontend/src/components/Items/AddItem.tsx::AddItem::onSubmit",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:3974",
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:88 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_99418aa45dd278c519db01f93f7322e0c848c6bad45e9934d6c734c51d88b434",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "line 88: pass: 'onSubmit' at frontend/src/components/Items/AddItem.tsx:88 resolves to frontend/src/components/Items/AddItem.tsx:68-70 VariableDeclaration"
+      }
+     ]
+    }
+   ],
+   "codegraph_context": [
+    {
+     "claim_id": "c_a9098b8eb2061ab52e94cbb9241b7bcdd8571681dd891f521a1ccce315728f68",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem::onSubmit",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:3031",
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:69 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_1704ba17cfa8a05f9d9469de3da11d8fafe99a655f8150c87bde2a22ec1279f9",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 identifier(s) 'mutate' at line 69; parents PropertyAccessExpression"
+      }
+     ]
+    }
+   ]
+  },
+  "L3": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_aa7dd1a43899cd1652e8c8ad4453cafb66483c0b2fb03c0f29293b7136e61cbb",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "calls",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem::mutationFn",
+     "to": "frontend/src/client/sdk.gen.ts::ItemsService::createItem",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:56 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_1ff8f2fe36e13e74fcdbd6b121811252e39b96529979a1e46754913b7ae57537",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "call ItemsService.createItem(...) inside property mutationFn of the object passed to useMutation(...); enclosing mutation@55 > AddItem@40"
+      },
+      {
+       "check_id": "k_ec23904f575746404b25987086b55611bd7593e719598dbd6ba4e9586ae6c545",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "ItemsService via frontend/src/components/Items/AddItem.tsx:8-8 ImportSpecifier -> frontend/src/client/index.ts:3-3 ExportSpecifier to frontend/src/client/sdk.gen.ts:287-365 ClassDeclaration; createItem to frontend/src/client/sdk.gen.ts:307-318 MethodDeclaration name line 307"
+      }
+     ],
+     "all_locations": [
+      "frontend/src/components/Items/AddItem.tsx:56-56 site site originator",
+      "frontend/src/components/Items/AddItem.tsx:8-8 input site originator",
+      "frontend/src/client/index.ts:3-3 input site originator",
+      "frontend/src/client/sdk.gen.ts:287-287 input declaration originator",
+      "frontend/src/client/sdk.gen.ts:307-318 to_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [
+    {
+     "claim_id": "c_8747c52f590dd32e24ee6054698b8332e0f99abc72d0e24dba0374bc35dc19d7",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-import",
+     "kind": "calls",
+     "from": "frontend/src/components/Items/AddItem.tsx::AddItem",
+     "to": "frontend/src/client/sdk.gen.ts::ItemsService::createItem",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:3970",
+     "sites": [
+      "frontend/src/components/Items/AddItem.tsx:56 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_b8c9e9dafad15ad579e1b82d6bf3bcf407626fb9135616f3f645d4d6b0eb6bb0",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "line 56: pass: 'createItem' at frontend/src/components/Items/AddItem.tsx:56 resolves to frontend/src/client/sdk.gen.ts:307-318 MethodDeclaration"
+      }
+     ]
+    }
+   ],
+   "codegraph_context": []
+  },
+  "L4": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_b0cb6970841d4088f6ff095e7ccc7015ecb45acb3a414269b3fc866eb63673db",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "implements_operation",
+     "from": "frontend/src/client/sdk.gen.ts::ItemsService::createItem",
+     "to": "backend/app/api/routes/items.py::operation POST /api/v1/items/ (items-create_item)",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [
+      "generated_file",
+      "runtime_config_dependent"
+     ],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "frontend/src/client/sdk.gen.ts:307 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_7b80a56307ec16bee8a1076963cf148d017329e4fdb381964dd9eff11fdf5e19",
+       "method": "deterministic_rule",
+       "rule_id": "R3",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "operation id 'items-create_item' from f-string at main.py (route.tags[0]='items', route.name='create_item'); K1 unique: ItemsService.createItem (.post at sdk.gen.ts:308, url '/api/v1/items/' at :311); K2 (A3, documented claim): method 'createItem' vs expected 'createItem', data type 'itemsCreateItemData' vs expected 'itemsCreateItemData', container 'ItemsService' vs expected 'ItemsService' from methodName /^[^-]*-/ -> '', containerName \"{{name}}Service\", strategy \"byTags\"; cross-check: itemsCreateItemData url '/api/v1/items/' at types.gen.ts:813 vs R1 '/api/v1/items/'; TS binding of the Option"
+      }
+     ],
+     "all_locations": [
+      "frontend/src/client/sdk.gen.ts:307-307 site site originator",
+      "frontend/src/client/sdk.gen.ts:287-287 input declaration originator",
+      "frontend/src/client/sdk.gen.ts:308-308 input site originator",
+      "frontend/src/client/sdk.gen.ts:311-311 input site originator",
+      "frontend/src/client/types.gen.ts:809-809 input declaration originator",
+      "frontend/src/client/types.gen.ts:813-813 input site originator",
+      "frontend/openapi-ts.config.ts:14-14 input site originator",
+      "frontend/openapi-ts.config.ts:16-16 input site originator",
+      "frontend/openapi-ts.config.ts:17-17 input site originator",
+      "backend/app/main.py:14-15 input declaration originator",
+      "backend/app/main.py:24-24 input site originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [],
+   "codegraph_context": [
+    {
+     "claim_id": "c_2d7dac2daebfd4b356e96f8b04177d1ac17f9041c72612dca74827c3bd4fa33d",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-import",
+     "kind": "references",
+     "from": "frontend/src/client/sdk.gen.ts::ItemsService::createItem",
+     "to": "frontend/src/client/types.gen.ts::itemsCreateItemData",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [
+      "generated_file"
+     ],
+     "injected": false,
+     "row_ref": "edges:3728",
+     "sites": [
+      "frontend/src/client/sdk.gen.ts:307 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_2cacb0232ad7891cb7676e0e5ff6641f0d04e59e53366c7beb2266b578917fde",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "typescript-compiler",
+       "result": "pass",
+       "independent": true,
+       "detail": "line 307: pass: 'itemsCreateItemData' at frontend/src/client/sdk.gen.ts:307 resolves via frontend/src/client/sdk.gen.ts:5-5 ImportSpecifier to frontend/src/client/types.gen.ts:809-814 TypeAliasDeclaration"
+      }
+     ]
+    }
+   ]
+  },
+  "L5": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_bb4af06851f0d96154f2aeeed75f75181ffc7d09211446001a9a31c7c8e8f933",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "routes_to",
+     "from": "backend/app/api/routes/items.py::operation POST /api/v1/items/ (items-create_item)",
+     "to": "backend/app/api/routes/items.py::create_item",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [
+      "runtime_config_dependent"
+     ],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:61 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_28b3644ddecd5cfe108b3f858395c2fa2090f8a3a7d5f146f2f41a0392981ed0",
+       "method": "deterministic_rule",
+       "rule_id": "R1",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "R1: POST /api/v1/items/ = '/api/v1' (backend/app/main.py:35 app include prefix) + '' (backend/app/api/main.py:6 router prefix) + '' (backend/app/api/main.py:10 include prefix) + '/items' (backend/app/api/routes/items.py:10 router prefix) + '/' (backend/app/api/routes/items.py:61 decorator path); tags ['items']; route name create_item; handler backend/app/api/routes/items.py:61-72 (def 62); condition None; flags ['runtime_config_dependent']"
+      },
+      {
+       "check_id": "k_aff450921b66c42425194a954cafaf7e7d4e89a07a4667725bef2e393537c4ea",
+       "method": "deterministic_rule",
+       "rule_id": "R3",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "operation id 'items-create_item' from f-string at main.py (route.tags[0]='items', route.name='create_item'); K1 unique: ItemsService.createItem (.post at sdk.gen.ts:308, url '/api/v1/items/' at :311); K2 (A3, documented claim): method 'createItem' vs expected 'createItem', data type 'itemsCreateItemData' vs expected 'itemsCreateItemData', container 'ItemsService' vs expected 'ItemsService' from methodName /^[^-]*-/ -> '', containerName \"{{name}}Service\", strategy \"byTags\"; cross-check: itemsCreateItemData url '/api/v1/items/' at types.gen.ts:813 vs R1 '/api/v1/items/'; TS binding of the Option"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:61-61 site site originator",
+      "backend/app/core/config.py:22-22 input declaration originator",
+      "backend/app/main.py:9-9 input site originator",
+      "backend/app/main.py:35-35 input site originator",
+      "backend/app/api/main.py:3-3 input site originator",
+      "backend/app/api/main.py:6-6 input declaration originator",
+      "backend/app/api/main.py:10-10 input site originator",
+      "backend/app/api/routes/items.py:10-10 input declaration originator",
+      "backend/app/api/routes/items.py:61-72 to_decl declaration originator",
+      "backend/app/api/routes/items.py:62-72 to_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [
+    {
+     "claim_id": "c_45666999095b479a91968f6fbb8eef1029c1785195e30920082cb02b85e23a43",
+     "originator": "codegraph",
+     "class": "analyzer_inference",
+     "provenance": "codegraph:name-match",
+     "kind": "references",
+     "from": "backend/app/api/routes/items.py::backend/app/api/routes/items.py::POST:/",
+     "to": "backend/app/api/routes/items.py::create_item",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:3230",
+     "sites": [
+      "backend/app/api/routes/items.py:61 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_fd97cdd98baa4b0f6ac5883d1275cf991d6ba61f947e3909cb94eb2408da3dcf",
+       "method": "deterministic_rule",
+       "rule_id": "R1",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "R1 finding: POST /api/v1/items/ handler create_item (decorator 61, def 62-72), tags ['items'], name create_item, condition None; extractor route-local path kept in provenance_raw"
+      }
+     ]
+    }
+   ],
+   "codegraph_context": []
+  },
+  "L6": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_3668810e017ffbc645f89a2a7650226d6f2d5357d029ff7ed0c2fed78de5b630",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "depends_on",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": "backend/app/api/deps.py::get_db",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:63 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_5a795179e5f7362373b31c2f25e2c0c149f37a6ad2bb84121b1bb77045b38f21",
+       "method": "deterministic_rule",
+       "rule_id": "R2",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "parameter session (backend/app/api/routes/items.py:63) annotated SessionDep, alias backend/app/api/deps.py:26 = Annotated[Session, Depends(get_db)], Depends(get_db) resolves to backend/app/api/deps.py:21 FunctionDef get_db; depth 1, path ['create_item', 'get_db']; closure complete: True"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:63-63 site site originator",
+      "backend/app/api/routes/items.py:7-7 input site originator",
+      "backend/app/api/deps.py:26-26 input declaration originator",
+      "backend/app/api/deps.py:21-23 to_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [],
+   "codegraph_context": [
+    {
+     "claim_id": "c_36e941bb9ae7c913d74bd2c1367d7828c7e96507871abc63bb6d1b079cc15adf",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-function-ref",
+     "kind": "references",
+     "from": "backend/app/api/deps.py::SessionDep",
+     "to": "backend/app/api/deps.py::get_db",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:3215",
+     "sites": [
+      "backend/app/api/deps.py:26 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_1dcdf015b9288983daa1c5eac8b1efeb11007208277445510b735347b0e90d88",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "'get_db' at line 26 resolves to backend/app/api/deps.py:21 FunctionDef get_db"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_b2a503fe712c7ec0b43b7d7f86aba04203166431f05aad3ec977457781f68024",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-import",
+     "kind": "imports",
+     "from": "backend/app/api/routes/items.py::backend/app/api/routes/items.py",
+     "to": "backend/app/api/deps.py::SessionDep",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:2014",
+     "sites": [
+      "backend/app/api/routes/items.py:7 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_98ab754204cf7f5e367073c4593b90f252299a6e71aa713fff9fad1749fb414f",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "'SessionDep' from app.api.deps resolves to backend/app/api/deps.py:26 ModuleAssign SessionDep"
+      }
+     ]
+    }
+   ]
+  },
+  "L7": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_99cfe7f9c7de541c924276a400457f4beaaeb2b814ee23a8ff90ece58f1f8043",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "depends_on",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": "backend/app/api/deps.py::get_current_user",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:63 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_3eeb0b13ff1c74624e949368f788b9c888c6f7762ca285706859e06f74ca5428",
+       "method": "deterministic_rule",
+       "rule_id": "R2",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "parameter current_user (backend/app/api/routes/items.py:63) annotated CurrentUser, alias backend/app/api/deps.py:49 = Annotated[User, Depends(get_current_user)], Depends(get_current_user) resolves to backend/app/api/deps.py:30 FunctionDef get_current_user; depth 1, path ['create_item', 'get_current_user']; closure complete: True"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:63-63 site site originator",
+      "backend/app/api/routes/items.py:7-7 input site originator",
+      "backend/app/api/deps.py:49-49 input declaration originator",
+      "backend/app/api/deps.py:30-46 to_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [],
+   "codegraph_context": [
+    {
+     "claim_id": "c_1d0f1acabaf7b48ccd688e16a77c2f055c0aa4d42d19175a60a2dbc3223896a6",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-import",
+     "kind": "imports",
+     "from": "backend/app/api/routes/items.py::backend/app/api/routes/items.py",
+     "to": "backend/app/api/deps.py::CurrentUser",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:2013",
+     "sites": [
+      "backend/app/api/routes/items.py:7 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_fcfc3f1b0ca275942e5f853db0a6ddff71c86e72efb4618318841421e70139fc",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "'CurrentUser' from app.api.deps resolves to backend/app/api/deps.py:49 ModuleAssign CurrentUser"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_a6e3ac5453f51eb218e9533f4b5fd24894083b9d3a0630ca0603ff90db23b2fa",
+     "originator": "codegraph",
+     "class": "statically_derived",
+     "provenance": "codegraph:resolved-function-ref",
+     "kind": "references",
+     "from": "backend/app/api/deps.py::CurrentUser",
+     "to": "backend/app/api/deps.py::get_current_user",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "edges:3218",
+     "sites": [
+      "backend/app/api/deps.py:49 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_7cb60db3152001bf053cf2b1bed8ba537f2547cbf0404022cceb503b819ed8c2",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "'get_current_user' at line 49 resolves to backend/app/api/deps.py:30 FunctionDef get_current_user"
+      }
+     ]
+    }
+   ]
+  },
+  "L8": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_b60f7c99a723a7f7b7a7736e04109edb666f27d876bff3b54f4de330efdb5a74",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "persistence_path",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": "backend/app/api/deps.py::get_db",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": "statically established persistence path",
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:68 (site, originator)",
+      "backend/app/api/routes/items.py:69 (site, originator)",
+      "backend/app/api/routes/items.py:70 (site, originator)",
+      "backend/app/api/routes/items.py:71 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_b315af4e45667355764496e26ac09249cf528453f867830bf96428da70a76d65",
+       "method": "deterministic_rule",
+       "rule_id": "R4",
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "stage at 69, commit at 70 on receiver session bound by R2 to SessionDep -> sqlmodel.Session, callable get_db; steps [('model_validation', 68), ('session_stage', 69), ('session_commit', 70), ('session_reload', 71)]; model backend/app/models.py:87 ClassDef Item table=True: True; label: statically established persistence path: create_item stages Item via session.add (69) and commits via session.commit (70) on the SessionDep-bound Session; model built at 68; reloaded at 71"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:68-68 site site originator",
+      "backend/app/api/routes/items.py:69-69 site site originator",
+      "backend/app/api/routes/items.py:70-70 site site originator",
+      "backend/app/api/routes/items.py:71-71 site site originator",
+      "backend/app/api/routes/items.py:63-63 input site originator",
+      "backend/app/api/routes/items.py:7-7 input site originator",
+      "backend/app/api/routes/items.py:8-8 input site originator",
+      "backend/app/api/deps.py:26-26 input declaration originator",
+      "backend/app/api/deps.py:9-9 input site originator",
+      "backend/app/api/deps.py:21-23 input declaration originator",
+      "backend/app/models.py:87-87 input declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [],
+   "codegraph_context": [
+    {
+     "claim_id": "c_10fb321467e3c414068df3c4b583220e3f6d6d343def0716e22f1dbb7c162914",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:300",
+     "sites": [
+      "backend/app/api/routes/items.py:70 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_33496746e75c825360f41861264aa0cdcaf4e856dfd0951d7c107065622d6e21",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 syntax node(s) named 'commit' at line 70: ['Attribute']"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_3c2a2a65190d82a6f31485bc3f885002d220956d5117f509df9d0f5f979b28fc",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:323",
+     "sites": [
+      "backend/app/api/routes/items.py:68 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_e5f219a96eaaafac7fe24291f402d383f54e85b55d15679aca8d3e3c7004eb61",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 syntax node(s) named 'id' at line 68: ['Attribute']"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_be0e65bb874c853f82f48e67bdc7686b91b07fec86be3dda67c5a2ee7c1c96c9",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:298",
+     "sites": [
+      "backend/app/api/routes/items.py:68 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_0d47413eb7c3a7f7c8f7cebd81a1df14ea46aaf1aad09385db5220d4ff5b43d6",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 syntax node(s) named 'model_validate' at line 68: ['Attribute']"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_e7f69a069b959e806e073ac855ed03ff1682659a438402f759038b89e1872620",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:301",
+     "sites": [
+      "backend/app/api/routes/items.py:71 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_a88483f45636de75f90613b39abf215cabaf1205d483dceff027a44efc1c30e5",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 syntax node(s) named 'refresh' at line 71: ['Attribute']"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_ffecb899be7ec2b4f285a65037e2e349abc0630c78d7c72fe7f9594bb2733461",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:unresolved",
+     "kind": "unresolved_reference",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "unresolved_refs:299",
+     "sites": [
+      "backend/app/api/routes/items.py:69 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_1bf557a7b8f1161bd83455c8bba553b03471340b7ac192a6a2a1898ea00d80a1",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "1 syntax node(s) named 'add' at line 69: ['Attribute']"
+      }
+     ]
+    }
+   ]
+  },
+  "L9": {
+   "link_status": "verified",
+   "reason": null,
+   "fixture_claims": [
+    {
+     "claim_id": "c_7aa704637cc4e3d0b0219c46d32a594c22d0e2a8f6cc3583a6d080fa3f614f9e",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "uses_model",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": "backend/app/models.py::Item",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:68 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_936cb2f27fa28fc65dbf155881818d8ad490acc7a966d3a396b08456ada64cfe",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "decl backend/app/models.py:87 ClassDef Item via [('backend/app/api/routes/items.py', 8)]"
+      },
+      {
+       "check_id": "k_8c4c1026941e49a6bd209fc3a52de217e70e79ab10d9bc337180170ff49fc687",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "ClassDef Item keywords [('table', 'True')]; call at line 68 inside FunctionDef create_item 62-72"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:68-68 site site originator",
+      "backend/app/api/routes/items.py:8-8 input site originator",
+      "backend/app/models.py:87-93 to_decl declaration originator"
+     ]
+    },
+    {
+     "claim_id": "c_afb8f1233239c6cf62a0cf2b8c12fc082d35ad81b29dfc6edd5cce8166aca880",
+     "originator": "traces-lab-fixture",
+     "class": "analyzer_inference",
+     "provenance": "fixture:expected-chain",
+     "kind": "returns_model",
+     "from": "backend/app/api/routes/items.py::create_item",
+     "to": "backend/app/models.py::ItemPublic",
+     "status": "verified",
+     "label": "verified",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": null,
+     "sites": [
+      "backend/app/api/routes/items.py:61 (site, originator)"
+     ],
+     "establishing_checks": [
+      {
+       "check_id": "k_f49966e9f6ea92beb3011398f8feaf0242c172c4d73ac4e9ab4f19994341a753",
+       "method": "syntax_structure",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "decorator router.post(\"/\", response_model=ItemPublic)"
+      },
+      {
+       "check_id": "k_37b6ddd86760088ff60ab78395280986fdd10ae785f94a0c7047e515fb300573",
+       "method": "binding_resolution",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "decl backend/app/models.py:97 ClassDef ItemPublic"
+      }
+     ],
+     "all_locations": [
+      "backend/app/api/routes/items.py:61-61 site site originator",
+      "backend/app/api/routes/items.py:8-8 input site originator",
+      "backend/app/models.py:97-100 to_decl declaration originator"
+     ]
+    }
+   ],
+   "codegraph_same_link": [],
+   "codegraph_context": [
+    {
+     "claim_id": "c_3a9639779cdb3ace92913f83e3aaf09eb08e6dd4dfe50f9342ed21937e8561f5",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:declaration",
+     "kind": "node",
+     "from": "backend/app/models.py::ItemPublic",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "nodes:class:94436442f73b5ec4d670bf815cdde628",
+     "sites": [],
+     "establishing_checks": [
+      {
+       "check_id": "k_ee9d7f24321ac52cce39afdd3e66c5285c0a92070fb6177fdf52d504915754b9",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "ClassDef 'ItemPublic' def/statement line 97, end 100"
+      }
+     ]
+    },
+    {
+     "claim_id": "c_491d5a69f12659e7f0974d59114bb58d0342c1a0fb8e8c2e48a9d6efda5f21b3",
+     "originator": "codegraph",
+     "class": "source_backed_declaration",
+     "provenance": "codegraph:declaration",
+     "kind": "node",
+     "from": "backend/app/models.py::Item",
+     "to": null,
+     "status": "observed",
+     "label": "observed",
+     "status_reason": null,
+     "qualifier": null,
+     "flags": [],
+     "injected": false,
+     "row_ref": "nodes:class:8b2f2757626b86946caa570fa503015d",
+     "sites": [],
+     "establishing_checks": [
+      {
+       "check_id": "k_f528e837bcec1ac0a3c0fd2b4aca2c33b90352a29149c72e70abb989f1879284",
+       "method": "parser_presence",
+       "rule_id": null,
+       "family": "cpython-ast",
+       "result": "pass",
+       "independent": true,
+       "detail": "ClassDef 'Item' def/statement line 87, end 93"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "transitive_L7": {
+  "L7T1": {
+   "claim_id": "c_a86fe9381acd4a2ca3e418aa4b61b7c5158861a23257bd92780c94d006bb62db",
+   "originator": "traces-lab-fixture",
+   "class": "analyzer_inference",
+   "provenance": "fixture:expected-chain",
+   "kind": "depends_on",
+   "from": "backend/app/api/deps.py::get_current_user",
+   "to": "backend/app/api/deps.py::get_db",
+   "status": "verified",
+   "label": "verified",
+   "status_reason": null,
+   "qualifier": null,
+   "flags": [],
+   "injected": false,
+   "row_ref": null,
+   "sites": [
+    "backend/app/api/deps.py:30 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_76583cea465fa2b8f66db90590731de4e2ca5f1fa8ec2cb5df95be57f2d82251",
+     "method": "deterministic_rule",
+     "rule_id": "R2",
+     "family": "cpython-ast",
+     "result": "pass",
+     "independent": true,
+     "detail": "parameter session (backend/app/api/deps.py:30) annotated SessionDep, alias backend/app/api/deps.py:26 = Annotated[Session, Depends(get_db)], Depends(get_db) resolves to backend/app/api/deps.py:21 FunctionDef get_db; depth 2, path ['create_item', 'get_current_user', 'get_db']; closure complete: True"
+    }
+   ],
+   "all_locations": [
+    "backend/app/api/deps.py:30-30 site site originator",
+    "backend/app/api/deps.py:26-26 input declaration originator",
+    "backend/app/api/deps.py:21-23 to_decl declaration originator"
+   ]
+  },
+  "L7T2": {
+   "claim_id": "c_813ab4a084d73bcaea13be14f7a137ce9ac3caa66a3187d0f7f9d47a50c2803b",
+   "originator": "traces-lab-fixture",
+   "class": "analyzer_inference",
+   "provenance": "fixture:expected-chain",
+   "kind": "depends_on",
+   "from": "backend/app/api/deps.py::get_current_user",
+   "to": "backend/app/api/deps.py::reusable_oauth2",
+   "status": "verified",
+   "label": "verified",
+   "status_reason": null,
+   "qualifier": null,
+   "flags": [],
+   "injected": false,
+   "row_ref": null,
+   "sites": [
+    "backend/app/api/deps.py:30 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_fd322937ecd60ae4fa3a961b67134a68c4c9b98d770f4877566846df1664d9ad",
+     "method": "deterministic_rule",
+     "rule_id": "R2",
+     "family": "cpython-ast",
+     "result": "pass",
+     "independent": true,
+     "detail": "parameter token (backend/app/api/deps.py:30) annotated TokenDep, alias backend/app/api/deps.py:27 = Annotated[str, Depends(reusable_oauth2)], Depends(reusable_oauth2) resolves to backend/app/api/deps.py:16 ModuleAssign reusable_oauth2; depth 2, path ['create_item', 'get_current_user', 'reusable_oauth2']; closure complete: True"
+    }
+   ],
+   "all_locations": [
+    "backend/app/api/deps.py:30-30 site site originator",
+    "backend/app/api/deps.py:27-27 input declaration originator",
+    "backend/app/api/deps.py:16-18 to_decl declaration originator"
+   ]
+  }
+ },
+ "library_hops": {
+  "H1": {
+   "claim_id": "c_626d6afed9712afc1fda7048bbb2236da996145625ac805a7d87f13f57a445da",
+   "originator": "traces-lab-fixture",
+   "class": "analyzer_inference",
+   "provenance": "fixture:expected-chain",
+   "kind": "library_contract",
+   "from": "frontend/src/components/Items/AddItem.tsx::AddItem::form.handleSubmit",
+   "to": "frontend/src/components/Items/AddItem.tsx::AddItem::onSubmit",
+   "status": "unvalidated",
+   "label": "inferred",
+   "status_reason": "library_contract: cannot be established in Task 002 (library source not installed, not in scope); handleSubmit at AddItem.tsx:88: no symbol (library or unknown); react-hook-form is not installed, and what the library does with the callback is not visible in repo source",
+   "qualifier": null,
+   "flags": [
+    "library_contract"
+   ],
+   "injected": false,
+   "row_ref": null,
+   "sites": [
+    "frontend/src/components/Items/AddItem.tsx:88 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_c107577d8e8fb92ff680a7b5e4c5d3829ca32908b892c1e936b3b7d72a0e4507",
+     "method": "binding_resolution",
+     "rule_id": null,
+     "family": "typescript-compiler",
+     "result": "inconclusive",
+     "independent": true,
+     "detail": "handleSubmit at AddItem.tsx:88: no symbol (library or unknown); react-hook-form is not installed, and what the library does with the callback is not visible in repo source"
+    }
+   ],
+   "all_locations": [
+    "frontend/src/components/Items/AddItem.tsx:88-88 site site originator"
+   ]
+  },
+  "H2": {
+   "claim_id": "c_7c3d5d549709fc71af12b9b215b5fc44c98482f0be83a804ab751f7f658cbb61",
+   "originator": "traces-lab-fixture",
+   "class": "analyzer_inference",
+   "provenance": "fixture:expected-chain",
+   "kind": "library_contract",
+   "from": "frontend/src/components/Items/AddItem.tsx::AddItem::mutation.mutate",
+   "to": "frontend/src/components/Items/AddItem.tsx::AddItem::mutationFn",
+   "status": "unvalidated",
+   "label": "inferred",
+   "status_reason": "library_contract: cannot be established in Task 002 (library source not installed, not in scope); mutate at AddItem.tsx:69: no symbol (library or unknown); @tanstack/react-query is not installed, and what the library does with mutationFn is not visible in repo source",
+   "qualifier": null,
+   "flags": [
+    "library_contract"
+   ],
+   "injected": false,
+   "row_ref": null,
+   "sites": [
+    "frontend/src/components/Items/AddItem.tsx:69 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_85b9161281247d49d748628ff80b511b5a209f64facfb8d8db1c63ce11b34f1b",
+     "method": "binding_resolution",
+     "rule_id": null,
+     "family": "typescript-compiler",
+     "result": "inconclusive",
+     "independent": true,
+     "detail": "mutate at AddItem.tsx:69: no symbol (library or unknown); @tanstack/react-query is not installed, and what the library does with mutationFn is not visible in repo source"
+    }
+   ],
+   "all_locations": [
+    "frontend/src/components/Items/AddItem.tsx:69-69 site site originator",
+    "frontend/src/components/Items/AddItem.tsx:56-56 input site originator"
+   ]
+  }
+ },
+ "negative_controls": {
+  "N1": {
+   "claim_id": "c_1a1044acc8d2021dadd2caf669ccc1a3420e4367d3642a0ba26e90943b3b0b3d",
+   "originator": "gitdiagram",
+   "class": "analyzer_inference",
+   "provenance": "external:gitdiagram-page",
+   "kind": "uses_crud",
+   "from": "backend/app/api/routes/items.py::create_item",
+   "to": "backend/app/crud.py::backend/app/crud.py",
+   "status": "rejected",
+   "label": "inferred",
+   "status_reason": "items.py has no import of app.crud and no crud reference; create_item writes through the SessionDep-bound session at items.py:68-71 (statically established persistence path) (failing checks: k_d410b58f0ea94aade12522f7ea4b623e5dfde98fe59555ef82deec812f3dd4fa, k_028296ff4c232f8436cfbafaaf871ea47076ced8c99150e088954009dce55e55)",
+   "qualifier": null,
+   "flags": [],
+   "injected": true,
+   "row_ref": null,
+   "sites": [
+    "backend/app/api/routes/items.py:61-72 (declaration, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_d410b58f0ea94aade12522f7ea4b623e5dfde98fe59555ef82deec812f3dd4fa",
+     "method": "binding_resolution",
+     "rule_id": null,
+     "family": "cpython-ast",
+     "result": "fail",
+     "independent": true,
+     "detail": "5 items.py handlers (R1); calls resolving into app.crud: []; module bindings to app.crud: []; Name/Attribute containing 'crud' in items.py: 0; unresolved callees (none can reach app.crud without a binding): ['HTTPException (external)', 'Item.model_validate (unresolved)', 'ItemPublic.model_validate (unresolved)', 'col (external)', 'col(Item.created_at).desc (unresolved)', 'func.count (external)', 'item.sqlmodel_update (unresolved)', 'item_in.model_dump (unresolved)', 'router.delete (unresolved)', 'router.get (unresolved)', 'router.post (unresolved)', 'router.put (unresolved)']; crud.py::create_"
+    }
+   ],
+   "all_locations": [
+    "backend/app/api/routes/items.py:61-72 site declaration originator",
+    "backend/app/api/routes/items.py:1-8 input declaration originator",
+    "backend/app/crud.py:63-68 input declaration originator",
+    "backend/tests/utils/item.py:16-16 input site originator"
+   ]
+  },
+  "N2a": {
+   "claim_id": "c_d9888fc62c541d963531b655f06be7b566f831d84856134a952e7f7ddd61161a",
+   "originator": "traces-negative-control",
+   "class": "analyzer_inference",
+   "provenance": "fixture:negative-control",
+   "kind": "depends_on",
+   "from": "backend/app/api/routes/private.py::create_user",
+   "to": "backend/app/api/deps.py::CurrentUser",
+   "status": "rejected",
+   "label": "inferred",
+   "status_reason": "private.py create_user takes only user_in and session: SessionDep; dependency closure is {get_db}; no CurrentUser or get_current_user binding; no dependencies= on decorator, router, includes or app (failing checks: k_7f6472a0ddcd36266e029c0fb5d0642a62ab21b7fb0d2b5976659d096ec11498, k_028dd2fe2ddae9aeb40c84644df78c5495b03ec5595ad9f3507c298a8cd0073d)",
+   "qualifier": null,
+   "flags": [],
+   "injected": true,
+   "row_ref": null,
+   "sites": [
+    "backend/app/api/routes/private.py:24 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_7f6472a0ddcd36266e029c0fb5d0642a62ab21b7fb0d2b5976659d096ec11498",
+     "method": "deterministic_rule",
+     "rule_id": "R2",
+     "family": "cpython-ast",
+     "result": "fail",
+     "independent": true,
+     "detail": "parameters ['user_in', 'session']; closure ['get_db'] (aliases ['SessionDep']), complete True; dependencies= on decorator/router/includes/app: []; notes ['user_in: no dependency (annotation is repo class backend/app/api/routes/private.py:16 ClassDef PrivateUserCreate)']"
+    },
+    {
+     "check_id": "k_028dd2fe2ddae9aeb40c84644df78c5495b03ec5595ad9f3507c298a8cd0073d",
+     "method": "binding_resolution",
+     "rule_id": null,
+     "family": "cpython-ast",
+     "result": "fail",
+     "independent": true,
+     "detail": "module-level bindings named CurrentUser/get_current_user: []; uses inside create_user: []; imports from app.api.deps: ['SessionDep']"
+    }
+   ],
+   "all_locations": [
+    "backend/app/api/routes/private.py:24-24 site site originator",
+    "backend/app/api/routes/private.py:6-6 input site originator",
+    "backend/app/api/routes/private.py:23-38 from_decl declaration originator",
+    "backend/app/api/deps.py:49-49 to_decl declaration originator"
+   ]
+  },
+  "N2b": {
+   "claim_id": "c_2bf010649b9b947b25fc54aeab4de9c1b45ccfc20f3f298b565026cb61a80b09",
+   "originator": "traces-negative-control",
+   "class": "analyzer_inference",
+   "provenance": "fixture:negative-control",
+   "kind": "depends_on",
+   "from": "backend/app/api/routes/private.py::create_user",
+   "to": "backend/app/api/deps.py::get_current_user",
+   "status": "rejected",
+   "label": "inferred",
+   "status_reason": "private.py create_user takes only user_in and session: SessionDep; dependency closure is {get_db}; no CurrentUser or get_current_user binding; no dependencies= on decorator, router, includes or app (failing checks: k_383bb6bdc6a39d180f259e5c3d46dd0e1690314cb082636d0f541a61a60d6473, k_0f542328115820131c8d0a1b0b15dd29eebf669b77dd34a7fc7ba3d6e9831ed9)",
+   "qualifier": null,
+   "flags": [],
+   "injected": true,
+   "row_ref": null,
+   "sites": [
+    "backend/app/api/routes/private.py:24 (site, originator)"
+   ],
+   "establishing_checks": [
+    {
+     "check_id": "k_383bb6bdc6a39d180f259e5c3d46dd0e1690314cb082636d0f541a61a60d6473",
+     "method": "deterministic_rule",
+     "rule_id": "R2",
+     "family": "cpython-ast",
+     "result": "fail",
+     "independent": true,
+     "detail": "parameters ['user_in', 'session']; closure ['get_db'] (aliases ['SessionDep']), complete True; dependencies= on decorator/router/includes/app: []; notes ['user_in: no dependency (annotation is repo class backend/app/api/routes/private.py:16 ClassDef PrivateUserCreate)']"
+    },
+    {
+     "check_id": "k_0f542328115820131c8d0a1b0b15dd29eebf669b77dd34a7fc7ba3d6e9831ed9",
+     "method": "binding_resolution",
+     "rule_id": null,
+     "family": "cpython-ast",
+     "result": "fail",
+     "independent": true,
+     "detail": "module-level bindings named CurrentUser/get_current_user: []; uses inside create_user: []; imports from app.api.deps: ['SessionDep']"
+    }
+   ],
+   "all_locations": [
+    "backend/app/api/routes/private.py:24-24 site site originator",
+    "backend/app/api/routes/private.py:6-6 input site originator",
+    "backend/app/api/routes/private.py:23-38 from_decl declaration originator",
+    "backend/app/api/deps.py:30-46 to_decl declaration originator"
+   ]
+  }
+ },
+ "summary": {
+  "L1": "verified",
+  "L2": "verified",
+  "L3": "verified",
+  "L4": "verified",
+  "L5": "verified",
+  "L6": "verified",
+  "L7": "verified",
+  "L8": "verified",
+  "L9": "verified"
+ }
+}

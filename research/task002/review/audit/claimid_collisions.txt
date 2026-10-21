@@ -1,0 +1,20 @@
+records 10050 distinct claim_id 7324 duplicate claim_id 608
+groups same (kind, from, to, originator) with >1 record: 571 records in them: 3461
+by kind [('unresolved_reference', 409), ('references', 66), ('calls', 51), ('imports', 37), ('contains', 3), ('node', 3), ('instantiates', 2)]
+statuses mixed within a group: 29
+largest ('unresolved_reference', None, 'frontend/tests/user-settings.spec.ts::frontend/tests/user-settings.spec.ts', None, 'codegraph') 204 [[1], [1], [1], [250], [250], [9], [10], [11]]
+claim_id groups 608 records 3334
+groups by kind [('unresolved_reference', 447), ('references', 66), ('calls', 51), ('imports', 37), ('contains', 3), ('instantiates', 2), ('node', 2)]
+records by kind [('unresolved_reference', 2932), ('calls', 175), ('references', 137), ('imports', 74), ('contains', 7), ('node', 5), ('instantiates', 4)]
+groups with mixed statuses 29 Counter({('observed', 'unvalidated'): 29})
+groups distinguished by site line: 267
+groups still colliding with site lines: 341
+groups still colliding with site+decl lines and cols: 84
+groups still colliding with plus full provenance_raw: 0
+proposed key (old fields + anchor range incl cols + unresolved reference_name/kind/line/col): duplicates 394
+unresolved without any location: 0
+
+['row', 'table']
+PROPOSED: old fields + anchor (role,file,start_line,start_col,end_line,end_col) + reference_name/kind for unresolved: duplicate keys 34 records 68
+Counter({True: 34})
+anchor only (no reference_name): duplicate keys 394

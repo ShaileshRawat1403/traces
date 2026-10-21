@@ -1,0 +1,72 @@
+## 2026-10-21T10:03:08+05:30 HOME=/workspace/traces-research/task002/tools/home
+$ git -C src/fsft rev-parse HEAD; git -C src/fsft status --porcelain --ignored (before)
+b1125d8839482cb7bbae603ddc6d0081bf87532e
+?? .codegraph/
+!! .codegraph/codegraph.db
+!! .codegraph/codegraph.db-shm
+!! .codegraph/codegraph.db-wal
+$ npm view "typescript@^6.0.3" version --json
+"6.0.3"
+npm notice
+npm notice New patch version of npm available! 11.21.0 -> 11.21.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.1
+npm notice To update run: npm install -g npm@11.21.1
+npm notice
+$ npm view typescript@6.0 version --json
+[
+  "6.0.2",
+  "6.0.3"
+]
+$ npm view typescript@6.0.3 version license dist.integrity dist.shasum dist.tarball --json
+{
+  "version": "6.0.3",
+  "license": "Apache-2.0",
+  "dist.integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+  "dist.shasum": "90251dc007916e972786cb94d74d15b185577d21",
+  "dist.tarball": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz"
+}
+$ cd tools/ts6 && npm init -y && npm install --save-exact --ignore-scripts --no-audit --no-fund typescript@6.0.3
+
+added 1 package in 778ms
+exit=0
+$ cat package.json
+{
+  "name": "ts6",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "typescript": "6.0.3"
+  }
+}
+$ lockfile entry
+{
+ "version": "6.0.3",
+ "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
+ "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+ "license": "Apache-2.0",
+ "bin": {
+  "tsc": "bin/tsc",
+  "tsserver": "bin/tsserver"
+ },
+ "engines": {
+  "node": ">=14.17"
+ }
+}
+$ sha256sum package-lock.json
+427b97fc486624e5c9b52ff69e4db4bf2f9d90d9196bfedd8c6bcbfafd669899  package-lock.json
+$ git -C src/fsft status --porcelain --ignored (after)
+?? .codegraph/
+!! .codegraph/codegraph.db
+!! .codegraph/codegraph.db-shm
+!! .codegraph/codegraph.db-wal
+b1125d8839482cb7bbae603ddc6d0081bf87532e
+$ ls $HOME
+.npm
