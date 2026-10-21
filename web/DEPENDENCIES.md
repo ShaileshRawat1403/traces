@@ -13,8 +13,9 @@ Checked from each package's own `package.json` in `node_modules` on 2026-10-21 (
 | cytoscape | 3.34.4 | MIT | Graph canvas, loaded only on the graph route (scaffold, code-split here) |
 | @tanstack/react-query | 5.104.5 | MIT | Server state: caching, job polling with ETag, retry policy. Added in ws/ui-shell |
 | @radix-ui/react-dialog | 1.3.1 | MIT | Accessible dialog primitive (focus trap, Escape, aria) for the phone More sheet. Added in ws/ui-shell |
+| @radix-ui/react-tabs | 1.2.1 | MIT | Accessible tabs (arrow-key roving focus, aria-selected) for the overview layers. Added in ws/ui-overview |
 
-Full production tree (`npm ls --omit=dev --all`): 37 packages MIT, 1 package 0BSD (`tslib`, pulled in by Radix). No copyleft code ships to the browser.
+Full production tree (`npm ls --omit=dev --all`): 42 packages MIT, 1 package 0BSD (`tslib`, pulled in by Radix). No copyleft code ships to the browser.
 
 ## Build time only (not shipped)
 
