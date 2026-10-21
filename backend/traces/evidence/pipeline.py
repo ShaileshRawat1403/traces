@@ -30,7 +30,7 @@ from traces.ingest.fetch import ensure_pinned_checkout, local_clone
 from traces.ingest.urls import parse_repo_url
 
 PKG = Path(__file__).resolve().parents[1]  # backend/traces
-SCHEMA_03 = PKG / "evidence" / "schema" / "evidence_record.schema.json"
+SCHEMA_03 = PKG / "evidence" / "schema" / "evidence_record.v0.3.schema.json"
 CHECKER_DIR = PKG / "validators" / "checker"
 CODEGRAPH_PIN = {"package": "@colbymchenry/codegraph", "version": "1.6.2",
                  "npm_integrity": "sha512-hODH/mGnCf3IUMs6rzktv/zbecJIKJfdZAYHZ9mqecb0G7ZkHaA8CZafDVnswANFEL1YFcG+lfAwc5SIXzUH6Q==",
