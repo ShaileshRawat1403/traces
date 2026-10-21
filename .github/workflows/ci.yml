@@ -1,0 +1,270 @@
+# Traces CI. GitHub-hosted ubuntu-latest runners only (free tier for public repos). No secrets, no deploys, read-only token.
+# Activated at .github/workflows/ci.yml (previously staged at ci/github-actions-ci.yml, D-018).
+# Third-party actions are pinned to full commit SHAs (release tag in the trailing comment).
+# Local equivalent without act or Docker: ci/run_local.sh (same jobs, same commands). See ci/README.md.
+name: ci
+on:
+  push:
+    branches: [build/traces-v1, "ws/**"]
+  pull_request:
+    branches: [build/traces-v1, main]
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: "Run the e2e placeholder job (fails until tests/e2e lands)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14.8"
+  UV_VERSION: "0.13.4"
+  NODE_VERSION: "22"
+  # Pinned Task 002 target. The cache key is derived from the full SHA, so a new pin is a new cache entry.
+  TARGET_SHA: b1125d8839482cb7bbae603ddc6d0081bf87532e
+  TARGET_PATH: .cache/targets/github.com__fastapi__full-stack-fastapi-template/b1125d8839482cb7bbae603ddc6d0081bf87532e/source
+  UV_NO_PROGRESS: "1"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+
+jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - name: ruff
+        run: uv run --frozen ruff check backend tests
+
+  types:
+    name: types (mypy, web tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - name: mypy
+        run: uv run --frozen mypy
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: web install (lockfile, no install scripts)
+        run: cd web && npm ci --ignore-scripts
+      - name: web tsc
+        run: cd web && npm run typecheck
+
+  unit:
+    name: unit tests + frozen checker integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - name: frozen checker integrity
+        run: cd backend/traces/validators/checker && sha256sum -c SHA256SUMS
+      - name: unit tests
+        run: uv run --frozen pytest -q tests/unit
+
+  api:
+    name: API tests (includes OpenAPI currency)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - name: API tests
+        run: uv run --frozen pytest -q tests/api
+
+  web-build:
+    name: web build (API types currency, vite build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: generated API types match docs/contracts/openapi.json
+        run: npm run check:api
+      - name: build (tsc --noEmit && vite build)
+        run: npm run build
+
+  target:
+    name: pinned target cache (fastapi/full-stack-fastapi-template@b1125d8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        id: target-cache
+        with:
+          path: ${{ env.TARGET_PATH }}
+          key: target-fastapi-full-stack-fastapi-template-${{ env.TARGET_SHA }}-v1
+      - if: steps.target-cache.outputs.cache-hit != 'true'
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - if: steps.target-cache.outputs.cache-hit != 'true'
+        run: uv python install "$PYTHON_VERSION"
+      - if: steps.target-cache.outputs.cache-hit != 'true'
+        run: uv sync --frozen
+      - name: fetch the pinned target with hardened git (hooks, symlinks, LFS, submodules off)
+        if: steps.target-cache.outputs.cache-hit != 'true'
+        run: uv run --frozen python -c "from traces.core.config import get_settings; from traces.evidence.pipeline import target_checkout; print(target_checkout(get_settings()))"
+      - name: verify pinned HEAD
+        run: test "$(git -C "$TARGET_PATH" rev-parse HEAD)" = "$TARGET_SHA"
+
+  contract:
+    name: contract tests CT1-CT16 (fresh baseline, unshare -rn)
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.TARGET_PATH }}
+          key: target-fastapi-full-stack-fastapi-template-${{ env.TARGET_SHA }}-v1
+          fail-on-cache-miss: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: toolchain/package-lock.json
+      - name: toolchain (CodeGraph 1.6.2 + TypeScript 6.0.3, integrity-pinned, no install scripts)
+        run: cd toolchain && npm ci --ignore-scripts
+      - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          unshare -rn true && echo "unshare available"
+      - name: contract tests
+        env:
+          TRACES_ISOLATION: unshare
+        run: uv run --frozen pytest -q tests/contract
+      - name: upload run summary on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: contract-run
+          path: |
+            .traces-data/runs/*/inside_result.json
+            .traces-data/runs/*/run_meta.json
+          retention-days: 7
+
+  regression:
+    name: regression tests RT1-RT8 + 0.4 migration (fresh baseline, unshare -rn)
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.TARGET_PATH }}
+          key: target-fastapi-full-stack-fastapi-template-${{ env.TARGET_SHA }}-v1
+          fail-on-cache-miss: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: toolchain/package-lock.json
+      - name: toolchain (CodeGraph 1.6.2 + TypeScript 6.0.3, integrity-pinned, no install scripts)
+        run: cd toolchain && npm ci --ignore-scripts
+      - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          unshare -rn true && echo "unshare available"
+      - name: regression and migration tests
+        env:
+          TRACES_ISOLATION: unshare
+        run: uv run --frozen pytest -q tests/regression
+      - name: upload run summary on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: regression-run
+          path: |
+            .traces-data/runs/*/inside_result.json
+            .traces-data/runs/*/run_meta.json
+          retention-days: 7
+
+  e2e:
+    # Placeholder until tests/e2e (Playwright, desktop + Pixel-class mobile) lands. It runs only on a manual dispatch with
+    # e2e=true, so push and PR runs report it as skipped, never as passed (hashFiles cannot be used in a job-level `if`).
+    # The harness PR replaces this condition and the steps.
+    name: e2e (Playwright; placeholder, skipped until tests/e2e lands)
+    needs: [api, web-build, target]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.e2e }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: harness present
+        run: test -f tests/e2e/playwright.config.ts || { echo "tests/e2e/playwright.config.ts missing" >&2; exit 1; }
