@@ -110,6 +110,8 @@ export interface ElementData {
   target?: string;
   tone?: string;
   line?: string;
+  /** Visual weight for a rolled-up count. Not a claim. */
+  weight?: number;
 }
 
 /** Opening frame: components only, when the page mixes symbols in. A focused neighborhood is drawn in full. */
@@ -138,6 +140,66 @@ export function openingMap(components: readonly { id: string; name: string; laye
     return !!src && !!tgt && ids.has(src) && ids.has(tgt);
   });
   return [...nodes, ...edges];
+}
+
+/**
+ * Count recorded relationships between components.
+ * A symbol edge is counted only when both files resolve to components, and those components differ.
+ * Rejected edges are already dropped by drawableEdges. Same-component edges stay off this map;
+ * they appear when the component is expanded. The line uses the weakest status in the pair,
+ * so a mix is not drawn as verified. Counts are from this graph page, which may be truncated.
+ */
+export function componentRollup(data: GraphResponse, components: readonly Component[]): { data: ElementData }[] {
+  const nodes = new Map(data.nodes.map((n) => [n.id, n]));
+  const owner = (id: string): string | null => {
+    const n = nodes.get(id);
+    if (!n) return null;
+    if (n.entity === "component") return n.id;
+    return componentForFile(n.file, components)?.id ?? null;
+  };
+  const buckets = new Map<string, { source: string; target: string; n: number; kinds: Map<string, number>; rank: number }>();
+  for (const e of drawableEdges(data).edges) {
+    const source = owner(e.source);
+    const target = owner(e.target);
+    if (!source || !target || source === target) continue;
+    const key = `${source}\0${target}`;
+    let row = buckets.get(key);
+    if (!row) {
+      row = { source, target, n: 0, kinds: new Map(), rank: 0 };
+      buckets.set(key, row);
+    }
+    row.n += 1;
+    row.kinds.set(e.kind, (row.kinds.get(e.kind) ?? 0) + 1);
+    const rank = e.status === "unvalidated" || e.status === "missing_location" ? 2 : e.status === "observed" ? 1 : 0;
+    if (rank > row.rank) row.rank = rank;
+  }
+  return [...buckets.values()]
+    .sort((a, b) => a.source.localeCompare(b.source) || a.target.localeCompare(b.target))
+    .map((row) => {
+      const top = [...row.kinds.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const kind = top.length === 1 ? `${row.n} ${top[0]![0].replaceAll("_", " ")}` : String(row.n);
+      const tone = row.rank === 2 ? "inferred" : row.rank === 1 ? "observed" : "verified";
+      const line = row.rank === 2 ? "dashed" : row.rank === 1 ? "thin" : "solid";
+      return {
+        data: {
+          id: `rollup::${row.source}::${row.target}`,
+          label: kind,
+          source: row.source,
+          target: row.target,
+          entity: "rollup",
+          tone,
+          line,
+          weight: Math.min(6, 1.6 + Math.log2(row.n)),
+        },
+      };
+    });
+}
+
+/** Opening picture: stored components in layer bands, with page-level relationship counts between them. */
+export function openingDiagram(components: readonly Component[], data: GraphResponse): { data: ElementData }[] {
+  if (components.length === 0) return openingMap([], toElements(data, []));
+  const nodes = components.map((c) => ({ data: { id: c.id, label: c.name, entity: "component", layer: c.layer } }));
+  return [...nodes, ...componentRollup(data, components)];
 }
 
 /** Cytoscape elements: component nodes become compound parents of the symbol nodes inside their paths. */

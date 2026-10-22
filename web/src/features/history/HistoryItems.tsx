@@ -48,15 +48,18 @@ export function ReviewState({ x }: { x: HistoryExtras | undefined }) {
   return <span className="text-xs text-ink-2">Review: {text}.</span>;
 }
 
-export function HistoryItem({ item, x, onEvidence, children }: { item: ClaimSummary; x: HistoryExtras | undefined; onEvidence: (id: string) => void; children?: React.ReactNode }) {
+export function HistoryItem({ item, x, onEvidence, children, eyebrow }: { item: ClaimSummary; x: HistoryExtras | undefined; onEvidence: (id: string) => void; children?: React.ReactNode; eyebrow?: React.ReactNode }) {
   const note = historyNote(item.class, item.status);
+  const who = (item.from_symbol ?? "").replace(/^(file|component|commit|dep|repo)::/, "");
   return (
     <li className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3" data-testid="history-item" data-class={item.class}>
+      {eyebrow}
       <span className="flex flex-wrap items-center gap-2">
         <StatusChip status={item.status} label={item.label} flags={item.flags} qualifier={item.qualifier} context={item.status === "rejected" ? "reviewer" : "default"} />
         {item.kind ? <span className="text-xs text-muted">{item.kind.replace(/_/g, " ")}</span> : null}
+        {who ? <span className="history-pill">{who}</span> : null}
       </span>
-      <p className="break-words text-sm">{item.statement}</p>
+      <p className="break-words text-sm text-ink-2">{item.statement}</p>
       {note ? <p className="text-xs font-medium text-ink-2">{note}</p> : null}
       <Commits x={x} />
       <ReviewState x={x} />

@@ -70,47 +70,48 @@ function Step({
   onEvidence: (id: string) => void;
   graphHref: string;
 }) {
-  const frame = tone === "gap" ? "border-2 border-dashed border-inferred bg-inferred-soft" : tone === "library" ? "border-2 border-dotted border-inferred bg-surface" : "border-line bg-surface";
+  const frame = tone;
   const note = flagNote(flags);
   return (
-    <li className="grid grid-cols-[1rem_minmax(0,1fr)] gap-3" data-flow={tone}>
-      <div className="flex flex-col items-center pt-4" aria-hidden="true">
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone === "edge" ? "bg-verified" : tone === "gap" ? "bg-inferred" : "bg-unknown"}`} />
-        <span className={`mt-1 w-px flex-1 ${tone === "edge" ? "bg-verified" : "bg-inferred"} opacity-50`} />
+    <li className="flow-hop" data-flow={frame}>
+      <div className="flow-node">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">From</span>
+        <code className="block break-all text-sm font-semibold">{short(from)}</code>
+        <Layer file={file} components={components} />
       </div>
-      <div className={`mb-2 rounded-lg border p-3 ${frame}`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {index}</span>
-          <Layer file={file} components={components} />
-          <StatusChip status={status} label={label} qualifier={qualifier} />
-        </div>
-        <p className="mt-2 text-sm">{flowLine(kind, short(from), short(to))}</p>
-        <p className="mt-1 text-xs text-muted">
-          <code className="break-all">{short(from)}</code>
-          <span aria-hidden="true"> → </span>
-          <span className="sr-only"> then </span>
-          <code className="break-all">{short(to)}</code>
-          <span className="ml-1">{kind.replaceAll("_", " ")}</span>
-        </p>
-        {reason ? <p className="mt-2 text-sm text-ink-2">{reason}</p> : null}
-        {note ? <p className="mt-1 text-sm text-ink-2">{note}</p> : null}
-        {persistence ? (
-          <div className="mt-2 rounded-md border border-line bg-canvas p-2 text-sm">
-            <p className="font-semibold">Static persistence path, same symbols</p>
+      <div className="flow-join">
+        <span className="font-semibold text-ink">{kind.replaceAll("_", " ")}</span>
+        <StatusChip status={status} label={label} qualifier={qualifier} />
+      </div>
+      <div className="flow-node">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">To</span>
+        <code className="block break-all text-sm font-semibold">{short(to)}</code>
+      </div>
+      <p className="flow-span text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {index}. </span>
+        {flowLine(kind, short(from), short(to))}
+      </p>
+      {reason ? <p className="flow-span text-sm text-ink-2">{reason}</p> : null}
+      {note ? <p className="flow-span text-sm text-ink-2">{note}</p> : null}
+      {persistence ? (
+        <div className="flow-span rounded-md border border-line bg-canvas p-2 text-sm">
+          <p className="font-semibold">Static persistence path, same symbols</p>
+          <p className="mt-1 text-xs text-muted">This is a recorded code path. Nothing was executed, and no database was contacted.</p>
+          <details className="mt-2">
+            <summary className="tap flex cursor-pointer items-center text-sm">Recorded steps</summary>
             <p className="mt-1">{persistence.statement}</p>
             {persistence.qualifier ? <p className="mt-1 text-xs text-muted">{persistence.qualifier}</p> : null}
-            <p className="mt-1 text-xs text-muted">This is a recorded code path. Nothing was executed, and no database was contacted.</p>
             <Button className="mt-2" onClick={() => onEvidence(persistence.claim_id)}>
               Open persistence evidence
             </Button>
-          </div>
-        ) : null}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {claimId ? <Button onClick={() => onEvidence(claimId)}>Open evidence</Button> : null}
-          <Link to={graphHref} className="tap inline-flex items-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink no-underline">
-            Show on the graph
-          </Link>
+          </details>
         </div>
+      ) : null}
+      <div className="flow-span flex flex-wrap gap-2">
+        {claimId ? <Button onClick={() => onEvidence(claimId)}>Open evidence</Button> : null}
+        <Link to={graphHref} className="tap inline-flex items-center rounded-md border border-line-strong bg-surface px-3 text-sm text-ink no-underline">
+          Show on the graph
+        </Link>
       </div>
     </li>
   );
@@ -240,7 +241,18 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
       <div className="mt-3">
         <HiddenCounts counts={chosen.hidden_counts} reviewHref={`${base}/review`} />
       </div>
-      <ol className="mt-3 flex flex-col" aria-label="User flow steps">
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
+        <li className="inline-flex items-center gap-1">
+          <span className="inline-block h-0.5 w-6 bg-verified" aria-hidden="true" /> Solid, verified or observed
+        </li>
+        <li className="inline-flex items-center gap-1">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dotted border-unknown" aria-hidden="true" /> Dotted, inferred library
+        </li>
+        <li className="inline-flex items-center gap-1">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap left open
+        </li>
+      </ul>
+      <ol className="flow-list mt-3" aria-label="User flow steps">
         {steps.map((s, i) => (
           <Step
             key={s.key}

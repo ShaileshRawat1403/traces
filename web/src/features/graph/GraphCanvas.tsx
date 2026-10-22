@@ -1,7 +1,7 @@
 import cytoscape from "cytoscape";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "../../ui/States";
-import { nextInDirection, type Direction, type ElementData } from "./graphModel";
+import { nextInDirection, LAYERS, type Direction, type ElementData } from "./graphModel";
 
 const C = {
   verified: "#8fd9cf",
@@ -28,11 +28,13 @@ const KEY_DIR: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", A
 
 export interface GraphCanvasProps {
   elements: { data: ElementData }[];
+  /** map: components in layer bands. neighborhood: the focused symbols. */
+  layout: "map" | "neighborhood";
   selected: string | null;
   onSelect: (id: string | null) => void;
   /** Enter or double tap on a node: expand its neighborhood. */
   onExpand: (id: string) => void;
-  /** Tap or Enter on an edge: open its evidence. */
+  /** Tap or Enter on an edge: open its evidence. Rollup counts are not claims. */
   onEdge: (claimId: string) => void;
   describe: (id: string) => string;
 }
@@ -41,7 +43,27 @@ export interface GraphCanvasProps {
  * Cytoscape canvas with keyboard equivalents: arrows move between nodes by position, Enter expands, E opens the
  * first relationship's evidence via the side panel, +/- zoom, 0 fits, Escape clears. Touch: tap selects, double tap expands.
  */
-export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, describe }: GraphCanvasProps) {
+function bandPositions(model: { data: ElementData }[]) {
+  const nodes = model.filter((e) => !e.data.source);
+  const by = new Map<string, { data: ElementData }[]>();
+  for (const n of nodes) {
+    const layer = n.data.layer || "other";
+    const list = by.get(layer) ?? [];
+    list.push(n);
+    by.set(layer, list);
+  }
+  const layers = [...LAYERS.filter((l) => by.has(l)), ...[...by.keys()].filter((l) => !(LAYERS as readonly string[]).includes(l)).sort()];
+  const positions: Record<string, { x: number; y: number }> = {};
+  layers.forEach((layer, col) => {
+    const list = by.get(layer) ?? [];
+    list.forEach((n, i) => {
+      positions[n.data.id] = { x: 96 + col * 210, y: 48 + i * 76 };
+    });
+  });
+  return positions;
+}
+
+export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, onEdge, describe }: GraphCanvasProps) {
   const box = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const handlers = useRef({ onSelect, onExpand, onEdge });
@@ -57,7 +79,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
       style: [
         { selector: "node", style: { label: "data(label)", "font-size": 12, color: "#10211c", "background-color": "#d7fff8", "border-width": 2, "border-color": "#8fd9cf", "text-valign": "bottom", "text-margin-y": 4, width: 22, height: 22, "text-max-width": "140px", "text-wrap": "ellipsis", "min-zoomed-font-size": 7 } },
         { selector: "node:parent", style: { "background-color": "#10211c", "background-opacity": 0.55, color: "#e7f2ef", "border-width": 1, "border-color": "#8fd9cf", "text-valign": "top", "text-margin-y": 4, "font-size": 12, "font-weight": "bold", padding: "16px", shape: "round-rectangle" } },
-        { selector: 'node[entity = "component"]', style: { shape: "round-rectangle", width: 120, height: 40, "font-weight": "bold", "font-size": 13, color: "#f4faf7", "background-color": "#1b3330", "background-opacity": 1, "text-valign": "center", "text-halign": "center", "text-margin-y": 0, "text-max-width": "112px" } },
+        { selector: 'node[entity = "component"]', style: { shape: "round-rectangle", width: 156, height: 42, "font-weight": "bold", "font-size": 11, color: "#f4faf7", "background-color": "#1b3330", "background-opacity": 1, "text-valign": "center", "text-halign": "center", "text-margin-y": 0, "text-max-width": "144px", "text-wrap": "wrap" } },
         { selector: 'node[layer = "frontend"]', style: { "border-color": "#8fd9cf", "border-width": 3 } },
         { selector: 'node[layer = "api"]', style: { "border-color": "#7eb6ff", "border-width": 3 } },
         { selector: 'node[layer = "backend"]', style: { "border-color": "#d7fff8", "border-width": 3 } },
@@ -66,35 +88,54 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
         { selector: 'node[layer = "docs"]', style: { "border-color": "#c4b4ea", "border-width": 3 } },
         { selector: 'node[layer = "tests"]', style: { "border-color": "#ef8d86", "border-width": 3 } },
         { selector: 'node[layer = "other"]', style: { "border-color": "#8ea399", "border-width": 3 } },
-        { selector: "edge", style: { width: 1.8, "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 0.8 } },
+        { selector: "edge", style: { width: 2.2, "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 1, label: "", "font-size": 10, color: "#e7f2ef", "text-background-color": "#0c1110", "text-background-opacity": 0.85, "text-background-padding": "3px", "text-rotation": "none", "text-wrap": "wrap", "text-max-width": "90px" } },
         { selector: 'edge[tone = "verified"]', style: { "line-color": C.verified, "target-arrow-color": C.verified } },
-        { selector: 'edge[tone = "observed"]', style: { "line-color": C.observed, "target-arrow-color": C.observed, width: 1 } },
+        { selector: 'edge[tone = "observed"]', style: { "line-color": C.observed, "target-arrow-color": C.observed, width: 1.6 } },
         { selector: 'edge[tone = "inferred"]', style: { "line-color": C.inferred, "target-arrow-color": C.inferred, "target-arrow-fill": "hollow" } },
         { selector: 'edge[tone = "unknown"]', style: { "line-color": C.unknown, "target-arrow-color": C.unknown } },
         { selector: 'edge[line = "dashed"]', style: { "line-style": "dashed", "line-dash-pattern": [6, 4] } },
         { selector: 'edge[line = "dotted"]', style: { "line-style": "dotted" } },
-        { selector: ".sel", style: { "border-width": 3, "border-color": C.focus, "line-color": C.focus, "target-arrow-color": C.focus, "z-index": 10 } },
+        { selector: 'edge[entity = "rollup"]', style: { width: "data(weight)" } },
+        { selector: ".sel", style: { "border-width": 3, "border-color": C.focus, "line-color": C.focus, "target-arrow-color": C.focus, "z-index": 10, label: "data(label)" } },
         { selector: ".dim", style: { opacity: 0.35 } },
       ],
-      layout: model.some((e) => e.data.source)
-        ? { name: "cose", animate: false, fit: false, padding: 16, nodeDimensionsIncludeLabels: true, nodeRepulsion: 1400, idealEdgeLength: 36, gravity: 1, numIter: 200 }
-        : { name: "grid", animate: false, fit: true, padding: 20, avoidOverlap: true, nodeDimensionsIncludeLabels: true, condense: true, spacingFactor: 1.2 },
+      layout:
+        layout === "map"
+          ? { name: "preset", positions: bandPositions(model), animate: false, fit: false, padding: 24 }
+          : { name: "breadthfirst", directed: true, animate: false, fit: false, padding: 28, spacingFactor: 1.15, avoidOverlap: true, nodeDimensionsIncludeLabels: true },
       wheelSensitivity: 0.3,
       boxSelectionEnabled: false,
       selectionType: "single",
     });
     cy.on("tap", "node", (ev) => handlers.current.onSelect(ev.target.id() as string));
     cy.on("dbltap", "node", (ev) => handlers.current.onExpand(ev.target.id() as string));
-    cy.on("tap", "edge", (ev) => handlers.current.onEdge(ev.target.id() as string));
+    cy.on("tap", "edge", (ev) => {
+      const id = ev.target.id() as string;
+      if (id.startsWith("rollup::")) {
+        const src = ev.target.source().id() as string;
+        handlers.current.onSelect(src);
+        return;
+      }
+      handlers.current.onEdge(id);
+    });
     cy.on("tap", (ev) => ev.target === cy && handlers.current.onSelect(null));
     const fitNow = () => {
       if (cy.destroyed()) return;
       cy.resize();
       const leaves = cy.nodes().filter((n) => !n.isParent());
       const targets = leaves.nonempty() ? leaves : cy.elements();
+      if (layout === "map") {
+        cy.fit(cy.elements(), 28);
+        if (cy.zoom() < 0.82) {
+          cy.zoom(0.92);
+          const core = cy.nodes().filter((n) => ["frontend", "api", "backend", "data"].includes(String(n.data("layer"))));
+          cy.center(core.nonempty() ? core : cy.nodes());
+        }
+        return;
+      }
       cy.fit(targets, 28);
       // A large neighborhood fitted to the canvas shrinks names to dots. Stay zoomed in on the busiest symbol.
-      if (targets.length > 12 && cy.zoom() < 1.05) {
+      if (layout === "neighborhood" && targets.length > 12 && cy.zoom() < 1.05) {
         let hub = targets[0]!;
         let best = -1;
         targets.forEach((n) => {
@@ -117,7 +158,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
       cy.destroy();
       cyRef.current = null;
     };
-  }, [elements]);
+  }, [elements, layout]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -129,6 +170,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
     const hood = n.closedNeighborhood().union(n.descendants()).union(n.ancestors());
     cy.elements().not(hood).not(n.ancestors()).addClass("dim");
     n.addClass("sel");
+    n.connectedEdges().addClass("sel");
     if (!cy.extent() || !n.renderedBoundingBox()) return;
     const bb = n.renderedBoundingBox();
     if (bb.x1 < 0 || bb.y1 < 0 || bb.x2 > cy.width() || bb.y2 > cy.height()) cy.center(n);
@@ -187,7 +229,7 @@ export function GraphCanvas({ elements, selected, onSelect, onExpand, onEdge, de
         aria-roledescription="graph"
         aria-label="Architecture graph. Use arrow keys to move between nodes, Enter to expand, Escape to clear. The list and cards views show the same data."
         onKeyDown={onKeyDown}
-        className="h-[min(48dvh,28rem)] min-h-64 w-full touch-none rounded-lg border border-line bg-[#070b0a]"
+        className={`min-h-72 w-full touch-none rounded-lg border border-line bg-[#070b0a] ${layout === "map" ? "h-[min(70dvh,38rem)]" : "h-[min(64dvh,34rem)]"}`}
         data-testid="graph-canvas"
       />
       <p className="sr-only" aria-live="polite" data-testid="graph-announce">

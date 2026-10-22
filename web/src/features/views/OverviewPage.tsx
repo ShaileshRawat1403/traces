@@ -19,7 +19,7 @@ const LAYER_SWATCH: Record<string, string> = {
   tests: "#ef8d86",
   other: "#8ea399",
 };
-const LAYER_ORDER = ["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"] as const;
+import { LAYERS } from "../graph/graphModel";
 const LABEL_FOR: Record<string, string> = { verified: "verified", observed: "observed", unvalidated: "inferred", missing_location: "inferred", rejected: "rejected" };
 
 function SnapshotCounts() {
@@ -67,41 +67,52 @@ function ComponentMap() {
     list.push(c);
     groups.set(c.layer, list);
   }
+  const volume = (c: Component) => Object.values(c.claim_counts).reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...q.data.map(volume));
+  const layers = LAYERS.filter((layer) => groups.has(layer));
   return (
     <section className="mb-4 rounded-lg border border-line bg-surface p-4" aria-label="Components by layer">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold">Components by layer</h2>
-        <p className="text-xs text-muted">Choose a component to open its relationships. Grouping is a stored rule, not a guess.</p>
+        <h2 className="font-semibold">Architecture, by stored layer</h2>
+        <p className="max-w-xl text-xs text-muted">Each band is a stored grouping rule, not a runtime boundary. The bar is how many claims were recorded, not a connection to the next band.</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {LAYER_ORDER.filter((layer) => groups.has(layer)).map((layer) => (
-          <div key={layer} className="rounded-md border border-line bg-canvas p-3">
-            <div className="mb-2 flex items-baseline justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold capitalize">
-                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: LAYER_SWATCH[layer] }} aria-hidden="true" />
-                {layer}
-              </h3>
+      <ol className="flex flex-col gap-2">
+        {layers.map((layer, i) => (
+          <li key={layer} className="grid grid-cols-1 gap-2 rounded-md border border-line bg-canvas p-2 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:items-start">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-xs tabular-nums text-muted">{i + 1}</span>
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ background: LAYER_SWATCH[layer] }} aria-hidden="true" />
+              <h3 className="text-sm font-semibold capitalize">{layer}</h3>
+            </div>
+            <ul className="flex flex-wrap gap-2">
+              {(groups.get(layer) ?? []).map((c) => {
+                const n = volume(c);
+                return (
+                  <li key={c.id} className="min-w-[9rem] max-w-full flex-1">
+                    <Link
+                      to={`${base}/graph?focus=${encodeURIComponent(c.id)}`}
+                      className="block rounded-md border-2 bg-surface px-2 py-1.5 text-ink no-underline hover:bg-sunken"
+                      style={{ borderColor: LAYER_SWATCH[layer] }}
+                      title={c.paths.join(", ")}
+                    >
+                      <span className="block truncate text-sm font-medium">{c.name}</span>
+                      <span className="mt-1 block h-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
+                        <span className="block h-1 rounded-full" style={{ width: `${Math.max(8, (n / max) * 100)}%`, background: LAYER_SWATCH[layer] }} />
+                      </span>
+                      <span className="mt-1 block text-xs text-muted tabular-nums">{n.toLocaleString("en-US")} claims</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="sm:col-start-2">
               <Link to={`${base}/graph?layer=${layer}`} className="text-xs">
-                Graph
+                Open {layer} on the graph
               </Link>
             </div>
-            <ul className="flex flex-wrap gap-1.5">
-              {(groups.get(layer) ?? []).map((c) => (
-                <li key={c.id}>
-                  <Link
-                    to={`${base}/graph?focus=${encodeURIComponent(c.id)}`}
-                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink no-underline hover:border-accent"
-                    title={c.paths.join(", ")}
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span className="tabular-nums text-muted">{Object.values(c.claim_counts).reduce((a, b) => a + b, 0)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
@@ -111,7 +122,7 @@ export function OverviewPage() {
   const base = snapshotBase(repoId, sha);
   return (
     <>
-      <PageHeader title="Overview">What the system does, its entry points and where to start. Grounded facts cite evidence; interpretations and unknowns are labelled as such.</PageHeader>
+      <PageHeader title="Overview">The shape of this repository. Layers and components come from a stored rule. Open one to see the relationships that were actually recorded.</PageHeader>
       <ComponentMap />
       <EndpointView
         name="overview"

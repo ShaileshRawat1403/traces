@@ -116,6 +116,125 @@
   justify-content: center;
 }
 
+.flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-hop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 0.6rem 0.7rem;
+}
+
+.flow-hop[data-hop="gap"],
+.flow-hop[data-flow="gap"] {
+  border-style: dashed;
+  border-color: var(--color-inferred);
+  background: var(--color-inferred-soft);
+}
+
+.flow-hop[data-hop="library_contract"],
+.flow-hop[data-flow="library"] {
+  border-style: dotted;
+  border-color: var(--color-unknown);
+}
+
+.flow-hop[data-hop="hidden"] {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.flow-node {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-canvas);
+  padding: 0.4rem 0.55rem;
+}
+
+.flow-join {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-ink-2);
+}
+
+.flow-join::before {
+  content: "";
+  display: block;
+  width: 100%;
+  border-top: 2px solid var(--color-verified);
+}
+
+.flow-hop[data-hop="gap"] .flow-join::before,
+.flow-hop[data-flow="gap"] .flow-join::before,
+.flow-hop[data-hop="library_contract"] .flow-join::before,
+.flow-hop[data-flow="library"] .flow-join::before {
+  border-top-style: dashed;
+  border-top-color: var(--color-inferred);
+}
+
+.flow-hop[data-hop="library_contract"] .flow-join::before,
+.flow-hop[data-flow="library"] .flow-join::before {
+  border-top-style: dotted;
+  border-top-color: var(--color-unknown);
+}
+
+.flow-span {
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .flow-hop {
+    grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+  }
+  .flow-span {
+    grid-column: 1 / -1;
+  }
+}
+
+.history-spine {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.85rem;
+  list-style: none;
+}
+
+.history-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.history-pill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-canvas);
+  padding: 0.15rem 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
 .panel {
   border: 1px solid var(--color-line);
   background: var(--color-surface);

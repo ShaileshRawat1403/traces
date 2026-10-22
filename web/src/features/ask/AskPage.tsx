@@ -20,9 +20,7 @@ export function AskPage() {
   const preview = () => question.trim() && ask.mutate({ question: question.trim(), mode: "prepare_bundle" });
   return (
     <>
-      <PageHeader title="Ask">
-        Explain mode answers from evidence with citations and needs no AI key. Optional chat with your own key arrives later; keys stay in your browser and never reach Traces.
-      </PageHeader>
+      <PageHeader title="Ask">A short answer from stored evidence. Each sentence is marked grounded, interpretation, or unknown, and points at the record it uses. No model is called.</PageHeader>
       <form onSubmit={submit} className="mb-4 flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
         <label htmlFor={qid} className="text-sm font-medium">
           Question about this snapshot

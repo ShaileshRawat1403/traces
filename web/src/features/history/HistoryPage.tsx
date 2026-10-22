@@ -109,7 +109,7 @@ function Timeline({ repoId, sha, onEvidence }: PanelProps) {
       <Frame q={q} what="Timeline" endpoint="GET history/timeline" repoId={repoId} sha={sha}>
         {(shown, recs) => (
           <>
-            <ol className="flex flex-col gap-2" aria-label="Timeline records in API order">
+            <ol className="history-spine" aria-label="Timeline records in API order">
               {shown.map((i) => (
                 <HistoryItem key={i.claim_id} item={i} x={recs.get(i.claim_id)} onEvidence={onEvidence} />
               ))}
@@ -184,7 +184,7 @@ function Hotspots({ repoId, sha, onEvidence }: PanelProps) {
                 </div>
               ) : null}
               {k ? <BarChart title={`${k} by ${level}, history pattern`} unit={k} bars={bars} /> : <p className="text-sm text-muted">The records carry no numeric metrics to chart.</p>}
-              <ol className="flex flex-col gap-2" aria-label="Hotspot records">
+              <ol className="history-spine" aria-label="Hotspot records">
                 {shown.map((i) => (
                   <HistoryItem key={i.claim_id} item={i} x={recs.get(i.claim_id)} onEvidence={onEvidence} />
                 ))}
@@ -243,14 +243,29 @@ function Cochange({ repoId, sha, onEvidence }: PanelProps) {
           return (
             <>
               <BarChart title="Co-change degree, history pattern" unit="Changed together" bars={bars} max={1} />
-              <ol className="flex flex-col gap-2" aria-label="Co-change records">
-                {shown.map((i) => (
-                  <HistoryItem key={i.claim_id} item={i} x={recs.get(i.claim_id)} onEvidence={onEvidence}>
-                    <p className="text-xs" data-testid="cochange-text">
-                      {cochangeText(i, recs.get(i.claim_id))}. History pattern.
-                    </p>
-                  </HistoryItem>
-                ))}
+              <ol className="history-spine" aria-label="Co-change records">
+                {shown.map((i) => {
+                  const other = (i.to_symbol ?? "").replace(/^(file|component)::/, "");
+                  return (
+                    <HistoryItem
+                      key={i.claim_id}
+                      item={i}
+                      x={recs.get(i.claim_id)}
+                      onEvidence={onEvidence}
+                      eyebrow={
+                        <div className="history-pair">
+                          <span className="history-pill">{subject(i)}</span>
+                          <span className="text-xs text-muted">changed together with</span>
+                          <span className="history-pill">{other || "unknown"}</span>
+                        </div>
+                      }
+                    >
+                      <p className="text-xs" data-testid="cochange-text">
+                        {cochangeText(i, recs.get(i.claim_id))}. History pattern.
+                      </p>
+                    </HistoryItem>
+                  );
+                })}
               </ol>
             </>
           );
@@ -274,7 +289,7 @@ function Milestones({ repoId, sha, onEvidence }: PanelProps) {
   return (
     <Frame q={q} what="Milestones" endpoint="GET history/milestones" repoId={repoId} sha={sha}>
       {(shown, recs) => (
-        <ol className="flex flex-col gap-2" aria-label="Milestones in API order">
+        <ol className="history-spine" aria-label="Milestones in API order">
           {shown.map((i) => {
             const m = milestoneSha(i, recs.get(i.claim_id));
             return (

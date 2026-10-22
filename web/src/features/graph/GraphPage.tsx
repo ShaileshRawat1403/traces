@@ -10,13 +10,24 @@ import { Button, Empty, ErrorState, Loading } from "../../ui/States";
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas } from "./GraphCanvas";
-import { LAYERS, STATUS_FILTERS, canvasElements, countsFor, drawableEdges, graphQuery, openingMap, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
+import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, graphQuery, openingDiagram, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
   observed: "Observed",
   unvalidated: "Inferred (unvalidated)",
   missing_location: "Inferred, no source location",
+};
+
+const LAYER_SWATCH: Record<string, string> = {
+  frontend: "#8fd9cf",
+  api: "#7eb6ff",
+  backend: "#d7fff8",
+  data: "#e2b16a",
+  infra: "#b7c4ce",
+  docs: "#c4b4ea",
+  tests: "#ef8d86",
+  other: "#8ea399",
 };
 
 function Legend() {
@@ -132,6 +143,12 @@ function Counts({ counts }: { counts: Record<string, number> | null }) {
   );
 }
 
+function componentNode(id: string, components: readonly Component[]): GraphNode | null {
+  const c = components.find((x) => x.id === id);
+  if (!c) return null;
+  return { id: c.id, label: c.name, entity: "component", layer: c.layer, file: null, degree: 0 };
+}
+
 function SelectionPanel({
   data,
   components,
@@ -149,10 +166,13 @@ function SelectionPanel({
   onEvidence: (id: string) => void;
   onClear: () => void;
 }) {
-  const node = data.nodes.find((n) => n.id === selected);
+  const node = data.nodes.find((n) => n.id === selected) ?? componentNode(selected, components);
   if (!node) return null;
   const { edges } = drawableEdges(data);
   const mine = edges.filter((e) => e.source === selected || e.target === selected);
+  const rolls = node.entity === "component" ? componentRollup(data, components).filter((e) => e.data.source === selected || e.data.target === selected) : [];
+  const byKind = new Map<string, number>();
+  for (const e of mine) byKind.set(e.kind, (byKind.get(e.kind) ?? 0) + 1);
   const focused = state.focus === selected;
   return (
     <section className="rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected node" data-testid="selection-panel">
@@ -183,7 +203,33 @@ function SelectionPanel({
         <Button onClick={onClear}>Clear selection</Button>
       </div>
       <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
-      {mine.length === 0 ? (
+      {byKind.size > 0 ? (
+        <ul className="mt-1 flex flex-wrap gap-1" aria-label="Relationship kinds">
+          {[...byKind.entries()].map(([k, n]) => (
+            <li key={k} className="rounded-md border border-line bg-canvas px-2 py-0.5 text-xs text-ink-2">
+              {n} {k.replaceAll("_", " ")}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {mine.length === 0 && rolls.length > 0 ? (
+        <>
+          <p className="mt-1 text-sm text-ink-2">On this page, counted between components. A line is not a new claim, and the count uses the weakest status in the pair.</p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {rolls.map((e) => {
+              const otherId = e.data.source === selected ? e.data.target : e.data.source;
+              const other = components.find((c) => c.id === otherId)?.name ?? otherId ?? "";
+              const dir = e.data.source === selected ? "to" : "from";
+              return (
+                <li key={e.data.id} className="text-sm">
+                  <span className="font-medium">{e.data.label}</span> <span className="text-muted">{dir}</span> {other}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-muted">Expand the component to see the symbols these counts come from.</p>
+        </>
+      ) : mine.length === 0 ? (
         <p className="text-sm text-muted">
           {node.entity === "component"
             ? "The lines on the map connect symbols inside this component, not the component itself. Select a symbol to open its evidence. The boundary is a stored path rule, not a runtime edge."
@@ -253,7 +299,7 @@ export default function GraphPage() {
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const components = useMemo(() => comps.data ?? [], [comps.data]);
   const elements = useMemo(() => (graph.data ? toElements(graph.data, components) : []), [graph.data, components]);
-  const drawn = useMemo(() => (state.focus ? canvasElements(elements, true) : openingMap(components, elements)), [elements, state.focus, components]);
+  const drawn = useMemo(() => (graph.data ? (state.focus ? canvasElements(elements, true) : openingDiagram(components, graph.data)) : []), [graph.data, elements, state.focus, components]);
   // A component id has no incident edges: the relationships belong to its symbols. Don't preselect it, or the panel
   // says "0" and the canvas dims the neighborhood the user came to see. A symbol focus stays selected (list view).
   useEffect(() => {
@@ -287,12 +333,12 @@ export default function GraphPage() {
   );
   const describe = useCallback(
     (id: string) => {
-      const n = graph.data?.nodes.find((x) => x.id === id);
+      const n = graph.data?.nodes.find((x) => x.id === id) ?? componentNode(id, components);
       if (!n) return "";
       const rel = graph.data ? drawableEdges(graph.data).edges.filter((e) => e.source === id || e.target === id).length : 0;
       return `${n.label}, ${n.entity}${n.layer ? `, ${n.layer}` : ""}, ${rel} relationships shown`;
     },
-    [graph.data],
+    [graph.data, components],
   );
   const submitSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -343,8 +389,20 @@ export default function GraphPage() {
               {graph.data.nodes.length === 0 ? (
                 <Empty title="Nothing matches these filters">Try including inferred relationships or clearing the search.</Empty>
               ) : mode === "graph" ? (
-                <GraphCanvas
+                <>
+                  {!state.focus ? (
+                    <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers on the map">
+                      {LAYERS.filter((l) => drawn.some((e) => !e.data.source && e.data.layer === l)).map((l) => (
+                        <li key={l} className="inline-flex items-center gap-1 capitalize">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: LAYER_SWATCH[l] }} aria-hidden="true" />
+                          {l}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <GraphCanvas
                   elements={drawn}
+                  layout={state.focus ? "neighborhood" : "map"}
                   selected={selected}
                   onSelect={choose}
                   onExpand={(id) => {
@@ -358,6 +416,7 @@ export default function GraphPage() {
                   onEdge={openEvidence}
                   describe={describe}
                 />
+                </>
               ) : mode === "list" ? (
                 <ListView data={graph.data} selected={selected} onEvidence={openEvidence} />
               ) : (
@@ -369,9 +428,12 @@ export default function GraphPage() {
                 {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
                 {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
               </p>
-              {!state.focus && drawn.length < elements.length ? <p className="text-xs text-muted">The map shows components. Expand one to load symbols.</p> : null}
-              {state.focus ? <p className="text-xs text-muted">Drag to move. Names stay large enough to read. List shows every relationship.</p> : null}
-              {selected && graph.data.nodes.some((n) => n.id === selected) ? (
+              {!state.focus ? (
+                <p className="text-xs text-ink-2">Lines count relationships on this page. The weakest status in the pair sets the line. A missing line is not proof that nothing connects.</p>
+              ) : (
+                <p className="text-xs text-muted">Names stay large enough to read. Select a symbol to label its lines. List shows every relationship.</p>
+              )}
+              {selected && (graph.data.nodes.some((n) => n.id === selected) || components.some((c) => c.id === selected)) ? (
                 <SelectionPanel data={graph.data} components={components} selected={selected} state={state} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
               ) : (
                 <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a node to see its relationships and open their evidence.</p>
