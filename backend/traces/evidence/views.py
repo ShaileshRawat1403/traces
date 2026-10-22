@@ -441,7 +441,11 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
         if focus_id is None and comp_focus is None:
             chosen = []
         elif comp_focus is not None:
-            members = {sym for sym, ep in nodes_eps.items() if file_comp.get(ep.get("file")) == comp_focus["id"]}
+            members = {
+                sym
+                for sym, ep in nodes_eps.items()
+                if isinstance(raw_file := ep.get("file"), str) and file_comp.get(raw_file) == comp_focus["id"]
+            }
             chosen = [
                 r for r in edges_all
                 if (r.get("from") or {}).get("symbol") in members or (r.get("to") or {}).get("symbol") in members

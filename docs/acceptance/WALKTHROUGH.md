@@ -27,7 +27,7 @@ Desktop shots are 1280×860. Phone shots are 390×844.
 2. **Overview.** Components by layer come first. Each chip opens that component in the graph. The language bar and the three readings (Business, Architecture, Implementation) sit under the map. Evidence counts are at the bottom, including the rejected claims that stay out of the graph. [Desktop](overview-desktop.png) · [Phone](overview-phone.png)
 3. **Architecture graph.** The opening map is the components, colored by layer. The relationship page behind it is larger and, for the template, truncated. [Desktop](graph-desktop.png) · [Phone](graph-phone.png)
 4. **Expanded relationships.** `src/itsdangerous` at depth 1. The map stays zoomed in so names stay readable (`Serializer`, `loads`, `dumps`, and the methods around them). Drag to pan. The side panel is a symbol you moved to, with its relationships and an evidence button, not a component that claims zero edges. [Desktop](graph-expanded-desktop.png) · [Phone](graph-expanded-phone.png)
-5. **Trace.** Outgoing verified steps from `Serializer`, drawn as a path. Each step can open evidence. [Desktop](trace-desktop.png) · [Phone](trace-phone.png)
+5. **Trace.** On the FastAPI template this opens the recorded create-item flow, not a symbol dump. The items page shows AddItem (verified). There is a gap between that page and the form library's submit function. AddItem connects the form to `onSubmit` (verified). Two library steps stay inferred (react-hook-form, TanStack Query). The generated client matches `POST /api/v1/items/`, and that operation is handled by `create_item`. `create_item` depends on `get_db`. A second verified claim on those same symbols is the static persistence path: validate, stage, commit, reload. The rejected "uses CRUD" claim is not on this path. Each step opens evidence or the graph. [Desktop](trace-desktop.png) · [Phone](trace-phone.png)
 6. **Evidence.** The `contains` claim from `Serializer` to `__init__`, with the pinned source lines. [Desktop](evidence-desktop.png) · [Phone](evidence-phone.png)
 7. **History.** The timeline leads. The criteria that produced the page are one click away, printed as stored. [Desktop](history-desktop.png) · [Phone](history-phone.png)
 8. **Ask.** "What does Serializer depend on?" answered with no model and no key. Grounded sentences cite claims. The category breakdown stays closed until you open it. [Desktop](ask-desktop.png) · [Phone](ask-phone.png)
@@ -41,6 +41,7 @@ Desktop shots are 1280×860. Phone shots are 390×844.
 - History is Git evidence for the indexed commit. It does not invent an architecture for commits that were not indexed, and co-change is not a call graph.
 - Component groups come from a stored path rule. They are not a runtime boundary.
 - A trace between two unrelated symbols is a gap. The gap is shown. It is not filled in.
+- The create-item flow is only drawn when the snapshot has a persistence path and the library steps that reach it. A snapshot without that path says so. The path ends at the session dependency. No database was contacted.
 - Ask does not call a model. There is no paid API in this path.
 - Rejected claims stay in the audit trail and out of the graph and the trace until you open Review.
 
