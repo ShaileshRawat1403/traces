@@ -50,7 +50,7 @@ function Cites({ ids, base, citations }: { ids: readonly string[]; base: string;
               key={id}
               to={`${base}/claim/${id}`}
               className="tap-sm inline-flex max-w-full items-center break-all rounded-sm border border-line bg-canvas px-1.5 font-mono text-xs text-ink no-underline hover:border-accent"
-              aria-label={`Citation ${i + 1}: claim ${id.slice(0, 10)}`}
+              aria-label={`${where}, claim ${id.slice(0, 10)}`}
               data-testid="citation"
             >
               {where}
