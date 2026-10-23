@@ -294,7 +294,7 @@ jobs:
           retention-days: 7
 
   security:
-    name: security and safe-failure tests (tests/security, unshare -rn)
+    name: security, safe-failure and package-pattern tests (tests/security, tests/e2e, unshare -rn)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -319,10 +319,10 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
-      - name: security tests (xfail-strict entries are open findings, listed by -rxX)
+      - name: security and package-pattern tests (xfail-strict entries are open findings, listed by -rxX)
         env:
           TRACES_ISOLATION: unshare
-        run: uv run --frozen pytest -q -rxXs tests/security
+        run: uv run --frozen pytest -q -rxXs tests/security tests/e2e
 
   history:
     name: history tests (incl. fsft regressions on the cached full-history clone)
@@ -344,16 +344,21 @@ jobs:
           enable-cache: true
       - run: uv python install "$PYTHON_VERSION"
       - run: uv sync --frozen
+      - name: allow unprivileged user namespaces (history no-network tests use unshare -rn)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
+          unshare -rn true && echo "unshare available"
       - name: cached target is a full-history clone (fsft regressions must not skip)
         run: |
           test "$(git -C "$TARGET_PATH" rev-parse --is-shallow-repository)" = "false"
           git -C "$TARGET_PATH" cat-file -e "${TARGET_SHA}^{commit}"
-      - name: history tests (-rs lists skip reasons; a skipped fsft regression fails the job)
+      - name: history tests (-rs lists skip reasons; any skip fails the job)
         env:
           TRACES_HISTORY_FSFT_REPO: ${{ github.workspace }}/${{ env.TARGET_PATH }}
         run: |
           uv run --frozen pytest -q -rs tests/history | tee history.out
-          if grep -q "SKIPPED.*fsft" history.out; then echo "fsft regression skipped" >&2; exit 1; fi
+          if grep -q "SKIPPED" history.out; then echo "a history test skipped (fsft clone or user namespaces missing)" >&2; exit 1; fi
 
   e2e:
     name: e2e (Playwright against a seeded snapshot)

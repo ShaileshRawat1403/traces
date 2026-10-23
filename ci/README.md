@@ -18,8 +18,8 @@ All jobs run on free GitHub-hosted `ubuntu-latest` runners with `permissions: co
 | `target` | restores or fills the cache of `fastapi/full-stack-fastapi-template` at `b1125d8839482cb7bbae603ddc6d0081bf87532e` (hardened git fetch via `traces.evidence.pipeline.target_checkout`), checks the pinned HEAD | |
 | `contract` | toolchain `npm ci --ignore-scripts`, user namespaces on, `pytest tests/contract` (CT1-CT16, fresh baseline under `unshare -rn`) | `target` |
 | `regression` | same setup, `pytest tests/regression` (RT1-RT8, baseline distribution, canonical hashes, 0.4 migration) | `target` |
-| `security` | toolchain, user namespaces, `pytest -rxXs tests/security` (bad URLs, traversal, hostile repo, caps, timeouts, rate limits, no-key mode, no unintended outbound calls). `xfail(strict=True)` tests are open findings; one that starts passing fails the job until the marker is removed | |
-| `history` | checks the cached target is a full-history clone, then `pytest -rs tests/history` with `TRACES_HISTORY_FSFT_REPO` set to it. A skipped fsft regression fails the job | `target` |
+| `security` | toolchain, user namespaces, `pytest -rxXs tests/security tests/e2e` (bad URLs, traversal, hostile repo, caps, timeouts, rate limits, no-key mode, no unintended outbound calls). `xfail(strict=True)` tests are open findings; one that starts passing fails the job until the marker is removed | |
+| `history` | checks the cached target is a full-history clone, then `pytest -rs tests/history` with `TRACES_HISTORY_FSFT_REPO` set to it. User namespaces on (the no-network tests need `unshare -rn`). Any skip fails the job | `target` |
 | `e2e` | seed a local snapshot, serve the API and the web app, `playwright test` in `web/` at desktop and 360 px | |
 
 Target cache: `actions/cache` with key `target-fastapi-full-stack-fastapi-template-<full sha>-v1` on the exact checkout path under `.cache/targets/`. `api`, `contract`, `regression` and `history` restore it with `fail-on-cache-miss: true`, so those jobs never fetch the pinned target themselves. Bump the `-v1` suffix to invalidate.
