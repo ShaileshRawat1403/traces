@@ -63,11 +63,30 @@ function Cites({ ids, base, citations }: { ids: readonly string[]; base: string;
   );
 }
 
+function CitedFiles({ r, base }: { r: ExplainResponse; base: string }) {
+  const files = [...new Set(r.citations.map((c) => c.file).filter((f): f is string => !!f))];
+  if (files.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1" aria-label="Cited files on the graph">
+      <span className="mr-1 text-xs text-muted">In the architecture</span>
+      {files.slice(0, 8).map((file) => {
+        const name = file.split("/").pop() || file;
+        return (
+          <Link key={file} to={`${base}/graph?q=${encodeURIComponent(name)}`} className="tap-sm inline-flex max-w-full items-center truncate rounded-md border border-line bg-canvas px-2 font-mono text-xs text-ink no-underline">
+            {name}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 /** ExplainResponse renderer: the answer in order, each sentence tagged, then citations, categories and what a bundle would send. */
 export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
   const counts = { grounded: 0, interpretation: 0, unknown: 0 };
   for (const f of r.answer) counts[sentenceStanding(f)] += 1;
   const cats = [...CATEGORY_ORDER, ...Object.keys(r.categories).filter((k) => !CATEGORY_ORDER.includes(k))];
+  const lead = r.answer.find((f) => sentenceStanding(f) === "grounded") ?? r.answer[0];
   return (
     <section aria-label="Answer" data-testid="explain">
       <div className="rounded-lg border border-line bg-surface p-4">
@@ -75,17 +94,20 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
         <p className="mt-1 text-xs text-muted" data-testid="answer-summary">
           {counts.grounded} grounded, {counts.interpretation} interpretation, {counts.unknown} unknown. Built from evidence records without an AI model. Static analysis only.
         </p>
+        {lead ? <p className="mt-3 text-lg font-medium leading-snug text-ink">{lead.text}</p> : null}
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs" aria-hidden="true">
           <Meter label="Grounded" n={counts.grounded} total={r.answer.length} cls="bg-verified" />
           <Meter label="Interpretation" n={counts.interpretation} total={r.answer.length} cls="bg-inferred" />
           <Meter label="Unknown" n={counts.unknown} total={r.answer.length} cls="bg-unknown" />
         </div>
-        <ol className="mt-3 flex flex-col gap-2">
+        <CitedFiles r={r} base={base} />
+        <h3 className="mt-4 text-sm font-semibold">How each sentence is supported</h3>
+        <ol className="mt-2 flex flex-col gap-2">
           {r.answer.map((f, i) => {
             const standing = sentenceStanding(f);
             const bar = standing === "grounded" ? "bg-verified" : standing === "interpretation" ? "bg-inferred" : "bg-unknown";
             return (
-              <li key={i} className="grid grid-cols-[4px_minmax(0,1fr)] gap-3 rounded-lg border border-line bg-canvas p-3" data-standing={standing} data-testid="answer-sentence">
+              <li key={i} className="grid grid-cols-[4px_minmax(0,1fr)] gap-3 border-b border-line py-2 last:border-b-0" data-standing={standing} data-testid="answer-sentence">
                 <span className={`rounded-full ${bar}`} aria-hidden="true" />
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-2">

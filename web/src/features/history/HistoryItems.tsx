@@ -52,7 +52,7 @@ export function HistoryItem({ item, x, onEvidence, children, eyebrow }: { item: 
   const note = historyNote(item.class, item.status);
   const who = (item.from_symbol ?? "").replace(/^(file|component|commit|dep|repo)::/, "");
   return (
-    <li className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3" data-testid="history-item" data-class={item.class}>
+    <li className="flex flex-col gap-1 pb-3" data-testid="history-item" data-class={item.class}>
       {eyebrow}
       <span className="flex flex-wrap items-center gap-2">
         <StatusChip status={item.status} label={item.label} flags={item.flags} qualifier={item.qualifier} context={item.status === "rejected" ? "reviewer" : "default"} />

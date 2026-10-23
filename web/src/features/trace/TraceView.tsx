@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { TraceResponse } from "../../api/client";
 import { splitSymbol } from "../../api/record";
 import { HiddenCounts } from "../../ui/HiddenCounts";
@@ -16,11 +17,11 @@ function Sym({ id }: { id: string }) {
   );
 }
 
-function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvidence: (id: string) => void; snapshotHidden: Record<string, number> | null | undefined; reviewHref: string }) {
+function Hop({ v, onEvidence, hot, onPick, snapshotHidden, reviewHref }: { v: HopView; onEvidence: (id: string) => void; hot?: boolean; onPick: () => void; snapshotHidden: Record<string, number> | null | undefined; reviewHref: string }) {
   const { hop } = v;
   const calls = unresolvedCalls(hop);
   return (
-    <li className="flow-hop" data-hop={v.kind}>
+    <li className="flow-hop" data-hop={v.kind} data-active={hot ? "true" : "false"} onClick={onPick}>
       {v.kind === "hidden" ? (
         <div className="flow-span text-sm text-ink-2">
           <span className="font-semibold">Step {hop.index + 1}: hidden.</span> A rejected relationship sits here. It is shown only in the reviewer view.
@@ -101,6 +102,7 @@ function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvid
 export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; reviewHref: string; onEvidence: (claimId: string) => void }) {
   const s = traceSummary(t);
   const hops = orderedHops(t);
+  const [active, setActive] = useState(0);
   return (
     <section aria-label="Trace result" data-testid="trace">
       <div className="mb-3 flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
@@ -132,22 +134,20 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
         ) : null}
         <p className="text-xs text-muted">{t.disclaimer}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
-          <li>Solid border: a recorded relationship.</li>
-          <li>Dotted border: inferred library step.</li>
-          <li>Dashed border: a gap, no accepted static evidence.</li>
+          <li>Solid line: a recorded relationship.</li>
+          <li>Dotted line: inferred library step.</li>
+          <li>Dashed line: a gap, no accepted static evidence.</li>
         </ul>
         <HiddenCounts counts={t.hidden_counts} reviewHref={reviewHref} />
       </div>
       {hops.length === 0 ? (
         <p className="text-sm text-ink-2">The API returned no steps for this trace.</p>
       ) : (
-        <>
-          <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
-            {hops.map((v) => (
-              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} snapshotHidden={t.hidden_counts} reviewHref={reviewHref} />
-            ))}
-          </ol>
-        </>
+        <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
+          {hops.map((v, i) => (
+            <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} hot={i === active} onPick={() => setActive(i)} snapshotHidden={t.hidden_counts} reviewHref={reviewHref} />
+          ))}
+        </ol>
       )}
     </section>
   );

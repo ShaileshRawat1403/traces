@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENT_IDS, componentsSample, graphComponentsSample, graphSymbolsSample } from "../../testing/samples";
-import { componentForFile, componentRollup, countsFor, drawableEdges, graphQuery, nextInDirection, openingDiagram, readGraphState, toElements, writeGraphState } from "./graphModel";
+import { componentForFile, componentRollup, columnLayout, countsFor, depthLayout, drawableEdges, fileRollup, graphQuery, nextInDirection, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState } from "./graphModel";
 
 describe("graph URL state and query", () => {
   it("defaults to verified and observed, depth 1, no focus", () => {
@@ -108,5 +108,83 @@ describe("keyboard navigation", () => {
   it("returns null at an edge", () => {
     expect(nextInDirection(grid, "a", "left")).toBeNull();
     expect(nextInDirection([], "a", "left")).toBeNull();
+  });
+});
+
+describe("column and depth layout", () => {
+  it("puts the frontend column to the left of the api column, on the same row when each has one node", () => {
+    const pos = columnLayout(
+      [
+        { id: "web", label: "web", layer: "frontend" },
+        { id: "api", label: "api", layer: "api" },
+      ],
+      [{ source: "web", target: "api" }],
+    );
+    expect(pos.web!.x).toBeLessThan(pos.api!.x);
+    expect(pos.web!.y).toBe(pos.api!.y);
+  });
+
+  it("wraps a tall layer into a second column and keeps support layers below the primary row", () => {
+    const nodes = Array.from({ length: 7 }, (_, i) => ({ id: `f${i}`, label: `f${i}`, layer: "frontend" }));
+    nodes.push({ id: "docs", label: "docs", layer: "docs" });
+    const pos = columnLayout(nodes, []);
+    expect(pos.f0!.x).toBeLessThan(pos.f6!.x);
+    expect(pos.docs!.y).toBeGreaterThan(pos.f0!.y);
+  });
+
+  it("orders a column so a node sits nearer the neighbor it records", () => {
+    const pos = columnLayout(
+      [
+        { id: "top", label: "a", layer: "frontend" },
+        { id: "bottom", label: "b", layer: "frontend" },
+        { id: "api-a", label: "a", layer: "api" },
+        { id: "api-b", label: "b", layer: "api" },
+      ],
+      [
+        { source: "bottom", target: "api-a" },
+        { source: "top", target: "api-b" },
+      ],
+    );
+    expect(pos.bottom!.y).toBeLessThan(pos.top!.y);
+    expect(pos["api-a"]!.y).toBeLessThan(pos["api-b"]!.y);
+  });
+
+  it("places a caller to the left of the symbol it records a call to", () => {
+    const pos = depthLayout(
+      [
+        { id: "caller", label: "caller" },
+        { id: "callee", label: "callee" },
+      ],
+      [{ source: "caller", target: "callee" }],
+    );
+    expect(pos.caller!.x).toBeLessThan(pos.callee!.x);
+  });
+});
+
+describe("file rollup", () => {
+  it("counts edges between files and drops same-file edges and rejected ones already removed", () => {
+    const els = [
+      { data: { id: "a", label: "A", entity: "symbol", file: "web/a.tsx", layer: "frontend", tone: undefined } },
+      { data: { id: "b", label: "B", entity: "symbol", file: "web/a.tsx", layer: "frontend" } },
+      { data: { id: "c", label: "C", entity: "symbol", file: "api/c.py", layer: "api" } },
+      { data: { id: "e1", label: "renders", source: "a", target: "b", tone: "verified", line: "solid" } },
+      { data: { id: "e2", label: "calls", source: "a", target: "c", tone: "inferred", line: "dashed" } },
+    ];
+    const rolled = fileRollup(els);
+    const files = rolled.filter((e) => !e.data.source);
+    expect(files.map((f) => f.data.file).sort()).toEqual(["api/c.py", "web/a.tsx"]);
+    expect(files.find((f) => f.data.file === "web/a.tsx")?.data.count).toBe(2);
+    const edges = rolled.filter((e) => e.data.source);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.data.line).toBe("dashed");
+    expect(edges[0]!.data.label).toBe("1");
+    const open = symbolsInFile(els, "web/a.tsx");
+    expect(open.filter((e) => !e.data.source).map((e) => e.data.id).sort()).toEqual(["a", "b", "c"]);
+    expect(open.filter((e) => e.data.source)).toHaveLength(2);
+  });
+
+  it("leaves a graph alone when each symbol already has its own file", () => {
+    const els = toElements(graphSymbolsSample, componentsSample);
+    expect(fileRollup(els)).toHaveLength(els.length);
   });
 });

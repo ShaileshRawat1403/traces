@@ -99,31 +99,29 @@ export function SnapshotLayout() {
   const snap = useSnapshot(repoId, sha);
   const repoName = repoId.split("__").slice(1).join("/") || repoId;
   return (
-    <div className="mx-auto flex max-w-6xl gap-6 px-4 py-4 md:py-6">
-      <aside className="hidden w-52 shrink-0 md:block">
-        <nav aria-label="Snapshot sections" className="sticky top-20 flex flex-col gap-0.5">
-          {SNAPSHOT_NAV.map((n) => (
-            <SideLink key={n.to} base={base} item={n} />
-          ))}
-        </nav>
-      </aside>
-      <main id="main" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-          <Link to={`/r/${encodeURIComponent(repoId)}`} className="font-medium">
-            {repoName}
-          </Link>
-          <ShaChip sha={sha} />
-          {snap.data ? <span className="text-muted">Snapshot {snap.data.state}</span> : null}
-          {snap.isError ? (
-            <span className="text-rejected" role="status">
-              {snap.error instanceof ApiError && snap.error.status === 404 ? "Snapshot not found" : "Snapshot details unavailable"}
-            </span>
-          ) : null}
-        </div>
+    <div className="mx-auto flex max-w-[90rem] flex-col px-3 py-3 md:px-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+        <Link to={`/r/${encodeURIComponent(repoId)}`} className="font-medium">
+          {repoName}
+        </Link>
+        <ShaChip sha={sha} />
+        {snap.data ? <span className="text-muted">Snapshot {snap.data.state}</span> : null}
+        {snap.isError ? (
+          <span className="text-rejected" role="status">
+            {snap.error instanceof ApiError && snap.error.status === 404 ? "Snapshot not found" : "Snapshot details unavailable"}
+          </span>
+        ) : null}
+      </div>
+      <nav aria-label="Snapshot sections" className="mb-2 hidden gap-1 overflow-x-auto md:flex">
+        {SNAPSHOT_NAV.map((n) => (
+          <SideLink key={n.to} base={base} item={n} />
+        ))}
+      </nav>
+      <main id="main" tabIndex={-1} className="min-w-0 focus:outline-none">
         <p className="mb-1 rounded-md border border-line bg-sunken px-3 py-1.5 text-xs text-ink-2" data-testid="static-disclaimer">
           {STATIC_DISCLAIMER}
         </p>
-        <p className="mb-3 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>
+        <p className="mb-2 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>
         <Outlet />
       </main>
       <nav aria-label="Snapshot sections, bottom bar" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface md:hidden">

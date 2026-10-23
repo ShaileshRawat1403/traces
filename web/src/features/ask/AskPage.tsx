@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
@@ -48,11 +48,19 @@ export function AskPage() {
 }
 
 function ExplainPanel({ repoId, sha }: { repoId: string; sha: string }) {
-  const [question, setQuestion] = useState("");
+  const [sp] = useSearchParams();
+  const seeded = sp.get("q") ?? "";
+  const [question, setQuestion] = useState(seeded);
   const qid = useId();
   const ask = useMutation({
     mutationFn: (v: { question: string; mode: "no_llm" | "prepare_bundle" }) => api.explain(repoId, sha, { question: v.question, mode: v.mode, focus_claim_ids: [] }),
   });
+  const ran = useRef(false);
+  useEffect(() => {
+    if (ran.current || !seeded.trim()) return;
+    ran.current = true;
+    ask.mutate({ question: seeded.trim(), mode: "no_llm" });
+  }, [seeded, ask]);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (question.trim()) ask.mutate({ question: question.trim(), mode: "no_llm" });

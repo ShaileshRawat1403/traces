@@ -1,6 +1,7 @@
 import { GAP_MEANING } from "./traceModel";
 import { GapHidden } from "./GapHidden";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type ClaimSummary, type Component, type TraceHop } from "../../api/client";
 import { splitSymbol } from "../../api/record";
@@ -71,7 +72,7 @@ function Step({
   const frame = tone;
   const note = flagNote(flags);
   return (
-    <li className="flow-hop" data-flow={frame}>
+    <div className="flow-detail" data-flow={frame}>
       <div className="flow-node">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">From</span>
         <code className="block break-all text-sm font-semibold">{short(from)}</code>
@@ -123,11 +124,12 @@ function Step({
           Show on the graph
         </Link>
       </div>
-    </li>
+    </div>
   );
 }
 
 export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: string; onEvidence: (id: string) => void }) {
+  const [picked, setPicked] = useState<number | null>(null);
   const base = snapshotBase(repoId, sha);
   const claimQ = (kind: string, limit: number) => ({ kind, claim_kind: "relationship", limit });
   const persist = useQuery({ queryKey: ["flow", "persistence", repoId, sha], queryFn: () => api.claims(repoId, sha, claimQ("persistence_path", 5)) });
@@ -241,6 +243,9 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
 
   const librarySteps = steps.filter((s) => s.tone === "library").length;
   const gapSteps = steps.filter((s) => s.tone === "gap").length;
+  const preferred = Math.max(0, steps.findIndex((s) => s.persistence));
+  const index = Math.min(steps.length - 1, picked ?? preferred);
+  const current = steps[index]!;
 
   return (
     <section className="mb-4" aria-label="Recorded user flow" data-testid="user-flow">
@@ -262,32 +267,40 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
           <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap: no accepted static evidence
         </li>
       </ul>
-      <ol className="flow-list mt-3" aria-label="User flow steps">
+      <div className="mt-3 flex flex-col gap-4">
+      <ol className="flow-rail" aria-label="User flow steps">
         {steps.map((s, i) => (
-          <Step
-            key={s.key}
-            index={i + 1}
-            kind={s.hop.kind}
-            from={s.hop.from_symbol}
-            to={s.hop.to_symbol}
-            status={s.tone === "library" || s.tone === "gap" ? "unvalidated" : s.hop.status}
-            label={s.tone === "library" || s.tone === "gap" ? "inferred" : s.hop.label}
-            qualifier={s.hop.qualifier}
-            reason={s.hop.reason}
-            claimId={s.hop.claim_id}
-            flags={s.flags}
-            persistence={s.persistence}
-            file={splitSymbol(s.hop.from_symbol).file}
-            components={components}
-            tone={s.tone}
-            onEvidence={onEvidence}
-            graphHref={graph(s.hop.to_symbol)}
-            hop={s.hop}
-            snapshotHidden={s.key === "bridge" ? bridge.data?.hidden_counts : chosen.hidden_counts}
-            reviewHref={`${base}/review`}
-          />
+          <li key={s.key} data-flow={s.tone}>
+            <button type="button" aria-pressed={i === index} onClick={() => setPicked(i)} className="flow-stop">
+              <span className="text-xs text-muted">{i + 1}</span>
+              <span className="block truncate font-semibold">{short(s.hop.to_symbol)}</span>
+              <span className="block truncate text-xs text-ink-2">{s.hop.kind.replaceAll("_", " ")}</span>
+            </button>
+          </li>
         ))}
       </ol>
+      <Step
+        index={index + 1}
+        kind={current.hop.kind}
+        from={current.hop.from_symbol}
+        to={current.hop.to_symbol}
+        status={current.tone === "library" || current.tone === "gap" ? "unvalidated" : current.hop.status}
+        label={current.tone === "library" || current.tone === "gap" ? "inferred" : current.hop.label}
+        qualifier={current.hop.qualifier}
+        reason={current.hop.reason}
+        claimId={current.hop.claim_id}
+        flags={current.flags}
+        persistence={current.persistence}
+        file={splitSymbol(current.hop.from_symbol).file}
+        components={components}
+        tone={current.tone}
+        onEvidence={onEvidence}
+        graphHref={graph(current.hop.to_symbol)}
+        hop={current.hop}
+        snapshotHidden={current.key === "bridge" ? bridge.data?.hidden_counts : chosen.hidden_counts}
+        reviewHref={`${base}/review`}
+      />
+      </div>
     </section>
   );
 }

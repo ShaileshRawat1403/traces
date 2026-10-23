@@ -1,7 +1,7 @@
-// Code-split route: this module and Cytoscape load only when the graph route opens.
+// Code-split route: the architecture diagram loads with this page.
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Component, type GraphEdge, type GraphNode, type GraphResponse } from "../../api/client";
 import { splitSymbol } from "../../api/record";
 import { snapshotBase } from "../../app/nav";
@@ -10,8 +10,8 @@ import { Button, Empty, ErrorState, Loading } from "../../ui/States";
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas } from "./GraphCanvas";
-import { LAYER_COLOR } from "../layers";
-import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, graphQuery, openingDiagram, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
+import { CODE_LAYERS, isLayer, layerColor } from "../layers";
+import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
@@ -19,6 +19,8 @@ const STATUS_TEXT: Record<StatusFilter, string> = {
   unvalidated: "Inferred (unvalidated)",
   missing_location: "Inferred, no source location",
 };
+
+const coreLayer = (layer: string | undefined) => isLayer(layer) && CODE_LAYERS[layer];
 
 function Legend() {
   return (
@@ -144,6 +146,7 @@ function SelectionPanel({
   components,
   selected,
   state,
+  base,
   onState,
   onEvidence,
   onClear,
@@ -152,6 +155,7 @@ function SelectionPanel({
   components: readonly Component[];
   selected: string;
   state: GraphState;
+  base: string;
   onState: (s: GraphState) => void;
   onEvidence: (id: string) => void;
   onClear: () => void;
@@ -191,6 +195,11 @@ function SelectionPanel({
           </Button>
         )}
         <Button onClick={onClear}>Clear selection</Button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+        <Link to={node.entity === "component" ? `${base}/trace` : `${base}/trace?from=${encodeURIComponent(node.id)}`}>Follow a recorded flow</Link>
+        <Link to={node.entity === "component" ? `${base}/history?component=${encodeURIComponent(node.id)}` : node.file ? `${base}/history?path=${encodeURIComponent(node.file)}` : `${base}/history`}>History</Link>
+        <Link to={`${base}/ask?q=${encodeURIComponent(`What is recorded about ${node.label}?`)}`}>Ask about this</Link>
       </div>
       <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
       {byKind.size > 0 ? (
@@ -232,6 +241,23 @@ function SelectionPanel({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function FilePanel({ node, onOpen, onClear }: { node: ElementData | undefined; onOpen: () => void; onClear: () => void }) {
+  if (!node) return null;
+  return (
+    <section className="rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected file">
+      <h2 className="break-all font-semibold">{node.label}</h2>
+      <p className="break-all font-mono text-xs text-ink-2">{node.file}</p>
+      <p className="mt-1 text-sm text-ink-2">{node.count ?? 0} symbols in this file. Lines to other files count recorded relationships. They are not new claims.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="primary" onClick={onOpen}>
+          Open symbols
+        </Button>
+        <Button onClick={onClear}>Clear selection</Button>
+      </div>
     </section>
   );
 }
@@ -282,6 +308,10 @@ export default function GraphPage() {
   const [selected, setSelected] = useState<string | null>(state.focus);
   const picked = useRef(false);
   const [q, setQ] = useState(state.q);
+  const [openedFile, setOpenedFile] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  const [layerPick, setLayerPick] = useState<string | null>(null);
+  const [scope, setScope] = useState<"core" | "all">("core");
   const searchId = useId();
   const query = graphQuery(state);
   const graph = useQuery({ queryKey: ["graph", repoId, sha, query], queryFn: () => api.graph(repoId, sha, query) });
@@ -289,7 +319,55 @@ export default function GraphPage() {
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const components = useMemo(() => comps.data ?? [], [comps.data]);
   const elements = useMemo(() => (graph.data ? toElements(graph.data, components) : []), [graph.data, components]);
-  const drawn = useMemo(() => (graph.data ? (state.focus ? canvasElements(elements, true) : openingDiagram(components, graph.data)) : []), [graph.data, elements, state.focus, components]);
+  const focusedEls = useMemo(() => canvasElements(elements, true), [elements]);
+  const symbolCount = focusedEls.filter((e) => !e.data.source && e.data.entity === "symbol").length;
+  const drawn = useMemo(() => {
+    if (!graph.data) return [];
+    if (!state.focus) return openingDiagram(components, graph.data);
+    if (openedFile) return symbolsInFile(focusedEls, openedFile);
+    if (symbolCount > 8) {
+      const rolled = fileRollup(focusedEls);
+      if (rolled.some((e) => e.data.entity === "file")) return rolled;
+    }
+    return focusedEls;
+  }, [graph.data, components, state.focus, openedFile, symbolCount, focusedEls]);
+  const useFiles = drawn.some((e) => e.data.entity === "file");
+  const mapNodes = drawn.filter((e) => !e.data.source);
+  const layersOnMap = LAYERS.filter((l) => mapNodes.some((n) => n.data.layer === l));
+  const defaultLayer = narrow && !state.focus && mapNodes.length > 8 ? (layersOnMap.includes("frontend") ? "frontend" : (layersOnMap[0] ?? null)) : null;
+  const effectiveLayer = !state.focus ? (layerPick === "all" ? null : (layerPick ?? defaultLayer)) : null;
+  const coreOn = !state.focus && !narrow && !effectiveLayer && scope === "core" && mapNodes.length > 12 && mapNodes.some((n) => coreLayer(n.data.layer));
+  const shown = useMemo(() => {
+    const allow = (layer: string | undefined) => {
+      if (effectiveLayer) return layer === effectiveLayer;
+      if (coreOn) return coreLayer(layer);
+      return true;
+    };
+    if (!effectiveLayer && !coreOn) return drawn;
+    const ids = new Set(drawn.filter((e) => !e.data.source && allow(e.data.layer)).map((e) => e.data.id));
+    return drawn.filter((e) => (!e.data.source ? ids.has(e.data.id) : !!e.data.source && !!e.data.target && ids.has(e.data.source) && ids.has(e.data.target)));
+  }, [drawn, effectiveLayer, coreOn]);
+  const pictured = useMemo(() => {
+    if (!useFiles) return shown;
+    const fileEdges = shown.filter((e) => e.data.source);
+    if (fileEdges.length <= 30 || !selected?.startsWith("file::")) {
+      if (fileEdges.length <= 30) return shown;
+      return shown.filter((e) => !e.data.source);
+    }
+    const nodes = shown.filter((e) => !e.data.source);
+    const edges = shown.filter((e) => e.data.source === selected || e.data.target === selected);
+    return [...nodes, ...edges];
+  }, [shown, useFiles, selected]);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  useEffect(() => {
+    setOpenedFile(null);
+  }, [state.focus]);
   // A component id has no incident edges: the relationships belong to its symbols. Don't preselect it, or the panel
   // says "0" and the canvas dims the neighborhood the user came to see. A symbol focus stays selected (list view).
   useEffect(() => {
@@ -323,12 +401,14 @@ export default function GraphPage() {
   );
   const describe = useCallback(
     (id: string) => {
+      const fileNode = id.startsWith("file::") ? drawn.find((e) => e.data.id === id)?.data : undefined;
+      if (fileNode) return `${fileNode.label}, file, ${fileNode.count ?? 0} symbols`;
       const n = graph.data?.nodes.find((x) => x.id === id) ?? componentNode(id, components);
       if (!n) return "";
       const rel = graph.data ? drawableEdges(graph.data).edges.filter((e) => e.source === id || e.target === id).length : 0;
       return `${n.label}, ${n.entity}${n.layer ? `, ${n.layer}` : ""}, ${rel} relationships shown`;
     },
-    [graph.data, components],
+    [graph.data, components, drawn],
   );
   const submitSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -337,36 +417,33 @@ export default function GraphPage() {
 
   return (
     <>
-      <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h1 className="text-xl font-semibold tracking-tight">Architecture graph</h1>
-        <p className="text-sm text-muted">Components first. Expand one to load the symbols inside it.</p>
-      </header>
-
-      <div className="mb-2 flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 gap-2">
+      <div className="mb-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+        <h1 className="text-lg font-semibold tracking-tight">Architecture</h1>
+        <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 gap-2">
             <label htmlFor={searchId} className="sr-only">
               Search nodes
             </label>
             <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="tap min-w-0 flex-1 rounded-md border border-line-strong px-3" />
-            <Button type="submit">Search</Button>
+            <Button type="submit" className="shrink-0">Search</Button>
           </form>
-          <div role="group" aria-label="View as" className="inline-flex rounded-md border border-line-strong">
+          <div role="group" aria-label="View as" className="inline-flex shrink-0 rounded-md border border-line-strong">
             {(["graph", "list", "cards"] as const).map((m) => (
               <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
                 {m === "graph" ? "Graph" : m === "list" ? "List" : "Cards"}
               </button>
             ))}
           </div>
-        </div>
-        <Filters state={state} onChange={setState} />
-        {state.focus ? (
-          <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="focus-bar">
-            Focused on <code className="break-all">{graph.data ? nodeName(graph.data.nodes, state.focus) : splitSymbol(state.focus).name}</code> at depth {state.depth}
-            <Button onClick={() => setState({ ...state, focus: null, depth: 1 })}>Back to components</Button>
-          </p>
-        ) : null}
       </div>
+      <Filters state={state} onChange={setState} />
+      {state.focus ? (
+        <p className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="focus-bar">
+          Focused on <code className="break-all">{graph.data ? nodeName(graph.data.nodes, state.focus) : splitSymbol(state.focus).name}</code> at depth {state.depth}
+          {useFiles ? <span className="text-ink-2">Files first. Select one to draw the lines recorded from it. A line is a count, not a new claim.</span> : null}
+          {openedFile ? <span className="text-ink-2">Symbols in {openedFile.split("/").pop()}, plus the symbols they record a relationship with.</span> : null}
+          <Button onClick={() => setState({ ...state, focus: null, depth: 1 })}>Back to components</Button>
+          {openedFile ? <Button onClick={() => setOpenedFile(null)}>Back to files</Button> : null}
+        </p>
+      ) : null}
 
       {graph.isPending ? (
         <Loading label="Loading graph" />
@@ -381,31 +458,97 @@ export default function GraphPage() {
               ) : mode === "graph" ? (
                 <>
                   {!state.focus ? (
-                    <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers on the map">
-                      {LAYERS.filter((l) => drawn.some((e) => !e.data.source && e.data.layer === l)).map((l) => (
-                        <li key={l} className="inline-flex items-center gap-1 capitalize">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: LAYER_COLOR[l] }} aria-hidden="true" />
-                          {l}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mb-2 flex flex-col gap-2">
+                      {narrow && mapNodes.length > 8 ? (
+                        <div role="group" aria-label="Layer in view" className="flex gap-1 overflow-x-auto">
+                          <button type="button" aria-pressed={effectiveLayer === null} onClick={() => setLayerPick("all")} className={`tap shrink-0 rounded-md border px-3 text-sm ${effectiveLayer === null ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                            All layers
+                          </button>
+                          {layersOnMap.map((l) => (
+                            <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className={`tap shrink-0 rounded-md border px-3 text-sm capitalize ${effectiveLayer === l ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      {!narrow && mapNodes.length > 12 ? (
+                        <div role="group" aria-label="How much of the map to show" className="flex gap-1">
+                          <button type="button" aria-pressed={scope === "core"} onClick={() => setScope("core")} className={`tap rounded-md border px-3 text-sm ${scope === "core" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                            Core layers
+                          </button>
+                          <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={`tap rounded-md border px-3 text-sm ${scope === "all" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                            All layers
+                          </button>
+                        </div>
+                      ) : null}
+                      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers on the map">
+                        {(effectiveLayer ? [effectiveLayer] : coreOn ? layersOnMap.filter((l) => coreLayer(l)) : layersOnMap).map((l) => (
+                          <li key={l} className="inline-flex items-center gap-1 capitalize">
+                            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: layerColor(l) }} aria-hidden="true" />
+                            {l}
+                          </li>
+                        ))}
+                      </ul>
+                      {effectiveLayer ? <p className="text-xs text-ink-2">One layer is open so the names stay readable. Select a component to list lines that leave it.</p> : null}
+                      {coreOn ? <p className="text-xs text-ink-2">Code layers are in the frame. All layers adds infra, docs, and tests.</p> : null}
+                    </div>
                   ) : null}
+                  {narrow && effectiveLayer ? (
+                    <ul className="grid gap-2" aria-label={`${effectiveLayer} components`}>
+                      {shown.filter((e) => !e.data.source).map((n) => {
+                        const links = drawn.filter((e) => e.data.source && (e.data.source === n.data.id || e.data.target === n.data.id));
+                        return (
+                          <li key={n.data.id}>
+                            <button
+                              type="button"
+                              aria-pressed={selected === n.data.id}
+                              onClick={() => choose(selected === n.data.id ? null : n.data.id)}
+                              className="min-h-11 w-full rounded-lg border-2 bg-[#1b3330] px-3 py-2 text-left text-[#f4faf7]"
+                              style={{ borderColor: selected === n.data.id ? "#7eb6ff" : layerColor(n.data.layer) }}
+                            >
+                              <span className="block text-sm font-semibold">{n.data.label}</span>
+                              <span className="mt-1 block text-xs text-[#c5d2cb]">
+                                {links.length
+                                  ? links
+                                      .slice(0, 3)
+                                      .map((e) => {
+                                        const otherId = e.data.source === n.data.id ? e.data.target : e.data.source;
+                                        const other = components.find((c) => c.id === otherId)?.name ?? otherId;
+                                        const dir = e.data.source === n.data.id ? "to" : "from";
+                                        return `${e.data.label} ${dir} ${other}`;
+                                      })
+                                      .join(" · ")
+                                  : "No line on this page leaves this component."}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
                   <GraphCanvas
-                  elements={drawn}
-                  layout={state.focus ? "neighborhood" : "map"}
+                  elements={pictured}
+                  layout={state.focus && !useFiles ? "neighborhood" : "map"}
                   selected={selected}
                   onSelect={choose}
                   onExpand={(id) => {
+                    if (id.startsWith("file::")) {
+                      setOpenedFile(id.slice("file::".length));
+                      setSelected(null);
+                      return;
+                    }
                     const node = graph.data?.nodes.find((n) => n.id === id);
                     if (!node || node.entity === "component") {
                       picked.current = false;
                       setSelected(null);
                     }
+                    setOpenedFile(null);
                     setState({ ...state, focus: id, depth: state.focus === id ? Math.min(4, state.depth + 1) : 1 });
                   }}
                   onEdge={openEvidence}
                   describe={describe}
                 />
+                  )}
                 </>
               ) : mode === "list" ? (
                 <ListView data={graph.data} selected={selected} onEvidence={openEvidence} />
@@ -419,12 +562,14 @@ export default function GraphPage() {
                 {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
               </p>
               {!state.focus ? (
-                <p className="text-xs text-ink-2">Lines count relationships on this page. The weakest status in the pair sets the line. A missing line is not proof that nothing connects.</p>
+                <p className="text-xs text-ink-2">Every component in this view is in the frame. A line counts relationships on this page. The weakest status in the pair sets the line. Select a component to read those lines. A missing line is not proof that nothing connects.</p>
               ) : (
-                <p className="text-xs text-muted">Names stay large enough to read. Select a symbol to label its lines. List shows every relationship.</p>
+                <p className="text-xs text-muted">{useFiles ? "Files first. Select a file to emphasize the lines recorded from it. Enter opens its symbols. A line is a count, not a new claim." : "Select a symbol to label its lines. List shows every relationship."}</p>
               )}
-              {selected && (graph.data.nodes.some((n) => n.id === selected) || components.some((c) => c.id === selected)) ? (
-                <SelectionPanel data={graph.data} components={components} selected={selected} state={state} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
+              {selected && selected.startsWith("file::") ? (
+                <FilePanel node={drawn.find((e) => e.data.id === selected)?.data} onOpen={() => setOpenedFile(selected.slice("file::".length))} onClear={() => choose(null)} />
+              ) : selected && (graph.data.nodes.some((n) => n.id === selected) || components.some((c) => c.id === selected)) ? (
+                <SelectionPanel data={graph.data} components={components} selected={selected} state={state} base={snapshotBase(repoId, sha)} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
               ) : (
                 <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a node to see its relationships and open their evidence.</p>
               )}
