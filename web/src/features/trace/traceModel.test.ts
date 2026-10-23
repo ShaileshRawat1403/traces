@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Schemas } from "../../api/client";
 import { traceSample } from "../../testing/samples";
-import { orderedHops, presentHop, traceSummary } from "./traceModel";
+import { incompleteText, orderedHops, presentHop, traceSummary, unresolvedCalls } from "./traceModel";
 
 const base = traceSample.hops.find((h) => h.type === "gap")!;
 
@@ -36,5 +36,25 @@ describe("trace model", () => {
   it("hides rejected edge hops in place", () => {
     const rejected: Schemas["TraceHop"] = { ...traceSample.hops[1]!, status: "rejected", label: "rejected" };
     expect(presentHop(rejected).kind).toBe("hidden");
+  });
+
+  it("F-9: names gaps and weak steps separately when saying why a trace is incomplete", () => {
+    expect(incompleteText(traceSample)).toBe(
+      "Incomplete: this trace has 1 gap where no accepted static evidence connects two steps. A gap is not evidence that a call does or does not happen. 1 step rests on a relationship that is not verified or observed.",
+    );
+    const weakOnly = { hops: traceSample.hops.filter((h) => h.type !== "gap") };
+    expect(incompleteText(weakOnly)).toBe("Incomplete: 1 step rests on a relationship that is not verified or observed.");
+    expect(incompleteText({ hops: [] })).toBe("Incomplete: the API marks this trace incomplete.");
+  });
+  it("F-9: an unresolved-calls gap gets its own title and lists the call names", () => {
+    const u = { ...base, to_symbol: "(unresolved)", unresolved_calls: ["mutation.mutate", "reset"] };
+    expect(unresolvedCalls(u)).toEqual(["mutation.mutate", "reset"]);
+    expect(unresolvedCalls(base)).toBeNull();
+    expect(unresolvedCalls({ ...base, unresolved_calls: [] })).toBeNull();
+    expect(presentHop(u).title).toBe("Gap: calls the trace cannot follow");
+    expect(presentHop(base).title).toBe("Gap: no static evidence connects these steps");
+    expect(incompleteText({ hops: [u] })).toBe(
+      "Incomplete: this trace has 1 step with calls the trace cannot follow. A gap is not evidence that a call does or does not happen.",
+    );
   });
 });
