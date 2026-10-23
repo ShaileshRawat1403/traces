@@ -54,5 +54,9 @@ TRACES_WEB_URL="http://127.0.0.1:$WEB_PORT" npx --no-install playwright test || 
 if [ "$SEED" = "fsft" ]; then
   # Real-snapshot content, axe (WCAG 2.2 AA) and 360 px touch checks; fsft-specific, so only on the fsft seed.
   WEB="http://127.0.0.1:$WEB_PORT" SHOTS="${TRACES_SHOTS_DIR:-test-results/shots}/real-snapshot" node "$ROOT/tests/e2e/real_snapshot.cjs" || rc=$?
+  # BYOK chat (G-5) against an in-process stub provider: consent, decline, manifest = what the stub receives, rejected
+  # claims never sent, and a throwaway key never reaching the Traces API, its logs or its store.
+  WEB="http://127.0.0.1:$WEB_PORT" SHOTS="${TRACES_SHOTS_DIR:-test-results/shots}/chat-g5" API_LOGS=/tmp/traces-e2e-api.log,/tmp/traces-e2e-web.log \
+    STORE="$DATA/traces.sqlite3" node "$ROOT/tests/e2e/chat_g5.cjs" || rc=$?
 fi
 exit "$rc"
