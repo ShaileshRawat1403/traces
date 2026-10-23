@@ -94,8 +94,9 @@ async function see(p, texts) {
     const text = await ask('When was new-frontend moved to frontend?', moves, '10-ask-history.png');
     inOrder(text, moves); // summary first, then the 96-file move ranked first (O-12)
   });
-  await step('11 ask (no key): runtime question marked unknown', async () => {
-    await ask('Does create_item write to the database at runtime?', ['Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown.'], '11-ask-runtime.png');
+  await step('11 ask (no key): runtime question marked unknown, with the verified static persistence path (O-13)', async () => {
+    await ask('Does create_item write to the database at runtime?', ['Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown.',
+      'create_item has a statically established persistence path through get_db', '(verified)'], '11-ask-runtime.png');
   });
   await step('12 itsdangerous overview: unknown purpose and entry points', async () => {
     await go(I); await see(p, ['@672971d', 'No route nodes or routes_to claims are stored', 'not proof the software has no HTTP routes', 'src/itsdangerous']);
