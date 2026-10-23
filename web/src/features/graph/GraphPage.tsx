@@ -10,6 +10,7 @@ import { Button, Empty, ErrorState, Loading } from "../../ui/States";
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas } from "./GraphCanvas";
+import { LAYER_COLOR } from "../layers";
 import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, graphQuery, openingDiagram, readGraphState, toElements, writeGraphState, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
@@ -17,17 +18,6 @@ const STATUS_TEXT: Record<StatusFilter, string> = {
   observed: "Observed",
   unvalidated: "Inferred (unvalidated)",
   missing_location: "Inferred, no source location",
-};
-
-const LAYER_SWATCH: Record<string, string> = {
-  frontend: "#8fd9cf",
-  api: "#7eb6ff",
-  backend: "#d7fff8",
-  data: "#e2b16a",
-  infra: "#b7c4ce",
-  docs: "#c4b4ea",
-  tests: "#ef8d86",
-  other: "#8ea399",
 };
 
 function Legend() {
@@ -394,7 +384,7 @@ export default function GraphPage() {
                     <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers on the map">
                       {LAYERS.filter((l) => drawn.some((e) => !e.data.source && e.data.layer === l)).map((l) => (
                         <li key={l} className="inline-flex items-center gap-1 capitalize">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: LAYER_SWATCH[l] }} aria-hidden="true" />
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: LAYER_COLOR[l] }} aria-hidden="true" />
                           {l}
                         </li>
                       ))}

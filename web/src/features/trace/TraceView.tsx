@@ -3,7 +3,8 @@ import { splitSymbol } from "../../api/record";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
-import { GAP_MEANING, gapHiddenNote, orderedHops, traceSummary, type HopView } from "./traceModel";
+import { GapHidden } from "./GapHidden";
+import { GAP_MEANING, orderedHops, traceSummary, type HopView } from "./traceModel";
 
 function Sym({ id }: { id: string }) {
   const s = splitSymbol(id);
@@ -15,7 +16,7 @@ function Sym({ id }: { id: string }) {
   );
 }
 
-function Hop({ v, onEvidence, hiddenNote }: { v: HopView; onEvidence: (id: string) => void; hiddenNote: string | null }) {
+function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvidence: (id: string) => void; snapshotHidden: Record<string, number> | null | undefined; reviewHref: string }) {
   const { hop } = v;
   return (
     <li className="flow-hop" data-hop={v.kind}>
@@ -51,7 +52,7 @@ function Hop({ v, onEvidence, hiddenNote }: { v: HopView; onEvidence: (id: strin
                   <span className="font-semibold">What this gap means: </span>
                   {GAP_MEANING}
                 </p>
-                {hiddenNote ? <p className="text-ink-2" data-testid="gap-hidden">{hiddenNote}</p> : null}
+                <GapHidden hop={hop} snapshotHidden={snapshotHidden} reviewHref={reviewHref} />
                 <p className="text-ink-2">
                   <span className="font-semibold">API note: </span>
                   {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
@@ -123,7 +124,7 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
         <>
           <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
             {hops.map((v) => (
-              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} hiddenNote={gapHiddenNote(t.hidden_counts)} />
+              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} snapshotHidden={t.hidden_counts} reviewHref={reviewHref} />
             ))}
           </ol>
         </>

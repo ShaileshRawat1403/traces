@@ -76,7 +76,8 @@ test.describe("acceptance fixes", () => {
     await page.goto(`${base(target)}/components`);
     await expect(page.getByRole("heading", { level: 1, name: "Components" })).toBeVisible();
     await expect(page.getByTestId("components-count")).toContainText(`of ${comps.length} components`);
-    await expect(page.getByTestId("layer-note")).toContainText("not a reading of what the code does");
+    // The API's reason replaces the path-rule note when every component has one (D-029); otherwise the note stays.
+    await expect(page.getByTestId("layer-note")).toContainText(/not a reading of what the code does|the API's own reason for its layer/);
     test.skip(comps.length === 0, "no components");
     expect(await page.getByTestId("component-layer").allTextContents()).toEqual(comps.map((c) => c.layer));
     await expect(page.locator('[data-testid="component-item"] [data-status="rejected"]')).toHaveCount(0);
