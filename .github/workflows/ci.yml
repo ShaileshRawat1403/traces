@@ -293,6 +293,37 @@ jobs:
             .traces-data/runs/*/run_meta.json
           retention-days: 7
 
+  security:
+    name: security and safe-failure tests (tests/security, unshare -rn)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0 (no floating v10 tag exists)
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install "$PYTHON_VERSION"
+      - run: uv sync --frozen
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: toolchain/package-lock.json
+      - name: toolchain (CodeGraph 1.6.2 + TypeScript 6.0.3, integrity-pinned, no install scripts)
+        run: cd toolchain && npm ci --ignore-scripts
+      - name: allow unprivileged user namespaces (unshare -rn isolation, D-006)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
+          unshare -rn true && echo "unshare available"
+      - name: security tests (xfail-strict entries are open findings, listed by -rxX)
+        env:
+          TRACES_ISOLATION: unshare
+        run: uv run --frozen pytest -q -rxXs tests/security
+
   history:
     name: history tests (incl. fsft regressions on the cached full-history clone)
     needs: target
