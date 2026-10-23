@@ -2,6 +2,8 @@
 
 Local run on the Traces Lab box, not CI. Run on 2026-10-23 at 13:11 IST, on a scratch server (API 18820, web 15180) built from `ws/lab-acceptance` @ `d492e0e`. The product code is identical to `build/traces-v1` @ `e532644`. The scratch store and cache are in `.traces-data/acceptance/express/` (gitignored). The box app was not used. The only network use was the target fetch.
 
+Re-run after merging `build/traces-v1` @ `b37eef2` (fixes for F-1 to F-6) as `3bad896`, on a fresh store from the cached clone. Results were identical: 3,671 claims, 0 verified, and the same counts. The trace from `register` is still complete with 3 edges. The `POST /register` explain answer is unchanged. `/meta` validators are still python and typescript.
+
 ## Target
 
 | | |
