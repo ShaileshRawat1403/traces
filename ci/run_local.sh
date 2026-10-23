@@ -63,7 +63,13 @@ job_history() {
   if grep -q "SKIPPED" "$out"; then rm -f "$out"; echo "a history test skipped (fsft clone or user namespaces missing)" >&2; return 1; fi
   rm -f "$out"
 }
-job_e2e()       { py_env && toolchain_env && web_env && userns && TRACES_ISOLATION=unshare bash scripts/e2e_ui.sh; }
+# Same seed as CI (fsft@b1125d8 from the cached clone). TRACES_E2E_SEED=synthetic ci/run_local.sh e2e for a fast run.
+job_e2e() {
+  local seed="${TRACES_E2E_SEED:-fsft}"
+  if [ "$seed" = "fsft" ]; then need_target || return 1; fi
+  py_env && toolchain_env && web_env && userns || return 1
+  TRACES_ISOLATION=unshare TRACES_E2E_SEED="$seed" TRACES_E2E_FSFT_REPO="$ROOT/$TARGET_PATH" bash scripts/e2e_ui.sh
+}
 
 {
   echo "date: $(date '+%Y-%m-%d %H:%M:%S %Z')"
