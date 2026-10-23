@@ -39,4 +39,45 @@ describe("TraceView", () => {
     );
     expect(within(container).getAllByTestId("gap-hidden")[0]!.textContent).toContain("47 rejected relationships are hidden from this trace");
   });
+
+  it("F-9: shows unresolved calls as their own gap, never as a symbol, and gives the API reasons", async () => {
+    const start = traceSample.hops.find((h) => h.index === 1)!;
+    const t = {
+      ...traceSample,
+      to_symbol: null,
+      hops: [
+        { ...start, index: 0 },
+        { ...start, index: 1, type: "gap" as const, to_symbol: "(unresolved)", claim_id: null, status: null, label: "inferred" as const, reason: "2 outgoing call(s) from this step are recorded only as unresolved references", unresolved_calls: ["mutation.mutate", "reset"] },
+      ],
+      complete: false,
+      incomplete_reasons: ["gaps: 1"],
+    };
+    const { container } = render(
+      <MemoryRouter>
+        <TraceView t={t} reviewHref="/review" onEvidence={() => {}} />
+      </MemoryRouter>,
+    );
+    const steps = within(within(container).getByRole("list", { name: "Trace steps in order" })).getAllByRole("listitem");
+    expect(steps[1]!.textContent).toContain("Gap: calls the trace cannot follow");
+    expect(within(steps[1]!).getByTestId("unresolved-calls").textContent).toBe("Unresolved calls:mutation.mutatereset");
+    expect(steps[1]!.textContent).not.toContain("(unresolved)");
+    expect(steps[1]!.textContent).toContain("did not resolve them to a declaration");
+    expect(steps[1]!.textContent).not.toContain("connects these two steps");
+    expect(within(container).getByTestId("trace-incomplete").textContent).toContain("1 step with calls the trace cannot follow");
+    expect(within(container).getByTestId("trace-incomplete-reasons").textContent).toBe("API reasons: gaps: 1");
+    const r = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(r.violations.map((v) => v.id)).toEqual([]);
+  });
+
+  it("F-9: a trace without gaps can still be incomplete because a step is not verified or observed", () => {
+    const t = { ...traceSample, hops: traceSample.hops.filter((h) => h.type !== "gap"), complete: false, incomplete_reasons: ["1 step(s) rest on relationships that are not verified or observed"] };
+    const { container } = render(
+      <MemoryRouter>
+        <TraceView t={t} reviewHref="/review" onEvidence={() => {}} />
+      </MemoryRouter>,
+    );
+    const v = within(container);
+    expect(v.getByTestId("trace-incomplete").textContent).toBe("Incomplete: 1 step rests on a relationship that is not verified or observed.");
+    expect(within(container).getByTestId("trace-incomplete").textContent).not.toContain("gap");
+  });
 });

@@ -4,7 +4,7 @@ import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { GapHidden } from "./GapHidden";
-import { GAP_MEANING, orderedHops, traceSummary, type HopView } from "./traceModel";
+import { GAP_MEANING, UNRESOLVED_MEANING, incompleteText, orderedHops, traceSummary, unresolvedCalls, type HopView } from "./traceModel";
 
 function Sym({ id }: { id: string }) {
   const s = splitSymbol(id);
@@ -18,6 +18,7 @@ function Sym({ id }: { id: string }) {
 
 function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvidence: (id: string) => void; snapshotHidden: Record<string, number> | null | undefined; reviewHref: string }) {
   const { hop } = v;
+  const calls = unresolvedCalls(hop);
   return (
     <li className="flow-hop" data-hop={v.kind}>
       {v.kind === "hidden" ? (
@@ -39,7 +40,20 @@ function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvid
           </div>
           <div className="flow-node">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">To</span>
-            <Sym id={hop.to_symbol} />
+            {calls ? (
+              <span className="min-w-0" data-testid="unresolved-calls">
+                <span className="block text-sm">Unresolved calls:</span>
+                <span className="flex flex-wrap gap-1">
+                  {calls.map((c) => (
+                    <code key={c} className="break-all font-semibold">
+                      {c}
+                    </code>
+                  ))}
+                </span>
+              </span>
+            ) : (
+              <Sym id={hop.to_symbol} />
+            )}
           </div>
           <div className="flow-span flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {hop.index + 1}</span>
@@ -50,7 +64,7 @@ function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvid
               <div className="flow-span flex flex-col gap-1 text-sm" data-testid="hop-reason">
                 <p data-testid="gap-meaning">
                   <span className="font-semibold">What this gap means: </span>
-                  {GAP_MEANING}
+                  {calls ? UNRESOLVED_MEANING : GAP_MEANING}
                 </p>
                 <GapHidden hop={hop} snapshotHidden={snapshotHidden} reviewHref={reviewHref} />
                 <p className="text-ink-2">
@@ -107,9 +121,15 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
           </p>
         ) : (
           <p className="text-sm font-semibold text-inferred" role="note" data-testid="trace-incomplete">
-            Incomplete: this trace has gaps. A gap is a step that no accepted static evidence connects. It is not evidence that a call does or does not happen.
+            {incompleteText(t)}
           </p>
         )}
+        {!t.complete && t.incomplete_reasons?.length ? (
+          <p className="text-xs text-ink-2" data-testid="trace-incomplete-reasons">
+            <span className="font-semibold">API reasons: </span>
+            {t.incomplete_reasons.join("; ")}
+          </p>
+        ) : null}
         <p className="text-xs text-muted">{t.disclaimer}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
           <li>Solid border: a recorded relationship.</li>
