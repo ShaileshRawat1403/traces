@@ -61,6 +61,8 @@ class Module:
                         self.top[t.id] = d
             if isinstance(ch, (ast.Import, ast.ImportFrom)) and parent is None:
                 modname = ch.module if isinstance(ch, ast.ImportFrom) else ch.names[0].name
+                if isinstance(ch, ast.ImportFrom) and ch.level:
+                    modname = "." * ch.level + (ch.module or "")  # F-4: relative imports keep their dots, as CodeGraph names them
                 self.decls.append(Decl(modname, type(ch).__name__, ch, ch.lineno, ch.lineno, ch.end_lineno, None, self.path))
                 for a in ch.names:
                     if isinstance(ch, ast.Import):
@@ -87,6 +89,24 @@ class Module:
 
     def seg(self, node):
         return ast.get_source_segment(self.text, node) or ast.unparse(node)
+
+
+def _is_overload_stub(node):
+    """`@overload`, `@typing.overload` or `@t.overload` (any alias of the typing module): a type-checking stub that the
+    runtime definition after it replaces."""
+    for dec in getattr(node, "decorator_list", []):
+        if (isinstance(dec, ast.Name) and dec.id == "overload") or (isinstance(dec, ast.Attribute) and dec.attr == "overload"):
+            return True
+    return False
+
+
+def _class_member(decls, cls_node, name):
+    """The declaration a class-body name binds. F-5: @overload stubs are skipped, so a call resolves to the
+    implementation that replaces them at runtime. Otherwise the first definition (unchanged behaviour, e.g. a property
+    getter before its setter)."""
+    cands = [d for d in decls if d.node in cls_node.body and d.name == name]
+    real = [d for d in cands if not _is_overload_stub(d.node)]
+    return (real or cands or [None])[0]
 
 
 class Py:
@@ -192,9 +212,9 @@ class Py:
                 cls = self.enclosing_class(m, expr)
                 if cls is None:
                     return ("unresolved", "self outside class", [])
-                for d in m.decls:
-                    if d.node in cls.body and d.name == expr.attr:
-                        return ("decl", d, [])
+                d = _class_member(m.decls, cls, expr.attr)
+                if d is not None:
+                    return ("decl", d, [])
                 return ("unresolved", f"{expr.attr} not defined in class {cls.name} body", [])
             base = self.resolve_expr(m, expr.value)
             if base[0] == "module":
@@ -204,9 +224,9 @@ class Py:
                     sub = None
                 return r
             if base[0] == "decl" and base[1].kind == "ClassDef":
-                for d in self.mod(base[1].file).decls:
-                    if d.node in base[1].node.body and d.name == expr.attr:
-                        return ("decl", d, base[2])
+                d = _class_member(self.mod(base[1].file).decls, base[1].node, expr.attr)
+                if d is not None:
+                    return ("decl", d, base[2])
                 return ("unresolved", f"{expr.attr} not in class {base[1].name} body (inherited or instance attribute)", base[2])
             if base[0] == "external":
                 return ("external", f"{base[1]}.{expr.attr}", base[2])
@@ -347,7 +367,11 @@ class PyValidator:
             first = loc(t["src"]["file"], n.lineno, n.lineno, "site", "site", range_rule="expression"); site = site + [first]; self.added.append(first)
         if g["kind"] == "import":
             modname = n.module if isinstance(n, ast.ImportFrom) else n.names[0].name
-            ok = modname == g["name"] and g["file"] == t["src"]["file"]
+            # F-4: a relative import is spelled with its dots (`from .enc import x` -> ".enc", `from . import x` -> "."),
+            # which is how CodeGraph names it; ast keeps the dots in ImportFrom.level, not in .module
+            spelled = ("." * n.level + (n.module or "")) if isinstance(n, ast.ImportFrom) and n.level else modname
+            ok = g["name"] in {modname, spelled} - {None} and g["file"] == t["src"]["file"]
+            modname = spelled
             # Decision 002-B correction A: the target is this file's own import node (library module or asset); this observes the statement, it resolves nothing
             return chk("parser_presence", "presence", None, site + [loc(g["file"], g["start_line"], g["end_line"], "to_decl", "declaration")], exp, "pass" if ok else "fail", f"module {m.path} has {type(n).__name__} of {modname!r} at line {L} (import statement observed; target outside validator scope, not resolved)")
         if g["kind"] == "file":

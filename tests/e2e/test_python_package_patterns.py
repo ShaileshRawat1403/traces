@@ -75,18 +75,13 @@ def test_relative_imports_are_extracted(indexed):
     assert rel, "CodeGraph should report the relative imports"
 
 
-@pytest.mark.xfail(strict=True, reason="FINDING F-4 (Traces seat, validators/python_ast.py import_check): a relative import "
-                   "(`from .enc import x`) is rejected. The check compares ast ImportFrom.module ('enc') with CodeGraph's name "
-                   "('.enc') and ignores ImportFrom.level, so a true import statement gets status rejected. itsdangerous@672971d: "
-                   "46 of 46 rejected imports are true relative imports; markupsafe@4e11127: 2 of 2.")
+# Regression guard for F-4, fixed in PR #27.
 def test_relative_imports_not_rejected(indexed):
     rel = [r for r in _rels(indexed["recs"], "imports") if r["to"]["symbol"].split("::")[-1].startswith(".")]
     assert rel and all(r["status"] != "rejected" for r in rel), [(r["statement"], r["status"]) for r in rel]
 
 
-@pytest.mark.xfail(strict=True, reason="FINDING F-5 (Traces seat, validators/python_ast.py binding_resolution): with @typing.overload "
-                   "stubs, `self.unsign(...)` is resolved to the first stub, not the last (runtime) definition, so CodeGraph's correct "
-                   "edge to the implementation is rejected. itsdangerous@672971d: TimestampSigner.validate -> unsign at timed.py:164.")
+# Regression guard for F-5, fixed in PR #27.
 def test_overload_call_to_implementation_not_rejected(indexed):
     calls = [r for r in _rels(indexed["recs"], "calls") if r["to"]["symbol"].endswith("Signer::unsign")
              and r["from"]["symbol"].endswith("Signer::validate")]

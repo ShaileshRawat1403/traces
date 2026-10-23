@@ -127,3 +127,17 @@ def test_interrupted_jobs_are_failed_on_startup(tmp_path):
     assert {get_job(st, j)["error_code"] for j in ("old1", "old2")} == {"interrupted"}
     assert st.get_snapshot(sid)["state"] == "failed"
     r.shutdown()
+
+
+def test_unknown_sha_is_refused_before_any_job_or_snapshot(env):
+    """F-6: a well-formed SHA that is not in the repository is refused with 422 sha_not_found; no snapshot row, job
+    or clone is created."""
+    c, st, holder = env
+    probe = app.dependency_overrides[get_head_probe]()
+    missing = "0" * 39 + "1"
+    probe.missing.add(missing)
+    r = c.post(f"/api/v1/repos/{RID}/index-jobs", json={"sha": missing})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "sha_not_found", r.text
+    assert st.get_snapshot(f"{RID}@{missing}") is None
+    assert st.db.execute("SELECT count(*) FROM jobs WHERE repo_id=?", (RID,)).fetchone()[0] == 0
+    assert c.post(f"/api/v1/repos/{RID}/index-jobs", json={"sha": "e" * 40}).status_code == 202  # existing commit

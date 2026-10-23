@@ -2,7 +2,8 @@
 # Traces worker sandbox (port of research/task002/tools/offline.sh).
 # Runs a command in a new user + network namespace (only a DOWN loopback), telemetry off, sandboxed HOME,
 # credentials stripped from the environment, and resource limits. Usage: sandbox.sh <command> [args...]
-# Env in: TRACES_SANDBOX_HOME (empty dir), TRACES_TOOLCHAIN_DIR, TRACES_ISOLATION (unshare|none),
+# Env in: TRACES_SANDBOX_HOME (empty dir), TRACES_TOOLCHAIN_DIR, TRACES_ISOLATION (unshare|off; anything else, including
+#         the old "none", is refused with exit 64: the caller resolves "auto" and fails closed, D-026),
 #         TRACES_LIMIT_CPU_S (default 1800), TRACES_LIMIT_NOFILE (default 4096), TRACES_LIMIT_FSIZE_KB (default 4 GiB),
 #         TRACES_LIMIT_AS_KB (default unset: V8/WebAssembly reserve large virtual ranges, so an address-space
 #         limit breaks CodeGraph; memory capping is an open item, see docs/DECISIONS.md D-006).
@@ -21,6 +22,6 @@ ulimit -t "${TRACES_LIMIT_CPU_S:-1800}" 2>/dev/null || true
 ulimit -n "${TRACES_LIMIT_NOFILE:-4096}" 2>/dev/null || true
 case "${TRACES_ISOLATION:-unshare}" in
   unshare) exec unshare -rn -- "$@" ;;
-  none) echo "sandbox.sh: WARNING isolation=none, network NOT isolated" >&2; exec "$@" ;;
-  *) echo "sandbox.sh: unknown TRACES_ISOLATION=${TRACES_ISOLATION}" >&2; exit 64 ;;
+  off) echo "sandbox.sh: WARNING TRACES_ISOLATION=off (explicit dev override), network NOT isolated" >&2; exec "$@" ;;
+  *) echo "sandbox.sh: E_ISOLATION unsupported TRACES_ISOLATION=${TRACES_ISOLATION} (use unshare, or off for a dev run)" >&2; exit 64 ;;
 esac

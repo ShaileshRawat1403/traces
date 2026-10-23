@@ -69,8 +69,8 @@ SQLite at `$TRACES_DATA_DIR/traces.sqlite3` (default `.traces-data/`). Migration
 
 | Table | Purpose |
 | --- | --- |
-| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch; 0002: `visibility_checked_at`, `external_ai_consent` (D-021) |
-| `snapshots` | id, repo_id, sha, state (`pending`/`indexing`/`ready`/`failed`), evidence_schema, extractor pins, languages, frameworks, `generated_paths`, stats |
+| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch; 0002: `visibility_checked_at`, `external_ai_consent` (D-021); 0003: `external_ai_consent_at`, `external_ai_consent_text_version` (D-027) |
+| `snapshots` | id, repo_id, sha, state (`pending`/`indexing`/`ready`/`failed`), evidence_schema, extractor pins, languages, frameworks, `generated_paths`, stats; 0003: `isolation` (`unshare`/`off`, D-026) |
 | `jobs` | id, repo, snapshot, kind, state, phase, progress, message, error code/detail, `version` (ETag), timestamps |
 | `job_events` | append-only progress log per job |
 | `runs` | pipeline runs per snapshot with their run directory and result |
@@ -106,6 +106,7 @@ Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "d
 | 4.1 | `GET /health`, `GET /meta` | liveness, versions, schema, pins, isolation mode, capability flags | implemented |
 | 4.2 | `POST /repos` `{url, sha?}` | validate, confirm public with an anonymous `ls-remote`, register, pin a `pending` snapshot at `sha` or HEAD (no clone; D-021) | implemented |
 | | `GET /repos`, `GET /repos/{id}` | list, get | implemented |
+| | `PUT /repos/{id}/ai-consent` `{consent, consent_text_version}` | record or revoke repo-level consent to send evidence to an external AI provider, with time and consent-text version (D-027) | implemented |
 | | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`); cached 60 s, rate limited | implemented |
 | 4.3 | `GET /repos/{id}/snapshots`, `GET S` | snapshots and metadata | implemented |
 | 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job, `Location`); active job for the same snapshot is returned; ready snapshot without `reindex` -> 409 `already_indexed` (D-022) | implemented |
@@ -113,7 +114,7 @@ Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "d
 | 4.5 | `GET S/overview` | business / architecture / implementation facts, each tagged fact, interpretation or unknown, with claim ids | implemented (D-024). Purpose is unknown unless a README heading is quoted as interpretation |
 | 4.6 | `GET S/components` | deterministic components and layers with claim counts | implemented (D-024). Rows are what the index stored |
 | 4.7 | `GET S/routes` | route and API inventory with status and claim ids | implemented (D-024). Method is UNKNOWN when the record does not carry one |
-| 4.8 | `GET S/graph?focus&depth&layer&rel&status&q&include_rejected&limit` | filtered graph or neighborhood (`focus`, `depth` 0-4); static relationships only; `hidden_counts` by status; `truncated` | implemented (D-024). History patterns are not edges here |
+| 4.8 | `GET S/graph?focus&depth&layer&rel&status&q&include_rejected&limit` | filtered graph or neighborhood (`focus`, `depth` 0-4); static relationships only; `hidden_counts` by status (scoped to filters and focus, D-028); `truncated`, `truncated_counts` by status | implemented (D-024). History patterns are not edges here |
 | 4.9 | `GET S/claims?status&claim_kind&kind&symbol&file&include_rejected&offset&limit` | claim list; rejected excluded unless `include_rejected=true`; `hidden_counts` | implemented |
 | | `GET S/claims/{claim_id}` | evidence by claim: full 0.4 record (locations, checks, status history, provenance, citations) | implemented |
 | | `GET S/export` | NDJSON export of all 0.4 records | implemented |

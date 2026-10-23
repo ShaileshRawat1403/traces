@@ -19,8 +19,8 @@ let ctx = CTXS[DEFAULT_PROJ], checker = ctx.checker;
 function projOf(file) { let best = DEFAULT_PROJ, n = -1; for (const pr of PROJECTS) { if ((pr === '' || (file || '').startsWith(pr + '/')) && pr.length > n) { best = pr; n = pr.length; } } return best; }
 function useCtxFor(file) { ctx = CTXS[projOf(file)]; checker = ctx.checker; }
 const VALIDATOR = {name: 'traces-ts-validator 1.0.0', version: 'typescript ' + ts.version, family: 'typescript-compiler'};
-const blobs = (() => { const m = new Map(); const out = require('child_process').execFileSync('git', ['-C', job.root, 'ls-tree', '-r', job.sha], {encoding: 'utf8', env: {...process.env, GIT_OPTIONAL_LOCKS: '0'}, maxBuffer: 1 << 26});
-  for (const l of out.split('\n')) { const t = l.split('\t'); if (t.length === 2) m.set(t[1], t[0].split(' ')[2]); } return m; })();
+const blobs = (() => { const m = new Map(); const out = require('child_process').execFileSync('git', ['-C', job.root, 'ls-tree', '-r', '-z', '--full-tree', job.sha], {encoding: 'utf8', env: {...process.env, GIT_OPTIONAL_LOCKS: '0'}, maxBuffer: 1 << 26});
+  for (const l of out.split('\0')) { const i = l.indexOf('\t'); const t = i < 0 ? [] : [l.slice(0, i), l.slice(i + 1)]; if (t.length === 2) m.set(t[1], t[0].split(' ')[2]); } return m; })();
 const crypto = require('crypto');
 const sfCache = new Map();
 function sourceFile(rel) {

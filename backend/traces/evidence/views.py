@@ -43,6 +43,18 @@ class ViewError(Exception):
         self.status, self.code, self.message = status, code, message
 
 
+INJECTED_FLAG = "injected_control"
+
+
+def output_flags(rec: dict[str, Any]) -> list[str]:
+    """Record flags for API output. An injected record (a Task 002 negative control fed to the validators, never a
+    statement about the repository) always carries `injected_control`, so lists and graphs cannot read it as a repo fact."""
+    flags = list(rec.get("flags") or [])
+    if rec.get("injected") and INJECTED_FLAG not in flags:
+        flags.append(INJECTED_FLAG)
+    return flags
+
+
 def summary(rec: dict[str, Any]) -> dict[str, Any]:
     return {
         "claim_id": rec["claim_id"],
@@ -56,7 +68,8 @@ def summary(rec: dict[str, Any]) -> dict[str, Any]:
         "to_symbol": (rec.get("to") or {}).get("symbol"),
         "statement": rec["statement"],
         "qualifier": rec.get("qualifier"),
-        "flags": list(rec.get("flags") or []),
+        "flags": output_flags(rec),
+        "injected": bool(rec.get("injected")),
     }
 
 
@@ -397,12 +410,10 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
     want_layer = set(layer or [])
     want_rel = set(rel or [])
     needle = (q or "").strip().lower()
-    hidden: Counter[str] = Counter()
+    # Filters first, then the status split, so hidden_counts describe what this request would otherwise have shown.
+    hidden_recs: list[dict[str, Any]] = []
     edges_all = []
     for rec in load_records(st, snapshot_id, scopes={"static"}, claim_kind="relationship"):
-        if rec.get("status") not in allowed:
-            hidden[str(rec.get("status"))] += 1
-            continue
         src = (rec.get("from") or {}).get("symbol")
         dst = (rec.get("to") or {}).get("symbol")
         if not src or not dst:
@@ -418,6 +429,9 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
             blob = " ".join(str(x) for x in (rec.get("statement"), kind, src, dst, *files)).lower()
             if needle not in blob:
                 continue
+        if rec.get("status") not in allowed:
+            hidden_recs.append(rec)
+            continue
         edges_all.append(rec)
 
     by_src: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -435,6 +449,7 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
     chosen = edges_all
     focus_id: str | None = None
     focus_ep: dict[str, Any] | None = None
+    focus_scope: set[str] | None = None  # symbols whose hidden edges count toward hidden_counts when focused
     if focus:
         focus_id = _resolve(focus, set(nodes_eps))
         comp_focus = by_comp.get(focus) if focus_id is None else None
@@ -450,6 +465,11 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
                 r for r in edges_all
                 if (r.get("from") or {}).get("symbol") in members or (r.get("to") or {}).get("symbol") in members
             ]
+            focus_scope = members | {
+                sym for r in hidden_recs for ep in (r.get("from") or {}, r.get("to") or {})
+                if isinstance(sym := ep.get("symbol"), str) and isinstance(f := ep.get("file"), str)
+                and file_comp.get(f) == comp_focus["id"]
+            }
             focus_id = None
         else:
             assert focus_id is not None
@@ -469,10 +489,24 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
                 frontier = nxt
                 if not frontier:
                     break
+            focus_scope = seen if depth > 0 else {focus_id}
             if depth == 0:
                 chosen = []
             else:
                 chosen = [r for r in edges_all if (r.get("from") or {}).get("symbol") in seen and (r.get("to") or {}).get("symbol") in seen]
+
+    # hidden_counts are scoped like the edges: the whole (filtered) snapshot when unfocused, otherwise only hidden
+    # edges that touch the focused neighbourhood or component (F5).
+    def ends(rec: dict[str, Any]) -> tuple[str | None, str | None]:
+        return (rec.get("from") or {}).get("symbol"), (rec.get("to") or {}).get("symbol")
+
+    if not focus:
+        scope_hidden = hidden_recs
+    elif focus_scope is None:
+        scope_hidden = []
+    else:
+        scope_hidden = [r for r in hidden_recs if any(e in focus_scope for e in ends(r))]
+    hidden: Counter[str] = Counter(str(r.get("status")) for r in scope_hidden)
 
     def rank(rec: dict[str, Any]) -> tuple[int, int, str]:
         kind = rec.get("relationship_kind") or ""
@@ -481,6 +515,8 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
 
     chosen.sort(key=rank)
     truncated = len(chosen) > limit
+    # edges cut by the limit are counted by status, so e.g. rejected edges sorted last are never silently lost (F4)
+    truncated_counts: Counter[str] = Counter(str(r.get("status")) for r in chosen[limit:])
     chosen = chosen[:limit]
 
     deg: Counter[str] = Counter()
@@ -498,7 +534,7 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
         edges.append({
             "id": rec["claim_id"], "source": src, "target": dst, "kind": rec.get("relationship_kind") or "",
             "status": rec["status"], "label": rec["label"], "qualifier": rec.get("qualifier"),
-            "flags": list(rec.get("flags") or []),
+            "flags": output_flags(rec), "injected": bool(rec.get("injected")),
         })
 
     nodes: list[dict[str, Any]] = []
@@ -517,7 +553,7 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
     for node in nodes:
         node["degree"] = int(deg.get(str(node["id"]), 0))
     return {"snapshot_id": snapshot_id, "nodes": nodes, "edges": edges, "hidden_counts": dict(hidden),
-            "truncated": truncated, "limit": limit}
+            "truncated": truncated, "truncated_counts": dict(truncated_counts), "limit": limit}
 
 
 def _resolve(query: str, nodes: set[str]) -> str | None:
@@ -548,7 +584,7 @@ def _hop(i: int, rec: dict[str, Any] | None, frm: str, to: str, *, gap: str | No
     return {"index": i, "type": "library_contract" if library else "edge", "claim_id": rec["claim_id"],
             "from_symbol": (rec.get("from") or {}).get("symbol") or frm, "to_symbol": (rec.get("to") or {}).get("symbol") or to,
             "kind": kind, "status": rec["status"], "label": rec["label"], "reason": reason,
-            "qualifier": rec.get("qualifier"), "evidence_scope": "static"}
+            "qualifier": rec.get("qualifier"), "evidence_scope": "static", "injected": bool(rec.get("injected"))}
 
 
 def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include_rejected: bool = False) -> dict[str, Any]:
@@ -625,13 +661,23 @@ def _shortest(outgoing: dict[str, list[tuple[int, str, dict[str, Any]]]], start:
 
 
 def safe_repo_path(path: str) -> str:
-    if not path or "\x00" in path or "\n" in path or "\r" in path or "\\" in path:
-        raise ViewError(422, "invalid_request", "path must be a relative path inside the repository")
+    """Validate a repository-relative path from a request. Refuses what could escape the tree or confuse Git (NUL,
+    newlines, backslashes, absolute or home-relative paths, `..` components) with a message naming the actual problem.
+    A leading `-` is a legal file name (`-rf.py`): paths only ever reach Git inside a `<sha>:<path>` revision argument
+    after `--end-of-options`, so they cannot be read as options (security finding F-2)."""
+    if not path:
+        raise ViewError(422, "invalid_request", "path is required")
+    if "\x00" in path or "\n" in path or "\r" in path:
+        raise ViewError(422, "invalid_request", "path must not contain NUL or line-break characters")
+    if "\\" in path:
+        raise ViewError(422, "invalid_request", "path must use forward slashes, not backslashes")
     if path.startswith("/") or path.startswith("~"):
-        raise ViewError(422, "invalid_request", "path must be a relative path inside the repository")
-    parts = Path(path).parts
-    if any(p == ".." for p in parts) or path.startswith("-"):
-        raise ViewError(422, "invalid_request", "path must stay inside the repository")
+        raise ViewError(422, "invalid_request", "path must be relative to the repository root, not absolute or home-relative")
+    parts = [p for p in Path(path).parts if p != "."]
+    if any(p == ".." for p in parts):
+        raise ViewError(422, "invalid_request", "path must not contain '..' components")
+    if not parts:
+        raise ViewError(422, "invalid_request", "path must name a file inside the repository")
     return "/".join(parts)
 
 
@@ -640,7 +686,7 @@ def _git_blob(checkout: Path, sha: str, path: str) -> str:
         raise ViewError(404, "not_found", "the pinned checkout is not on this machine; index the snapshot here to read source")
     spec = f"{sha}:{path}"
     try:
-        p = subprocess.run(["git", "-C", str(checkout), "cat-file", "blob", spec], capture_output=True, timeout=30, check=False)
+        p = subprocess.run(["git", "-C", str(checkout), "cat-file", "blob", "--end-of-options", spec], capture_output=True, timeout=30, check=False)
     except (OSError, subprocess.TimeoutExpired) as e:
         raise ViewError(404, "not_found", f"could not read {path} from the pinned checkout") from e
     if p.returncode != 0:
@@ -649,7 +695,7 @@ def _git_blob(checkout: Path, sha: str, path: str) -> str:
 
 
 def _blob_sha(checkout: Path, sha: str, path: str) -> str:
-    p = subprocess.run(["git", "-C", str(checkout), "rev-parse", f"{sha}:{path}"], capture_output=True, text=True, timeout=30, check=False)
+    p = subprocess.run(["git", "-C", str(checkout), "rev-parse", "--verify", "--quiet", "--end-of-options", f"{sha}:{path}"], capture_output=True, text=True, timeout=30, check=False)
     if p.returncode != 0:
         raise ViewError(404, "not_found", f"{path} is not in the tree at {sha[:12]}")
     return p.stdout.strip()

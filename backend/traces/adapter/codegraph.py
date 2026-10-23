@@ -1,7 +1,7 @@
 """CodeGraph 1.6.2 -> Traces evidence records (pipeline format traces-evidence/0.3; migrated to 0.4 downstream).
 Ported from research/task002/adapter/cg_adapter.py (ADAPTER_CONTRACT v2 with Decision 002-B amendments).
 Changes from research: package imports, portable paths from the manifest, the registry record is a committed JSON
-file (toolchain/registry_record.json) instead of a setup log, and a documented isolation fallback (section 9).
+file (toolchain/registry_record.json) instead of a setup log, and no isolation fallback: check 4.7 is skipped only for the explicit TRACES_ISOLATION=off dev override (D-026).
 CodeGraph is an extractor only: the adapter never sets observed or verified. Reads the index with mode=ro&immutable=1.
 Usage: python -m traces.adapter.codegraph --manifest <manifest.json>
 Exit 0 with records.jsonl + report.json, or exit 2 with errors.json and no records (fail closed)."""
@@ -197,12 +197,17 @@ class Adapter:
         self.checks_done.append("4.6 tables and columns")
 
     def c47(self):
-        if self.m["env"].get("isolation") == "none":
-            # Documented fallback (docs/DECISIONS.md D-006): no network namespace available. Recorded, never silent.
+        iso = self.m["env"].get("isolation")
+        if iso == "off":
+            # Explicit dev override only (TRACES_ISOLATION=off, D-026): recorded on the snapshot as unisolated and never
+            # acceptance evidence. "auto" never resolves to this; there is no silent fallback.
             self.adapter_ns = os.readlink("/proc/self/ns/net") if os.path.exists("/proc/self/ns/net") else None
-            self.warnings.append("isolation fallback: no network namespace; network isolation NOT enforced for this run")
-            self.checks_done.append("4.7 SKIPPED: isolation=none (fallback)")
+            self.warnings.append("isolation off (explicit TRACES_ISOLATION=off dev override); network isolation NOT enforced, "
+                                 "snapshot is unisolated and not acceptance evidence")
+            self.checks_done.append("4.7 SKIPPED: isolation=off (explicit dev override)")
             return
+        if iso != "unshare":
+            raise AdapterError("E_ISOLATION", f"isolation {iso!r} cannot be shown; only unshare (or the explicit off override) is accepted")
         p = self.m["env"]["netprobe_log"]
         if not os.path.exists(p):
             raise AdapterError("E_ISOLATION", f"no per-run probe log at {p}")

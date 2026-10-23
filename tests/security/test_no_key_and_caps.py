@@ -45,9 +45,6 @@ def test_keys_cannot_be_submitted(indexed_hostile: Indexed, hostile_client, fiel
         assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_request", r.text
 
 
-@pytest.mark.xfail(strict=True, reason="FINDING F-3 (Traces seat, api/app.py _validation_error): the 422 envelope copies pydantic's "
-                   "errors() including 'input', so a key sent by mistake (or any rejected field value) is echoed back in the "
-                   "response body, where proxies and browser logs can keep it.")
 def test_submitted_key_not_echoed(indexed_hostile: Indexed, hostile_client):
     b = f"/api/v1/repos/{indexed_hostile.repo_id}/snapshots/{indexed_hostile.sha}"
     r = hostile_client.post(f"{b}/explain", json={"question": "x", "api_key": "sk-test-not-a-real-key"})

@@ -190,9 +190,12 @@ def test_source_reads_git_objects_and_rejects_escape(client, st: Store):
     snap["sha"] = git_sha  # the fixture snapshot SHA is not this throwaway commit
     body = source_view(st, snap, path="a.py", start=3, end=3, checkout=st.checkout)  # type: ignore[attr-defined]
     assert body["lines"] == ["foo()"] and _id(1) in body["claim_ids"]
-    for bad in ("../secrets", "/etc/passwd", "a.py/../../x", "-n"):
+    for bad in ("../secrets", "/etc/passwd", "a.py/../../x"):
         r = http.get(f"{BASE}/source", params={"path": bad})
         assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_request", bad
+    # a leading dash is a legal file name, never a git option (F-2): absent here, so 404, not a 422
+    r = http.get(f"{BASE}/source", params={"path": "-n"})
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
     with pytest.raises(ViewError) as ei:
         source_view(st, snap, path="nope.py", start=1, end=None, checkout=st.checkout)  # type: ignore[attr-defined]
     assert ei.value.status == 404
