@@ -83,6 +83,8 @@ class ClaimView:
     support: int | None = None
     union: int | None = None
     degree: float | None = None
+    # Files in a grouped directory move (prefix_moved), from metrics or provenance_raw.
+    files: int | None = None
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
@@ -219,5 +221,6 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         else None,
         union=int(uni) if (uni := _num(record.get("metrics"), "union_commits")) is not None else None,
         degree=_num(record.get("metrics"), "degree"),
+        files=int(fl) if (fl := _num(record.get("metrics"), "files") or _num(raw, "files")) is not None else None,
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )

@@ -47,6 +47,28 @@ DEFINITION = [
     re.compile(rf"^\s*(?:what\s+is|tell\s+me\s+about|explain|describe|show)\s+{ONE}\s*\??\s*$", re.I),
     re.compile(rf"^\s*{ONE}\s*\??\s*$", re.I),
 ]
+# A route named by method and path ("POST /register"), or "route /path" / "endpoint /path".
+HTTP_METHOD = r"(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|USE)"
+ROUTE_PATH = r"(/[\w/:{}.\-*~]*)"
+ROUTE_ONE = [
+    re.compile(rf"(?<![\w/])({HTTP_METHOD})\s+`?{ROUTE_PATH}`?", re.I),
+    re.compile(rf"\b(?:route|endpoint|path)\s+`?{ROUTE_PATH}`?", re.I),
+]
+# Directory moves and renames: "When was A moved to B?", "move from A to B", "Where did A move?".
+MOVE = re.compile(r"\b(mov(?:e|ed|es|ing)|renam(?:e|ed|es|ing)|relocat\w*)\b", re.I)
+DIR = r"`?(?P<{}>[\w.{{}}@-]+(?:/[\w.{{}}@-]+)*/?)`?"
+MOVE_PATTERNS = [
+    re.compile(rf"\bfrom\s+{DIR.format('a')}\s+(?:to|into)\s+{DIR.format('b')}", re.I),
+    re.compile(
+        rf"\b(?:was|were|did|has|have|is)\s+(?:the\s+)?{DIR.format('a')}\s+(?:(?:get|been)\s+)?(?:directory\s+|folder\s+)?"
+        rf"(?:moved|move|renamed|rename|relocated)\b(?:\s+(?:to|into|as)\s+{DIR.format('b')})?",
+        re.I,
+    ),
+    re.compile(
+        rf"\b(?:moved|move|renamed|rename)\s+(?:of\s+)?{DIR.format('a')}\s+(?:to|into|as)\s+{DIR.format('b')}", re.I
+    ),
+]
+
 # A file named in a question: a path with a slash, or a name with an extension (crud.py, Alpha.tsx).
 FILE_TOKEN = re.compile(r"`?((?:[\w.@-]+/)*[\w@-][\w.@-]*\.[A-Za-z][\w]{0,9}|(?:[\w.@-]+/)+[\w.@-]+)`?")
 COCHANGE = re.compile(
@@ -80,6 +102,9 @@ NOT_SYMBOL = frozenset(
     "service codebase library package page pages file files function functions".split()
 )
 
+NOT_DIR = frozenset(
+    "the a an this that it its these those they them what which who directory directories folder folders files".split()
+)
 HISTORY_WORDS = frozenset("other others each together commits commit history time files file".split())
 
 SUGGESTIONS = (
@@ -87,6 +112,8 @@ SUGGESTIONS = (
     "What calls <symbol>?",
     "Trace from <symbol> to <symbol>",
     "Which routes are declared?",
+    "What does POST /path do?",
+    "When was <dir> moved to <dir>?",
     "How is data persisted?",
     "Which files changed together?",
     "Which files changed together with <path/to/file.py>?",
@@ -96,7 +123,7 @@ SUGGESTIONS = (
 
 @dataclass(frozen=True)
 class Intent:
-    name: str  # runtime | trace | commit | cochange | dependencies | dependents | definition | history | routes | persistence | docs | unsupported
+    name: str  # runtime | trace | commit | route | move | cochange | dependencies | dependents | definition | history | routes | persistence | docs | unsupported
     entities: tuple[str, ...] = ()
     reason: str = ""
 
@@ -143,6 +170,21 @@ def classify(question: str) -> Intent:
     for p in COMMIT:
         if m := p.search(q):
             return Intent("commit", (m.group(1).lower(),))
+    # A named route: method and path (method may be empty for "route /x").
+    for p in ROUTE_ONE:
+        if m := p.search(q):
+            if m.lastindex == 2:
+                return Intent("route", (m.group(1).upper(), m.group(2)))
+            return Intent("route", ("", m.group(1)))
+    # Directory moves: the named directories are the entities (none named lists the recorded moves).
+    if MOVE.search(q):
+        for p in MOVE_PATTERNS:
+            if m := p.search(q):
+                names = [_clean(x).strip("/") for x in (m.group("a"), m.groupdict().get("b")) if x]
+                names = [n for n in names if n and n.lower() not in NOT_DIR]
+                if names:
+                    return Intent("move", tuple(dict.fromkeys(names)))
+        return Intent("move")
     # Co-change: the files it names are the entities. A bare name is kept for exact resolution against stored paths.
     if COCHANGE.search(q):
         files = files_in(q)
