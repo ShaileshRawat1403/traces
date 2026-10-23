@@ -81,13 +81,10 @@ The one overclaim is the trace's "Complete" label (F-9). It hides the unresolved
 
 ## BYOK chat (G-5)
 
-The box app is still the 12:09 IST start on `35499bc` and has not been restarted on the new head. `/api/v1/meta` reports `chat_bundle: true`, but `35499bc` has no BYOK chat UI. Nothing changed for G-5.
+Superseded: see G-5 in [../ACCEPTANCE.md](../ACCEPTANCE.md). The box app runs `b37eef2` with BYOK chat. `tests/e2e/chat_g5.cjs` passes 13 of 13 with an in-process stub provider. It ran against the box web app on 5731 (read-only), and in the CI e2e job's local run on the fsft seed. It covers:
+- the consent dialog, and that Cancel and Escape send nothing
+- the outbound manifest, which matches what the stub receives
+- rejected claims, which are never sent
+- the key, which never reaches the Traces API, its logs or its store
 
-These parts can be tested without a paid key:
-- the consent dialog
-- that rejected claims stay out of the bundle
-- the outbound manifest
-- the stub-provider path (`web/e2e/chat.spec.ts`, already in CI)
-- an optional local Ollama, if one is installed
-
-No paid key was used.
+Live-provider chat is untested in v1 (L-2). No paid key was used.

@@ -71,7 +71,7 @@ async function see(p, texts) {
     await p.screenshot({ path: SHOTS + '/' + shot });
   };
   await step('10 ask (no key): rename question answered from history records', async () => {
-    await ask('When was new-frontend moved to frontend?', ['new-frontend/ prefix moved frontend/'], '10-ask-history.png');
+    await ask('When was new-frontend moved to frontend?', ['Commit 9d703df25491 moved 96 files from new-frontend/ to frontend/'], '10-ask-history.png');
   });
   await step('11 ask (no key): runtime question marked unknown', async () => {
     await ask('Does create_item write to the database at runtime?', ['Static evidence cannot show runtime behavior', 'statically established persistence path through get_db'], '11-ask-runtime.png');
