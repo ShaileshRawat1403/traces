@@ -27,6 +27,7 @@ class ComponentDef:
     layer: str                    # frontend | api | backend | data | infra | docs | tests | other
     paths: tuple[str, ...]        # member file paths at the snapshot
     rule: str                     # deterministic rule id that produced the grouping (D-007)
+    reason: str = ""              # why this layer: the counted evidence behind it (D-029); not part of the map digest
 
 
 @dataclass(frozen=True)

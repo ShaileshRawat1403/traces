@@ -234,8 +234,10 @@ class Store:
         with self.write_lock, self.db:
             self.db.execute("DELETE FROM components WHERE snapshot_id=?", (snapshot_id,))
             for c in components:
-                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule) VALUES (?,?,?,?,?,?,?)",
-                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule))
+                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule, record_json) "
+                                "VALUES (?,?,?,?,?,?,?,?)",
+                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule,
+                                 json.dumps({"reason": getattr(c, "reason", "") or None}, sort_keys=True)))
                 n += 1
         return n
 

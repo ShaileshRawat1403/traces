@@ -169,11 +169,15 @@ class ClaimPage(Strict):
 class Component(Strict):
     id: str
     name: str
-    layer: Literal["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"]
+    layer: Literal["frontend", "api", "backend", "library", "data", "infra", "docs", "tests", "other"] = Field(
+        description="library: code of a repository that declares a package and has no application framework or entrypoint "
+                    "(D-029); otherwise the path-and-extension rule")
     kind: str
     paths: list[str]
     rule: str = Field(description="deterministic grouping rule that produced this component")
     claim_counts: dict[str, int]
+    reason: str | None = Field(None, description="why this layer: the counted files and rule behind it (D-029); null for "
+                                                 "snapshots indexed before D-029")
 
 
 class RouteItem(Strict):
@@ -186,6 +190,8 @@ class RouteItem(Strict):
     status: Status
     claim_id: str | None
     flags: list[str] = []
+    label: str | None = Field(None, description="the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for "
+                                                 "display; null when none was recorded. Never synthesized")
 
 
 class OverviewFact(Strict):
@@ -263,6 +269,8 @@ class TraceHop(Strict):
     qualifier: str | None = None
     evidence_scope: Literal["static"] = "static"
     injected: bool | None = Field(None, description="true when the hop is an injected negative control, never a repository fact; sent for edge hops")
+    hidden_rejected: int | None = Field(None, description="gap hops only: rejected relationships leaving this step that the request hides "
+                                                    "(include_rejected=false); the reason text states all hidden counts")
 
 
 class TraceResponse(Strict):
