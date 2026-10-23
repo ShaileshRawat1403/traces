@@ -272,13 +272,10 @@ class TraceHop(Strict):
     qualifier: str | None = None
     evidence_scope: Literal["static"] = "static"
     injected: bool | None = Field(None, description="true when the hop is an injected negative control, never a repository fact; sent for edge hops")
-<<<<<<< HEAD
-    unresolved_calls: list[str] | None = Field(None, description="gap hops for unresolved calls only (F-9): the call names this step makes "
-                                                                  "that the extractor stored as unresolved references")
-=======
     hidden_rejected: int | None = Field(None, description="gap hops only: rejected relationships leaving this step that the request hides "
                                                     "(include_rejected=false); the reason text states all hidden counts")
->>>>>>> origin/build/traces-v1
+    unresolved_calls: list[str] | None = Field(None, description="gap hops for unresolved calls only (F-9): the call names this step makes "
+                                                                  "that the extractor stored as unresolved references")
 
 
 class TraceResponse(Strict):
