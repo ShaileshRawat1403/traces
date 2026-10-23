@@ -1,60 +1,60 @@
-# Traces v1 review package (DRAFT)
+# Traces v1 review package (DRAFT, v1 candidate)
 
-> **Draft.** Rows marked **PENDING-LAB** wait on Traces Lab (`ws/lab-acceptance`). Rows marked **UPDATE ON MERGE** wait on an open seat branch. Do not treat this file as a v1 sign-off until those rows are filled in.
+> **Draft.** The section 7 checklist is marked **pending Lab final pass at `0f32d4d`**. Lab is refreshing [docs/ACCEPTANCE.md](../ACCEPTANCE.md) now, and its results will be folded into section 4. Do not treat this file as a v1 sign-off until that is done.
 
 | | |
 | --- | --- |
-| Audited head | `build/traces-v1` at `35499bc7b1fa172bc977009d30d63f082be393cb` ("Keep citation names aligned with the file they show") |
-| Audit date | 2026-10-23, about 12:00 to 12:20 IST |
-| Audited by | Architect seat, from a fresh clone at the head (`/tmp/audit`) plus the box app served from a separate clean clone |
+| Candidate head | `build/traces-v1` at **`0f32d4d`** (merge of PR #38). All seat PRs #20 and #22-#38 merged |
+| CI on the head | push [39930532720](https://github.com/ShaileshRawat1403/traces/actions/runs/39930532720) and pull_request [39930539272](https://github.com/ShaileshRawat1403/traces/actions/runs/39930539272): **success, 11 of 11 jobs** |
+| Package updated | 2026-10-23, about 15:00 IST |
+| Earlier audit | Architect audit of `35499bc` (12:00-12:20 IST). Results and its findings are kept in sections 9 and 10 |
 | Charter | Issue #2, section 7 (acceptance checklist) |
-| Last updated | 2026-10-23, 12:35 IST. `build/traces-v1` still at `35499bc`; PR #20 (BYOK chat) and PR #22 (Lab CI and security) are open, not merged (checked with `gh pr view`) |
+| Companion docs | [ARCHITECTURE.md](ARCHITECTURE.md), [ROLLBACK.md](ROLLBACK.md), [STATUS.md](../STATUS.md), [ACCEPTANCE.md](../ACCEPTANCE.md), [REVIEW_V1_EVIDENCE.md](REVIEW_V1_EVIDENCE.md), [REVIEW_V1_ADDENDUM_b37eef2.md](REVIEW_V1_ADDENDUM_b37eef2.md) |
 
-## 1. Run it
+## 1. How to run it yourself
 
-One command, from a clean clone with `uv` and Node 20.19 or newer:
+From the README and [SETUP.md](../SETUP.md). You need `uv` and Node 20.19 or newer, on Linux with unprivileged user namespaces (`unshare -rn true` must succeed; indexing fails closed otherwise).
 
 ```bash
-./scripts/start.sh          # API on 127.0.0.1:8000, web UI on 127.0.0.1:5173
+git clone https://github.com/ShaileshRawat1403/traces && cd traces
+git checkout 0f32d4d
+./scripts/start.sh        # or: make start. API http://127.0.0.1:8000, web http://127.0.0.1:5173
 # other ports:
 TRACES_API_PORT=8731 TRACES_WEB_PORT=5731 ./scripts/start.sh
 ```
 
-`start.sh` installs from lockfiles with `--frozen` and `npm ci --ignore-scripts`, starts the API, waits for `/api/v1/health`, then serves the web UI. Data goes to `.traces-data/` in the clone. Indexing needs user namespaces (`unshare -rn`). See [SETUP.md](../SETUP.md).
+`start.sh` installs from lockfiles (`uv sync --frozen`, `npm ci --ignore-scripts`), starts the API, waits for `/api/v1/health`, then serves the web UI. Open the web UI, paste a public GitHub URL, and follow the index job. Data goes to `.traces-data/`, pinned checkouts to `.cache/`.
 
-Full local check, as run for this audit:
+Baseline and tests:
 
 ```bash
-uv run --frozen ruff check . && uv run --frozen mypy
-(cd web && npx tsc --noEmit && npx vitest run && npm run check:api && npm run build)
-uv run --frozen pytest -q                                  # Python suite
-TRACES_NETWORK_TESTS=1 uv run --frozen pytest -q tests/unit/test_ingest.py -k live
-TRACES_API_PORT=18801 TRACES_WEB_PORT=18802 bash scripts/e2e_ui.sh   # Playwright, same as CI
+uv run --frozen python -m traces.evidence.pipeline baseline --run-id dev1   # about 1 minute; fetches fsft@b1125d8
+uv run --frozen traces import-run .traces-data/runs/dev1                     # load it into the store
+make test-fast                       # unit + API
+make test                            # everything incl. a fresh baseline (CT1-16, RT1-8)
+make lint typecheck                  # ruff, mypy, web tsc
+cd web && npm test && npm run check:api && npm run build
+TRACES_E2E_SEED=fsft TRACES_E2E_FSFT_REPO=<full-history fsft clone> bash scripts/e2e_ui.sh   # what CI runs
 ```
 
 ## 2. Architecture
 
+Full diagram and module table: [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```mermaid
 flowchart LR
-  U[Browser: web/ React + Vite] -->|OpenAPI /api/v1| API[FastAPI backend/traces/api]
-  U -. BYOK chat, after consent, key stays in browser .-> LLM[(User's LLM provider)]
-  API --> ING[ingest: URL check, ls-remote, pinned snapshot, capped clone]
-  ING -->|git over HTTPS, anonymous| GH[(github.com public repo)]
-  API --> JOB[evidence/jobs: index job runner]
-  JOB --> SB[workers/sandbox.sh: unshare -rn, ulimits, RSS watchdog]
-  SB --> CG[CodeGraph 1.6.2 toolchain/]
-  CG --> AD[adapter/codegraph: evidence 0.3]
-  AD --> VAL[validators: Python AST, TS Compiler API, generic]
-  VAL --> ST[(evidence/store: SQLite, schema 0.4)]
-  JOB -->|hook H1| HIS[history: hardened git runner, timeline, churn, co-change, milestones]
-  HIS --> ST
-  API --> VW[evidence/views: overview, graph, trace, source, claims]
-  API --> EX[explain: deterministic engine + chat bundle]
-  VW --> ST
-  EX --> ST
+  U["Browser: React, Cytoscape.js"] -->|"OpenAPI /api/v1"| API["FastAPI"]
+  U -. "BYOK chat after consent; key stays in the browser" .-> LLM[("User's LLM provider")]
+  API --> ING["ingest: ls-remote, SHA check, capped clone"]
+  ING -->|"anonymous HTTPS"| GH[("github.com public repo")]
+  API --> JOB["index job: isolation fails closed"]
+  JOB --> SB["workers/sandbox.sh: unshare -rn"]
+  SB --> CG["CodeGraph 1.6.2"] --> AD["adapter"] --> VAL["validators: Python ast, TS Compiler API, JS imports only"]
+  VAL --> ST[("SQLite store, migrations 0001-0003")]
+  JOB --> HIS["history: hardened git, no transports"] --> ST
+  API --> VW["views: overview, graph, trace, source"] --> ST
+  API --> EX["explain: no-key, cited or unknown; chat bundle + manifest"] --> ST
 ```
-
-Path of one request: `POST /repos` checks the URL and confirms anonymous access with `git ls-remote`, then pins a snapshot SHA. `POST /repos/{id}/snapshots/{sha}/index-jobs` clones within caps, runs CodeGraph in the sandbox, adapts and validates the output, writes records to the store, then runs history. Every screen reads the store (D-024). The target repository's code, hooks, installs and tests are never run.
 
 ## 3. Seat-to-module map
 
@@ -63,173 +63,205 @@ From [CONTRACTS.md section 6](../CONTRACTS.md).
 | Seat | Modules |
 | --- | --- |
 | Traces | `backend/traces/{evidence,adapter,validators,ingest,core,api}`, `workers/`, `toolchain/` |
-| Traces History | `backend/traces/history` (including `gitcmd`), `docs/contracts/history.md`, migrations 0100-0199 |
-| Traces UI | `web/`, `backend/traces/explain`, migrations 0200-0299 |
-| Traces Lab | `tests/e2e`, CI workflow, `tests/security`, `tests/perf`, second-repo acceptance, `docs/ACCEPTANCE.md` |
-| Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, this package, merges into `build/traces-v1` |
+| Traces History | `backend/traces/history`, `docs/contracts/history.md`, `docs/history/`, migrations 0100-0199 (none yet) |
+| Traces UI | `web/`, `backend/traces/explain`, migrations 0200-0299 (none yet) |
+| Traces Lab | `tests/e2e`, `tests/security`, `tests/perf`, CI workflow, `docs/ACCEPTANCE.md`, `docs/acceptance/` |
+| Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, `docs/review/`, merges into `build/traces-v1` |
 
-## 4. Section 7 checklist on `35499bc`
+## 4. Section 7 checklist
 
-Every row was run during this audit unless it says otherwise. "Box app" means the instance at API `127.0.0.1:8731` and web `127.0.0.1:5731`, started from a clean clone at `35499bc`.
+**All rows: pending Lab final pass at `0f32d4d`.** The "earlier evidence" column is what was established before the final pass; Lab's ACCEPTANCE.md will replace it.
 
-| # | Charter item | Result | Proof |
+| # | Charter item | State at `0f32d4d` | Earlier evidence (not the final pass) |
 | --- | --- | --- | --- |
-| 1 | Workflow A: index a public URL pinned to a SHA | **PASS** | `POST /repos` for `fastapi/full-stack-fastapi-template` pinned `b1125d8839482cb7bbae603ddc6d0081bf87532e`. Index job `j_b3030040192949cd992a` succeeded: 4,642 CodeGraph edges, 10,016 static records, history `done` (8,464 records). Web routes `r/:repoId/s/:sha/...` return 200. |
-| 2 | Overview, graph and evidence drawer | **PASS** | API overview, components, routes, graph and claim detail all answer on the box app. Default graph: 0 rejected and 0 injected edges, with `hidden: {rejected: 12}`. Browser coverage: CI e2e (`graph.spec.ts`, `overview.spec.ts`, `trace.spec.ts`) plus 16 screenshots in [acceptance/WALKTHROUGH.md](../acceptance/WALKTHROUGH.md). |
-| 3 | The 9 Task 002 links are traceable | **PASS** | Fixture claims L1, L2A, L2B, L3, L4, L5, L6, L7, L7T1, L7T2, L8, L9A and L9B are all `verified` on the product index. L8 carries "statically established persistence path". H1 and H2 stay `unvalidated`/`inferred` with the library-contract flag. Trace Items to `get_db`: complete, 5 verified hops, with the static-only disclaimer. |
-| 4 | 9 wrong imports never verified; 3 injected negatives rejected and hidden; CT1-CT16 and RT1-RT8 pass | **PASS** | 9 rejected CodeGraph edges, all imports, 0 verified. 3 injected records are `rejected`/`rejected` and absent from the default graph and claim list (default claims 18,468, hidden 12). `pytest tests/contract tests/regression`: 32 collected, all passed inside the full run. CI: contract 17 passed, regression 15 passed. |
-| 5 | Git-backed change explanation; co-change shown as a pattern, not causation | **PARTIAL** | History API and screens: timeline 1,537, co-change 144, milestones 8, compare 694 (identity diff, see limits). History records carry "History pattern only; it is not a code dependency and does not show intent." **Gap:** no-key explain about co-change files history records under `code_structure` as facts. `history_patterns` is hard-coded to `[]` (`backend/traces/explain/engine.py:233-234`) and the answer text drops the not-causation caveat. Owner: Traces UI. |
-| 6 | No-key explain plus provider (BYOK) mode | **PARTIAL** (UPDATE ON MERGE) | No-key explain is grounded (8 citations on itsdangerous). Chat bundle returns `consent required` and a 3-item outbound manifest. Explain with `api_key` returns 422. The BYOK chat UI is [PR #20](https://github.com/ShaileshRawat1403/traces/pull/20) (`ws/ui-chat` `7db2456`), open and not merged. Update this row when #20 merges. Lab finding F-3 (key echoed in the 422 body, section 9b) also applies here. |
-| 7 | Second public repo end to end | **PASS** (box app), **PENDING-LAB** (acceptance record) | `pallets/itsdangerous@672971d66a2ef9f85151e53283113f33d642dabd`, job `j_d4c00e3c7141453898ef` succeeded: 674 edges (310 verified, 3 observed, 268 unvalidated, 46 missing_location, 47 rejected), 1,324 records, 6 components, 50 files, history `done` with 1,988 records, 65 hotspots. Graph: 61 nodes, 50 edges, 47 hidden. Overview: purpose `unknown` with a README interpretation. The INDEX lane reported the same repo and SHA in STATUS, but no artifact or test for it is committed on `build/traces-v1` or `ws/arch-index`. Lab owns the committed acceptance run. |
-| 8 | Safe failures | **PASS** (minor findings) | gitlab, ssh and `..` URLs return 422 `invalid_repo_url`. A nonexistent or private repo returns 422 `repo_not_public`. A malformed SHA returns 422 `invalid_sha`. An unknown well-formed SHA fails the job with `sha_not_found`. Source paths `../`, absolute and `-c` return 422. Unknown job returns 404. Oversize (1 MiB cap, `pallets/flask`) fails with `too_large`. Timeout (1 s) fails with `fetch_timeout`. Not live-tested here: `rate_limited` and the missing-key UI (both covered by Lab's `tests/security` in PR #22, not merged). Findings in section 9; Lab F-1 and F-2 (odd file names) in section 9b. |
-| 9 | Desktop and mobile, accessibility | **PASS** (synthetic seed), **PENDING-LAB** (real snapshot) | CI e2e run 39716507167: 54 passed, 2 skipped, desktop and phone projects with axe checks. Same script on the fresh clone: 54 passed, 2 skipped (1.1 min). It seeds `octo/synth` (4 files) via `scripts/e2e_seed.py`, not `b1125d8`. Lab is adding a real-snapshot seed. |
-| 10 | CI scope | **PARTIAL** | Green on `35499bc`: push [39716507167](https://github.com/ShaileshRawat1403/traces/actions/runs/39716507167) (9/9 jobs) and pull_request [39716512798](https://github.com/ShaileshRawat1403/traces/actions/runs/39716512798). Jobs: lint, types, unit, api, web-build, target, contract, regression, e2e. Missing: `tests/history`, `tests/explain` and web vitest jobs. Lab has them, plus a `security` job, in [PR #22](https://github.com/ShaileshRawat1403/traces/pull/22) (`ws/lab-acceptance` `6384c78`), open and not merged. **PENDING-LAB.** |
-| 11 | Docs, screenshots, demo script | **PARTIAL** | Present: README, SETUP, CONTRACTS, DECISIONS (D-001 to D-025, D-H), STATUS, TEST_MAPPING, FIXTURES, THIRD_PARTY_LICENSES, `contracts/openapi.json`, `contracts/history.md`, WALKTHROUGH with 16 screenshots. Missing: a committed demo script (section 10 below is a draft) and `docs/ACCEPTANCE.md`. **PENDING-LAB.** |
-| 12 | Discrepancy table | **FAIL** (PENDING-LAB) | `docs/ACCEPTANCE.md` does not exist on `35499bc`. Lab owns it on `ws/lab-acceptance`. Link: [ACCEPTANCE.md](../ACCEPTANCE.md) (dead until Lab merges). |
+| 1 | Index a public URL pinned to a SHA; overview | pending Lab final pass at `0f32d4d` | Architect audit PASS at `35499bc` (fsft job, 4,642 edges). CI `api` includes `test_index_baseline` |
+| 2 | Graph, focus, cross-file edges, evidence drawer, source | pending Lab final pass at `0f32d4d` | CI `e2e` on the real fsft seed (Playwright 94 passed, 4 skipped); Lab demo walk 15 of 15 on the box app |
+| 3 | Nine Task 002 links; persistence static only; H1/H2 inferred | pending Lab final pass at `0f32d4d` | Traces seat review and addendum: exact reproduction; CI `regression` 16 passed |
+| 4 | Nine wrong imports never verified; three injected rejected and hidden; 16+8 | pending Lab final pass at `0f32d4d` | CI `contract` 17 and `regression` 16 passed; injected flagged `injected_control` (F3) |
+| 5 | Git-backed change explanation; co-change is not causality | pending Lab final pass at `0f32d4d` | Architect finding at `35499bc` fixed by #24; CI `history` 176 passed; `tests/e2e/test_cochange_explain.py` in CI `security` |
+| 6 | No-key mode; provider (BYOK) mode with consent and citations | pending Lab final pass at `0f32d4d` | BYOK chat merged (#20); `chat_g5.cjs` 13 of 13 in CI with a **stub** provider. Live provider untested |
+| 7 | Second, different public repo | pending Lab final pass at `0f32d4d` | itsdangerous@672971d (Python library) and node-express-boilerplate@179ae84 (Express) run end to end by Lab; JS imports verifiable since #33 |
+| 8 | Safe failures | pending Lab final pass at `0f32d4d` | CI `security` 136 passed, 0 xfailed (F-1 to F-3 fixed) |
+| 9 | Desktop, mobile, touch, accessibility | pending Lab final pass at `0f32d4d` | CI `e2e`: `real_snapshot.cjs` 21 of 21 (axe WCAG 2.2 AA, 1280 px and 360 px touch) |
+| 10 | CI scope, no unintended outbound calls, no secrets | pending Lab final pass at `0f32d4d` | 11 of 11 CI jobs green on `0f32d4d`; `test_outbound.py` in CI |
+| 11 | Docs: setup, architecture, licenses, limits, rollback, screenshots, demo | pending Lab final pass at `0f32d4d` | G-2 (STATUS) and G-6 (architecture, rollback) closed by this PR; [DEMO_SCRIPT.md](../acceptance/DEMO_SCRIPT.md), [WALKTHROUGH.md](../acceptance/WALKTHROUGH.md) |
+| 12 | Discrepancy table | pending Lab final pass at `0f32d4d` | [ACCEPTANCE.md section 2](../ACCEPTANCE.md) (Lab, being refreshed) |
 
-Also tracked:
+## 5. Test totals on `0f32d4d` (CI)
 
-| Item | State |
+From the job logs of push run [39930532720](https://github.com/ShaileshRawat1403/traces/actions/runs/39930532720). The pull_request run [39930539272](https://github.com/ShaileshRawat1403/traces/actions/runs/39930539272) also succeeded.
+
+| Job | Result |
 | --- | --- |
-| History opt-in path aliases | **UPDATE ON MERGE.** `ws/history-aliases` `cd48b65` (WIP D-H14). Not on the head. |
-| `tests/e2e`, `tests/security`, `tests/perf` | **PENDING-LAB.** None exist on the head. Browser specs live in `web/e2e`. `tests/security` (125 cases, 3 strict xfail pinning F-1 to F-3) is in PR #22, not merged. |
+| lint (ruff), types (mypy, web tsc) | pass |
+| unit (`tests/unit`) | 87 passed, 3 skipped (live GitHub) |
+| explain (`tests/explain`, in the unit job) | 96 passed |
+| api (`tests/api`) | 95 passed |
+| web-build (vitest, `check:api`, vite build) | vitest 16 files, 125 tests passed; build pass |
+| target (pinned fsft cache) | pass |
+| contract (CT1-CT16) | 17 passed |
+| regression (RT1-RT8, migration, report) | 16 passed |
+| security (`tests/security`, `tests/e2e/*.py`) | 136 passed, 0 xfailed |
+| history (full-history fsft, any skip fails) | 176 passed |
+| e2e (fsft@b1125d8 seed) | Playwright 94 passed, 4 skipped by design; `real_snapshot.cjs` 21 of 21; `chat_g5.cjs` 13 of 13 |
 
-## 5. Test totals on `35499bc`
-
-| Suite | Local (fresh clone `/tmp/audit`) | CI |
-| --- | --- | --- |
-| ruff | clean | lint: pass |
-| mypy | no issues in 40 source files | types: pass |
-| Python, `pytest -q` (all of `tests/`) | 302 passed, 2 skipped (live-network), 239 s | unit 47 passed / 2 skipped; api 47 passed; contract 17 passed; regression 15 passed |
-| Live ingest (`TRACES_NETWORK_TESTS=1`) | 2 passed | not run in CI |
-| web `tsc`, `check:api` | clean, API types current | web-build: pass |
-| vitest | 13 files, 89 tests passed | **not in CI** (PENDING-LAB, PR #22) |
-| web build | index 143.51 kB gzip, GraphPage 144.68 kB gzip | web-build: pass |
-| Playwright (`scripts/e2e_ui.sh`, synthetic seed) | 54 passed, 2 skipped | e2e: 54 passed, 2 skipped |
-
-CI runs: [push 39716507167](https://github.com/ShaileshRawat1403/traces/actions/runs/39716507167), [pull_request 39716512798](https://github.com/ShaileshRawat1403/traces/actions/runs/39716512798). Both succeeded on `35499bc`.
+`tests/e2e/demo_walk.cjs` runs against the box app only (not CI). `tests/perf/bench.py` is a local baseline ([PERF.md](../acceptance/PERF.md)).
 
 ## 6. Discrepancy table
 
-**PENDING-LAB.** The table lives in [docs/ACCEPTANCE.md](../ACCEPTANCE.md), owned by Traces Lab. This package will link it and copy no rows from it.
+Lab owns it: [ACCEPTANCE.md section 2](../ACCEPTANCE.md). It is being refreshed at `0f32d4d` and will be linked here, not copied.
 
-## 7. Key decisions
+## 7. Decision index
 
-Full list in [DECISIONS.md](../DECISIONS.md). The ones a reviewer needs:
+Full text in [DECISIONS.md](../DECISIONS.md) and, for D-H, [contracts/history.md](../contracts/history.md).
 
-| Decision | Summary |
+| Id | Decision |
 | --- | --- |
-| D-001, D-002 | uv, Python 3.14.8, FastAPI, SQLite, Vite/React/TS |
-| D-003 | MIT license |
-| D-004, D-005 | Pipeline emits evidence 0.3; store and API use 0.4, generated from 0.3 |
-| D-006 | Sandbox: `unshare -rn`, ulimits, secret env removed; memory cap closed by D-022 |
-| D-011 | Rejected claims stay stored and hidden by default; `missing_location` is never verified without recovered locations |
-| D-013 | BYOK in the browser only; request models forbid extra fields |
-| D-014 | OpenAPI is the UI contract |
-| D-021 | Ingest caps: clone 1024 MB, 900 s, 100,000 files, tree 1024 MB |
-| D-022 | Index worker, RSS watchdog 6144 MB, index timeout 1800 s |
-| D-023 | Explain and chat bundle use the deterministic engine |
-| D-024 | Views read the store; compare is an identity diff without H3 |
+| D-019 | Evidence-set diff keeps the `git_recount` check family in v1 |
+| D-020 | `PrContextProvider` gains optional `artifact_bytes` |
+| D-021 | Ingest: anonymous visibility check, pinned snapshot on registration, fetch caps |
+| D-022 | Index worker, job runner, generic validation, RSS memory cap (closes D-006) |
+| D-023 | Explain and chat bundle call the deterministic engine |
+| D-024 | Views and history queries read the store; compare is an identity diff without H3 |
 | D-025 | TypeScript resolution stops at the checkout |
-| D-026 | A3 naming is a qualified, documented claim (Task 002 ruling 4) |
-| D-H1 to D-H9, D-H6 | History decisions (summary pointer in DECISIONS) |
+| D-026 | Isolation fails closed; `TRACES_ISOLATION=off` is the only unisolated mode, recorded on the snapshot (F2) |
+| D-027 | Repo-level AI consent endpoint |
+| D-028 | Hardening from the security suite and the evidence review (F-1 to F-6, F1, F3, F4, F7, F8, ingest cleanup) |
+| D-029 | Component layer reasons, `library` layer, route labels, per-step trace gaps |
+| D-030 | Minimal JavaScript import check; JavaScript calls are v1.1 |
+| D-031 | Trace completeness, Express mounts, git process groups, focused hidden counts (F5), `/meta` isolation, O-9 cleanup |
+| D-032 | A3 naming is a qualified, documented claim (Task 002 ruling 4) — added by this PR (F6) |
+| D-H1 | Co-change, churn and hotspot counts may reach `observed` after a recount; class stays `history_pattern`, never `verified` |
+| D-H2 | Git plumbing checks count as independent for git-object facts; `quote_match` proves only that a quote exists |
+| D-H3 | `citations` field; history records need `locations` or `citations` |
+| D-H4 | `review_state` is separate from `status` and never promotes it |
+| D-H5 | "All commits" means non-merge commits; file-set replay along first-parent |
+| D-H6 | Git-object fact `claim_id`s anchor to their commit |
+| D-H7 | Generated filter matches `dist/` and `build/` directory segments at any depth |
+| D-H8 | The Evidence seat supplies `generated_paths` |
+| D-H9 | Milestone cap 8 for the index worker, 20 on demand |
+| D-H10 | Optional `artifact_bytes` in `PrContextProvider` |
+| D-H11 | No new check method in v1; dedicated method deferred to schema 0.5 |
+| D-H12 | `run()` signature, budgets, stage order and report layout frozen |
+| D-H13 | Runner config and budget, RLIMITs on git children, finalize validation option C |
+| D-H14 | Alias suggestions are opt-in (`HistoryConfig.aliases=False`) |
+| D-H15 | Lineage restart caveat on delete and re-add; fsft default digest `402d3d34eff4` to `2fb288167ebf`, same claim_ids |
 
-## 8. Security posture
+## 8. Security posture at `0f32d4d`
 
-| Area | What the code does | Checked how |
+| Area | What the code does | Evidence |
 | --- | --- | --- |
-| No target code execution | The target is cloned and read. CodeGraph parses it; validators use Python `ast` and the TypeScript Compiler API. No install, hook, build or test of the target runs. Clone runs with hooks disabled. | Code read of `ingest/fetch.py`, `workers/sandbox.sh`; CT15 asserts isolation |
-| Sandboxing | `workers/sandbox.sh`: `unshare -rn` (no network), HOME and telemetry overridden, token and secret env vars removed, ulimits (CPU 1800 s, file 4 GiB, 4096 fds). RSS watchdog (D-022). `TRACES_ISOLATION=none` is recorded and fails CT15. | D-006, D-022; CI `target` and `contract` jobs |
-| Ingest limits | Anonymous `ls-remote` only, github.com HTTPS only, SHA validation, size, time and file-count caps | Section 4 row 8 |
-| BYOK | Provider keys never reach the backend's logic or storage. The server returns a deterministic answer or a prompt bundle with an outbound manifest; the browser sends it after consent. `api_key` in a request returns 422. **But** the 422 body echoes the rejected value (Lab F-3, blocking, section 9b). | Live 422 on the box app; D-013; PR #22 `test_submitted_key_not_echoed` (xfail) |
-| Token handling | v1 never asks for credentials and does not support private repos. History's git runner redacts `gh*_`, `github_pat_` and `user@` URL parts from errors (`history/gitcmd.py`). | `git grep` for key patterns at `35499bc`: only the redaction regex and a test assertion match |
-| Outbound network | Backend uses git only (no HTTP client calls in `backend/`). The browser calls the provider only in BYOK chat. | `git grep` for HTTP client calls in `backend/`: none |
-| Security tests | **PENDING-LAB.** `tests/security` in PR #22: URLs, fetch limits, hostile repo, no-key and caps, outbound. 3 open findings, section 9b | PR #22, not merged |
+| No target code execution | The target is cloned and parsed. No install, hook, build or test of the target runs. Clone has hooks, LFS and submodules off | `tests/security/test_hostile_repo.py`; CT15 |
+| Isolation | CodeGraph, adapter and validators run under `unshare -rn` in `workers/sandbox.sh`. If isolation cannot be shown the job fails closed (`E_ISOLATION`), nothing is fetched, no claims stored (D-026). `TRACES_ISOLATION=off` is recorded as `isolation=off`, `unisolated=true`, never acceptance evidence | `tests/unit/test_isolation.py`; addendum F2 PASS |
+| History git | Runs in the job thread with transports refused (`protocol.allow=never`) and RLIMITs, on a local clone; not inside `unshare -rn` (see limits) | `history/gitcmd.py` |
+| Ingest | Public github.com HTTPS only; 28 malformed URL classes refused before any network call; caps on size, time, files, tree; git in its own process group, cleanup on every failure | `test_repo_urls.py`, `test_fetch_limits.py` |
+| BYOK | Key held in the browser only, sent only in the provider's `Authorization` header after consent. Manifest rows hash the exact line sent (O-11). Rejected claims stripped. The API forbids key fields, and 422 bodies no longer echo input (F-3) | `chat_g5.cjs` 13 of 13 (stub provider), `test_no_key_and_caps.py` |
+| Outbound | Read, explain and chat-bundle endpoints make no off-loopback connection; the worker's only network-capable process is the clone | `test_outbound.py` |
+| Secrets | Lab scanned `git log -p --all` for GitHub, OpenAI, AWS, Slack and private-key patterns: only a fake test token | ACCEPTANCE row 10 |
 
-## 9. Findings
+## 9. Findings: final status
 
-Blocking v1: **F2** (section 9a) and **F-3** (section 9b). Both are being fixed on the API lane.
+### 9a. Independent evidence review (Traces seat)
 
-### Architect audit findings
+Full reports: [REVIEW_V1_EVIDENCE.md](REVIEW_V1_EVIDENCE.md) (at `35499bc`) and [REVIEW_V1_ADDENDUM_b37eef2.md](REVIEW_V1_ADDENDUM_b37eef2.md) (recheck at `b37eef2`). Absolute box paths are replaced with placeholders.
 
-None blocks v1 alone. Item 1 is the gap behind row 5.
+At `35499bc`: the reproduction is exact (4,538 verified, 36 observed, 59 unvalidated, 9 rejected of 4,642 edges; validation hash `73db432b`; identical `claim_id` sets of 10,016). It found 0 `claim_id` collisions and 0 EOF violations, the 9 wrong imports stay rejected, and `missing_location` is never verified without recovered locations.
 
-1. **Explain files co-change as code structure** (Traces UI, `backend/traces/explain/engine.py:233-234`). Grounded citations all go to `code_structure`; `history_patterns` is always `[]`. A co-change answer then lists history records as facts and omits the not-causation caveat. Fix: route `history_pattern` records to `history_patterns` and add the caveat to the answer.
-2. **Partial clone left after a fetch timeout** (Traces, `ingest/fetch.py`). A `fetch_timeout` left a `source.partial` directory (~860 KB of pack temp files), against D-021's cleanup promise. A retry removes it.
-3. **Unknown SHA accepted at registration** (Traces). A well-formed SHA that does not exist returns 201; the error comes at index time as `sha_not_found`. Safe, but late.
-4. **Not live-tested:** `rate_limited` (429 with `Retry-After`) and the missing-key UI path.
+**Addendum at `b37eef2`:**
 
-## 9a. Independent evidence review (Traces seat)
-
-Full report: [REVIEW_V1_EVIDENCE.md](REVIEW_V1_EVIDENCE.md) (absolute box paths replaced with placeholders). Read-only review of `35499bc` against the Task 002 rulings (Decision 002-B, CLOSEOUT_002, RULINGS), 2026-10-23 about 12:20 IST. The target app was not run.
-
-| Check | Result |
+| Recheck | Verdict |
 | --- | --- |
-| Reproduction of Task 002 run 002b-2 | Exact. 4,642 CodeGraph edges = 4,538 verified + 36 observed + 59 unvalidated + 9 rejected. Validation hash `73db432b...` equal for the review run, the product index and the Task 002 export. Identical `claim_id` sets (10,016 records, 10,016 distinct ids) |
-| `claim_id` collisions | 0 (0 recompute mismatches; 34 consolidated records covering 68 rows keep provenance) |
-| EOF semantics | 0 violations over 94,472 locations and inputs (16,959 file ranges); RT4 to RT6 pass |
-| Wrong imports | The 9 import edges stay `rejected`; all 36 observed carry "observed import statement" |
-| `missing_location` | Never verified while it lacks locations. 1,981 records passed through it; every one left only via `location_recovery`; 0 verified records lack locations |
-| L1 to L9, H1/H2 | L1 to L9B verified; H1, H2 `unvalidated`, `inferred`, `library_contract` |
-| Static vs runtime | No static evidence presented as runtime behavior |
+| F2 isolation | PASS: `auto`, `unshare` and `none` fail closed with `E_ISOLATION` and create no run; `off` gives an `unisolated` snapshot; `tests/unit/test_isolation.py` 12 passed |
+| F1 CT4 clause | PASS: mutation proof, the new clause fails a broken run |
+| F3 injected marker | PASS: the 3 injected carry `injected=true` and `injected_control` in claims and graph edges |
+| F4 truncation | PARTIAL: rejected edges are counted in `truncated_counts`, not kept (accepted, D-028) |
+| F5 focused counts | PARTIAL at `b37eef2` (counted either-end, shown both-ends); fixed in #33 (D-031) |
+| F7 report | PASS: `chain.json` and `coverage.json` written; only `run_id` differs from Task 002 |
+| F8 test | PASS: the test now asserts that missing_location is never verified |
+| Re-run on fsft@b1125d8 | Validation hash `73db432be3ba...` equal to Task 002; 4,642 = 4,538/36/59/9; 10,016 distinct ids; 0 EOF violations |
+| Full suite (namespace with loopback up) | 524 passed, 3 skipped, 0 real failures |
+| New items A1-A6 | A1 (F5 scope) fixed in #33; A2 accepted (D-028); A3 `/meta` isolation fixed in #33; A4 config comment fixed; A5 `test_index_baseline` network rule fixed in #33; A6 research file outside the repo, no action |
 
-| ID | Severity | Summary | Owner | Blocks v1 | Status |
+| ID | Severity | Summary | Owner | Blocks v1 | Final status |
 | --- | --- | --- | --- | --- | --- |
-| F1 | medium | CT4 negative assertion is commented out (`tests/contract/_ct.py:47`); behavior is right, the check is dead | Traces | no | Being fixed |
-| F2 | medium | `TRACES_ISOLATION=auto` falls back to no isolation with a warning and still stores a ready snapshot; conflicts with the Task 002 rule "stop when isolation cannot be shown" | Traces (API lane) | **yes** | **Being fixed on the API lane** (fail closed unless explicitly opted in; record isolation on the snapshot) |
-| F3 | low | Injected controls carry no injected marker in claim lists or graph edges; with `include_rejected` they read as repo facts | Traces (views, API) | no | Being fixed |
-| F4 | low | Unfocused graph with `include_rejected` truncates rejected edges away and drops their `hidden_counts` | Traces (views) | no | Being fixed |
-| F5 | low | `hidden_counts` in a focused graph is snapshot-wide, not scoped to the focus | Traces (views) | no | Being fixed |
-| F6 | low | A3 ruling-4 wording absent from v1 docs (code is right) | Architect | no | **Fixed in this PR** (D-026) |
-| F7 | low | `report.py` not ported: no `chain.json` / `coverage.json` per v1 run; L1 to L9 held by tests only | Traces | no | Being fixed, or listed as a limit (section 11) |
-| F8 | low | `test_index_worker.py:118-120` comment promises "missing_location never verified" but asserts something weaker | Traces | no | Being fixed |
-| F9 | info | R-contains recovered locations have `recovered_by` null (traceable via `location_recovery` history) | Traces | no | Noted, inherited from Task 002 |
-| F10 | info | D-011 wording "never verified" is too strong given D-Q9 recovery | Architect | no | **Fixed in this PR** (D-011 now "never verified without recovered locations") |
-| F11 | info | The fastapi `b1125d8` product store includes fixture and injected records, by design | none | no | Noted |
-| F12 | info | `test_store_concurrency` fails inside `unshare -rn` (loopback down); passes outside | Lab / Traces | no | Noted, environment artifact |
+| F1 | medium | CT4 negative clause was commented out | Traces | no | **Fixed** in #27 (`b37eef2`), verified by addendum |
+| F2 | medium | `auto` fell back to no isolation and stored a ready snapshot | Traces (API lane) | was **yes** | **Fixed** in #27 (D-026), verified by addendum |
+| F3 | low | Injected controls not marked in lists and graph | Traces | no | **Fixed** in #27 (D-028), verified by addendum |
+| F4 | low | Unfocused graph truncates rejected edges | Traces | no | **Accepted** under D-028: reported in `truncated_counts`, not kept |
+| F5 | low | Focused `hidden_counts` was snapshot-wide, then either-end | Traces | no | **Fixed** in #33 (D-031): counted under the shown-edge rule |
+| F6 | low | A3 ruling-4 wording missing from docs | Architect | no | **Fixed in this PR** (#21, D-032), not merged yet |
+| F7 | low | `report.py` not ported | Traces | no | **Fixed** in #27, verified by addendum |
+| F8 | low | Worker test asserted less than its comment | Traces | no | **Fixed** in #27, verified by addendum |
+| F9 | info | R-contains recovered locations have `recovered_by` null | Traces | no | Noted, inherited from Task 002 |
+| F10 | info | D-011 said "never verified" without the recovery caveat | Architect | no | **Fixed in this PR** (#21), not merged yet |
+| F11 | info | fsft store holds fixture and injected records by design | none | no | Noted |
+| F12 | info | `test_store_concurrency` fails in a namespace without loopback | Lab / Traces | no | Noted; passes with loopback up (addendum) |
 
-## 9b. Lab security findings (PR #22, `tests/security`)
+### 9b. Lab findings (ACCEPTANCE.md section 3)
 
-Pinned as `xfail(strict=True)` in PR #22 (not merged), so a fix flips the test and fails the job until the marker is removed. Lab's markers give the finding id, owner and cause; the severity column is the Architect's assessment.
+Severities are Lab's.
 
-| ID | Severity | Summary | Owner | Blocks v1 | Status |
+| ID | Severity | Summary | Owner | Blocks v1 | Final status |
 | --- | --- | --- | --- | --- | --- |
-| F-1 | medium | A tracked file with a non-ASCII name makes the adapter fail closed with `E_PATH`, so the whole repo cannot be indexed (likely `git ls-tree -r` without `-z`, C-quoted paths) | Traces (adapter) | no | Being fixed on the API lane |
-| F-2 | low | A tracked file whose name starts with `-` is refused with 422 "path must stay inside the repository"; safe, but unviewable and the message is wrong | Traces (`evidence/views.safe_repo_path`) | no | Being fixed on the API lane |
-| F-3 | high | The 422 validation envelope copies pydantic's `errors()` including `input`, so a provider key sent by mistake is echoed in the response body (proxies, browser logs) | Traces (`api/app.py` `_validation_error`) | **yes** | **Being fixed on the API lane** |
+| F-1 | High | Non-ASCII file name failed the whole index (`E_PATH`) | Traces (adapter) | no | **Fixed** in #27 (`git ls-tree -z`, D-028) |
+| F-2 | Low | Source view refused names starting with `-` | Traces (views) | no | **Fixed** in #27 (D-028) |
+| F-3 | Medium | 422 body echoed rejected input, including a key | Traces (API) | was **yes** | **Fixed** in #27 (D-028); CI `security` 0 xfailed |
+| F-4 | High | Relative Python imports rejected | Traces (validators) | no | **Fixed** in #27 (D-028) |
+| F-5 | Medium | `@overload` call resolved to the stub | Traces (validators) | no | **Fixed** in #27 (D-028) |
+| F-6 | Low | Unknown SHA left a failed snapshot row and empty cache | Traces (ingest) | no | **Fixed** in #27 (422 `sha_not_found`); old rows cleaned by O-9 in #33 |
+| F-7 | Medium | No-key explain matched keywords | Traces UI (explain) | no | **Fixed** in #26 (intent routing, `intents.py`) |
+| F-8 | Medium | History questions ignored the named file | Traces UI (explain) | no | **Fixed** in #26; JavaScript paths in #36 |
+| F-9 | Medium | Trace claimed "complete" despite unresolved calls | Traces (views), UI | no | **Fixed** in #33 (D-031) and #38 (UI) |
+| F-10 | High (JS repos) | No JavaScript validator; `require` failed L3 | Traces (validators) | no | **Fixed** in #33 (D-030): 107 of 107 imports verified on node-express-boilerplate; calls deferred to v1.1 |
+| F-11 | Low | Route question answered "no README or manifest" | Traces UI (explain) | no | **Fixed** in #36 |
 
-## 10. Demo script (10 minutes, DRAFT)
+All fixes are pending Lab's final pass at `0f32d4d`.
 
-Uses the box app (API `http://127.0.0.1:8731`, web `http://127.0.0.1:5731`) and real data already indexed there. **PENDING-LAB:** Lab owns the committed demo script; replace or link it when it lands.
+### 9c. Architect audit findings at `35499bc`
 
-| Time | Step | What to show |
-| --- | --- | --- |
-| 0:00 | Open `http://127.0.0.1:5731/` | Home lists `fastapi/full-stack-fastapi-template`, `pallets/itsdangerous` and the failed `pallets/markupsafe` snapshot |
-| 1:00 | Open `/r/github.com__fastapi__full-stack-fastapi-template/s/b1125d8839482cb7bbae603ddc6d0081bf87532e` | Overview pinned to the SHA. Components and layers. Purpose stated only where evidence supports it |
-| 2:30 | Graph tab | 0 rejected or injected edges shown; the hidden count (12 rejected) is visible. Open one edge's evidence drawer: file, line range, validator, status |
-| 4:00 | Trace tab: Items page to `get_db` | 5 verified hops with the static-only disclaimer. L8 says "statically established persistence path", not a runtime write |
-| 5:00 | Claims, show hidden | The 9 wrong imports and 3 injected negatives are `rejected`, never `verified` |
-| 6:00 | History tab | Timeline, hotspots, co-change with "pattern, not a dependency" text, milestones. Compare is an identity diff (H3 not done) |
-| 7:30 | Ask tab, no key | A grounded answer with citations. Show the chat bundle consent and outbound manifest. Do not paste a real key |
-| 8:30 | Switch to `/r/github.com__pallets__itsdangerous/s/672971d66a2ef9f85151e53283113f33d642dabd` | Second repo: overview `unknown` purpose with README interpretation, graph with 47 hidden rejected edges |
-| 9:15 | Phone width (DevTools 360 px) | Same screens on mobile |
-| 9:45 | Close | Limits in section 11 |
-
-## 11. Known limits and deferrals
-
-| Limit | State |
+| Finding | Final status |
 | --- | --- |
-| H3: re-index milestone SHAs | Not done. Compare falls back to an identity diff of static claims (D-024) |
-| Memory cap (D-006) | Closed by D-022's RSS watchdog. `RLIMIT_AS` stays off (breaks CodeGraph's WebAssembly) |
-| e2e in CI | Runs on every push and PR, but on the synthetic `octo/synth` seed. Real-snapshot seed: PENDING-LAB |
-| CI coverage | history, explain, vitest and security jobs: PENDING-LAB (PR #22, `ws/lab-acceptance` `6384c78`) |
-| BYOK chat UI | UPDATE ON MERGE (PR #20, `ws/ui-chat`) |
-| History opt-in aliases | UPDATE ON MERGE (`ws/history-aliases`) |
-| Private repos | Out of scope for v1. No credentials are requested |
-| Server-side LLM | None by design (D-013) |
-| Run report artifacts (F7) | No `chain.json` / `coverage.json` per v1 run unless F7 lands; L1 to L9 traceability is held by the regression tests |
-| Static evidence only | Graph and trace are static. A missed relationship is a gap, not proof of absence. Library-contract hops stay inferred |
+| Explain filed co-change as code structure without the caveat | Fixed in #24 |
+| Partial clone left after a fetch timeout | Fixed in #27 (process group kill, cleanup in `finally`, D-028) |
+| Unknown SHA accepted at registration | Fixed in #27 (F-6) |
+| Rate limit and missing-key UI not live-tested | Covered by `tests/security` in CI |
+
+## 10. Known limits and deferrals (v1)
+
+| Limit | Detail |
+| --- | --- |
+| O-5 latency | Graph and trace p95 about 630 ms on fsft (graph 635.7 ms, trace 624.9 ms; local baseline, [PERF.md](../acceptance/PERF.md)). No performance target in the charter |
+| JavaScript calls and references | Deferred to v1.1 (D-030). Only JS `imports` can be verified; calls, references, instantiations and named bindings stay unvalidated or observed |
+| O-7 Express mounts | Routers mounted through a computed `forEach` are shown without the mount prefix. Literal mounts compose; middleware mounts show as `USE` with flag `mount` |
+| O-8 persistence | Mongoose and other ODMs are not detected; trace and explain say no persistence path is recorded |
+| Overview interpretations | README heading and frameworks are shown as uncited interpretations, not verified claims |
+| Live-provider chat | Untested. Only a stub provider is tested (`chat_g5.cjs`); no paid key or local model was approved |
+| Provider key storage | By design the key is in browser sessionStorage, or localStorage with "Remember on this device" and a warning (Lab L-1). It never reaches the Traces API, logs, store or sent record |
+| H3 milestone re-indexing | Still absent at `0f32d4d`: the index job passes only the pinned SHA to history, so compare uses an identity diff of static claims (D-024) |
+| History isolation | History git runs with transports refused and RLIMITs, not inside `unshare -rn`, while `docs/contracts/history.md` says it does. Doc or code to align (History, Traces) |
+| Private repositories, server-side LLM | Out of scope for v1 |
+| Static evidence only | A missed relationship is a gap, not proof of absence. Library-contract hops stay inferred. The Task 002 persistence path is static |
+| Snapshots indexed before migration 0003 | `isolation` is null (unknown); re-index to record it. The box app's two snapshots are in this state |
+
+## 11. Box app and demo
+
+The box app serves `0f32d4d` from a clean clone: API `http://127.0.0.1:8731` (health `store_migration` 3, `/meta` isolation `unshare`, JavaScript validator listed), web `http://127.0.0.1:5731`. Ready snapshots: fastapi/full-stack-fastapi-template@b1125d8 and pallets/itsdangerous@672971d.
+
+The guided demo is Lab's [DEMO_SCRIPT.md](../acceptance/DEMO_SCRIPT.md) (`tests/e2e/demo_walk.cjs`, 15 steps). Short version, 10 minutes:
+
+| Time | Step |
+| --- | --- |
+| 0:00 | Home: both repos and their snapshots |
+| 1:00 | fsft overview at `b1125d8`: components with layer reasons, README heading as interpretation |
+| 2:30 | Graph: rejected and injected hidden, with counts; open an edge's evidence drawer |
+| 4:00 | Trace Items page to `get_db`: verified hops, library steps inferred, static persistence path |
+| 5:00 | Claims with rejected shown: 9 imports and 3 `injected_control` |
+| 6:00 | History: timeline, co-change with the "not a dependency" caveat, milestones |
+| 7:30 | Ask without a key: a cited answer, then a question it must answer `unknown` |
+| 8:30 | itsdangerous: `library` layer with its reason, purpose unknown |
+| 9:15 | Phone width (360 px) |
+| 9:45 | Limits (section 10) |
 
 ## 12. Licenses
 
-Traces is MIT ([LICENSE](../../LICENSE)). Third-party software is listed in [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md), updated in this PR for the shipped web dependencies: shiki 4.5.0, `@shikijs/langs`, `@shikijs/themes`, `@tanstack/react-query`, `@radix-ui/react-dialog`, `@radix-ui/react-tabs` and their transitive packages, plus the bundled TextMate grammars and theme. Shipped web packages: MIT 86, ISC 1, 0BSD 1. No GPL or AGPL dependency. No GitNexus or Code Maat code.
+MIT ([LICENSE](../../LICENSE)). Third-party list: [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md), including shiki and `@shikijs/*`, `@tanstack/react-query`, `@radix-ui/*` and the bundled grammars and theme. No GPL or AGPL dependency, no GitNexus or Code Maat code. No dependency was added between `35499bc` and `0f32d4d`: `uv.lock`, `web/package.json`, `web/package-lock.json` and the toolchain locks are unchanged (only `pyproject.toml` lint and mypy settings changed). The JavaScript import check (D-030) reuses the pinned TypeScript 6.0.3 parser already in `toolchain/`.

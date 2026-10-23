@@ -1,70 +1,115 @@
 # Status (Traces v1)
 
-Updated 2026-10-21 IST, after integrating PRs #9, #15, #16, #17, #19 and #14 into `build/traces-v1`. The "Not done" list was corrected on 2026-10-23 IST against head `35499bc` (e2e, CI gaps, D-006). Authority is the code and the tests, not earlier seat notes.
+State of `build/traces-v1` at **`0f32d4d`** (merge of PR #38), written 2026-10-23 IST. Every seat PR through #38 is merged. Authority is the code and CI, not seat notes. Acceptance evidence is in [ACCEPTANCE.md](ACCEPTANCE.md) (Lab). The review package is [review/V1_REVIEW_PACKAGE.md](review/V1_REVIEW_PACKAGE.md), with [ARCHITECTURE](review/ARCHITECTURE.md) and [ROLLBACK](review/ROLLBACK.md).
 
-## Integrated
+## What each module does
 
-| PR | Branch | What landed |
+| Module | Owner | What it does at `0f32d4d` |
 | --- | --- | --- |
-| #9 | `ws/arch-ingest` | Anonymous public check, pinned snapshot, HEAD discovery, capped clone (D-021) |
-| #15 | `ws/arch-index` | Index jobs, sandboxed worker, generic validation, RSS cap, history hook H1 (D-022) |
-| #16 | `ws/history-runner` | `run()` / `GitHistoryRunner` with budgets |
-| #17 | `ws/ui-history` | History screens (timeline, hotspots, co-change, milestones, compare) |
-| #14 | `ws/ui-explain-tests` | Explain tests moved to `tests/explain` so pytest collects them |
-| #19 | `ws/arch-explain` | Explain and chat bundle wired to the deterministic engine (D-023) |
-| #18 | `ws/lab-ci` | CI workflow active at `.github/workflows/ci.yml` (already merged before this pass) |
+| `backend/traces/ingest` | Traces | Public GitHub HTTPS URLs only. Anonymous `ls-remote` visibility and HEAD check. A requested SHA is checked with a shallow, credential-free fetch (unknown is 422 `sha_not_found`). Capped clone (1024 MB, 900 s, 100,000 files, 1024 MB tree) in its own process group, with hooks, LFS and submodules off; cleanup runs on every failure (D-021, D-028, D-031) |
+| `evidence/jobs.py`, `evidence/index.py` | Traces | Index jobs on a thread pool. Isolation is resolved first and fails closed (`E_ISOLATION`); `TRACES_ISOLATION=off` is an explicit dev override stored on the snapshot (D-026). Then clone, CodeGraph, adapter, validators, store, report, history. RSS watchdog 6144 MB, index timeout 1800 s (D-022) |
+| `workers/sandbox.sh` | Traces | `unshare -rn` (no network), HOME and telemetry overridden, secrets stripped, ulimits. Runs CodeGraph, the adapter and the validators |
+| `toolchain/` | Traces | CodeGraph 1.6.2 and TypeScript 6.0.3, integrity-pinned, installed with `--ignore-scripts` |
+| `backend/traces/adapter` | Traces | Fail-closed CodeGraph-to-evidence 0.3 mapping, `claim_id` v3, consolidation, EOF rules, isolation probe check 4.7 |
+| `backend/traces/validators` | Traces | Python (CPython 3.14 `ast`, FastAPI rules R1-R4, A3 qualified per D-032), TypeScript (Compiler API, resolution stops at the checkout, D-025), JavaScript **imports only** (TypeScript parser plus Node CommonJS resolution, D-030). Paths listed with `git ls-tree -z` |
+| `evidence/store.py`, migrations | Traces | SQLite, WAL, per-thread connections. Migrations 0001-0003 (0003: snapshot isolation, consent fields). Startup removes empty failed `sha_not_found` snapshot rows (O-9, D-031) |
+| `evidence/report.py` | Traces | `chain.json` and `coverage.json` for baseline runs (F7) |
+| `evidence/views.py`, `evidence/components.py` | Traces | Overview (README heading and frameworks as interpretation), components with layer `reason` and a `library` layer (D-029), routes with `label` and Express `USE` mounts, graph and trace (rejected hidden with `hidden_counts`; `truncated_counts`; `injected` flag; trace gaps with `unresolved_calls` and `incomplete_reasons`, D-031), source by `git cat-file` |
+| `backend/traces/history` | Traces History | Timeline, lifecycle, churn, hotspots, co-change, milestones, rationale; aliases opt-in (D-H14); lineage-restart caveat (D-H15). Hardened `gitcmd` (`protocol.allow=never`, RLIMITs). fsft default digest `2fb288167ebf`, 8,402 records |
+| `backend/traces/explain` | Traces UI | No-key, deterministic: intent routing (`intents.py`), cited answer or `unknown`. Co-change answered only as a history pattern with the caveat (#24). `chat/bundle` returns a prompt and an outbound manifest; each row hashes the exact line sent (O-11) |
+| `backend/traces/api` | Traces | FastAPI, OpenAPI contract in `docs/contracts/openapi.json`. `PUT /repos/{id}/ai-consent` (D-027). 422 bodies never echo input (F-3). `/meta` reports probed isolation |
+| `web/` | Traces UI | React, React Router, TanStack Query, Cytoscape.js, Shiki, Radix. Home, job, overview, components, routes, graph and evidence drawer, trace, history, ask, claims, source, settings, BYOK chat |
 
-Earlier merges on the branch: history contract and core, history analysis, UI shell, overview, graph, trace, explain screen, store concurrency.
+## Tests and CI
 
-## What the API does now
+CI run on `0f32d4d`: push [39930532720](https://github.com/ShaileshRawat1403/traces/actions/runs/39930532720) and pull_request [39930539272](https://github.com/ShaileshRawat1403/traces/actions/runs/39930539272), both **success, 11 of 11 jobs**. Counts from the push run's job logs:
 
-| Area | State |
-| --- | --- |
-| Register a public GitHub URL, confirm it anonymously, pin a snapshot | done |
-| Discover HEAD, show `behind` against the newest ready snapshot | done |
-| Index job: capped clone, CodeGraph in the sandbox, adapter, validators, store, history hook | done |
-| Overview, components, routes, graph, source, trace | done (D-024). Graph and trace are static evidence only |
-| History timeline, lifecycle, hotspots, co-change, milestones, rationale | done, from stored history records |
-| Compare | done, with a limit: rename-aware `snapshot_added` / `snapshot_removed` records are returned when history stored them. Otherwise the endpoint returns an identity diff of static claims that already exist. It does not invent records and it does not map renames |
-| Explain (no LLM) and chat bundle | done. Provider keys never reach the backend |
-| Task 002 CT1-CT16 and RT1-RT8 | still the baseline suite. The product index path is `tests/api/test_index_baseline.py` |
+| CI job | Command | Result |
+| --- | --- | --- |
+| lint | `ruff check backend tests` | pass |
+| types | `mypy`, web `tsc` | pass |
+| unit | `pytest tests/unit`, `pytest tests/explain` | 87 passed, 3 skipped (live GitHub); explain 96 passed |
+| api | `pytest tests/api` | 95 passed |
+| web-build | vitest, `check:api`, `vite build` | vitest 16 files, 125 tests passed; API types current; build pass |
+| target | pinned fsft@b1125d8 cache, hardened git | pass |
+| contract | `pytest tests/contract` (CT1-CT16, fresh baseline, `unshare -rn`) | 17 passed |
+| regression | `pytest tests/regression` (RT1-RT8, 0.4 migration, report) | 16 passed |
+| security | `pytest -rxXs tests/security tests/e2e` (Python e2e pattern tests) | 136 passed, 0 xfailed |
+| history | `pytest tests/history` on the full-history fsft clone; any skip fails | 176 passed |
+| e2e | `scripts/e2e_ui.sh` with `TRACES_E2E_SEED=fsft` | Playwright 94 passed, 4 skipped by design; `real_snapshot.cjs` 21 of 21; `chat_g5.cjs` 13 of 13 |
 
-`/meta` capability flags for the rows above are true.
+### Which end-to-end checks are real
 
-## Not done
+| Check | Data | Where it runs |
+| --- | --- | --- |
+| Playwright (`web/e2e`, desktop and android-360, axe) | **Real**: fsft@b1125d8 from the cached full-history clone, indexed with history by `scripts/e2e_seed.py --seed fsft` | CI `e2e` job. Locally `scripts/e2e_ui.sh` defaults to the 4-file synthetic seed (`octo/synth`) unless `TRACES_E2E_SEED=fsft` |
+| `tests/e2e/real_snapshot.cjs` | Real fsft snapshot: nine screens, axe WCAG 2.2 AA at 1280 px and 360 px touch | CI `e2e` job (fsft seed only) |
+| `tests/e2e/chat_g5.cjs` | Real fsft snapshot, BYOK chat against an in-process **stub** provider | CI `e2e` job (fsft seed only) |
+| `tests/e2e/demo_walk.cjs` | The running box app (15 demo steps, read-only) | Local only, not in CI ([acceptance/DEMO_SCRIPT.md](acceptance/DEMO_SCRIPT.md)) |
+| `tests/e2e/test_*.py` | Worker-indexed scratch repos (co-change explain, Express patterns, Python package patterns) | CI `security` job |
 
-- Hook H3: the index job does not re-index milestone SHAs, so history's evidence-set diff usually has only the pinned SHA. Compare then falls back to an identity diff of static claims (D-024).
+A live LLM provider is not tested in v1 (no paid key, no local model).
+
+## Merged into `build/traces-v1`
+
+| PR | Merge SHA | Branch | What landed |
+| --- | --- | --- | --- |
+| #1 | `bcc9c2c` | `task/002-evidence-core` | Task 002 research and Decision 002-B closeout (on `main`) |
+| #3 | `7d93fae` | `ws/history-contract` | History contract |
+| #5 | `1bfb082` | `ws/history-core` | History core |
+| #6 | `0586697` | `ws/ui-shell` | UI shell |
+| #8 | `358b05c` | `ws/arch-store-concurrency` | Per-thread SQLite connections, WAL |
+| #11 | `cc2da0d` | `ws/history-analysis` | History analysis |
+| #7 | `8dd6fe5` | `ws/ui-overview` | Overview screen |
+| #10 | `a0cc07c` | `ws/ui-graph` | Graph and evidence drawer |
+| #12 | `7a34dea` | `ws/ui-trace` | Trace view |
+| #13 | `a571299` | `ws/ui-explain` | Deterministic explain, Ask screen |
+| #18 | `184dfd3` | `ws/lab-ci` | CI workflow active |
+| #14 | `15a5f71` | `ws/ui-explain-tests` | Explain tests in `tests/explain` |
+| #9 | `83f5731` | `ws/arch-ingest` | Ingest (D-021), migration 0002 |
+| #15 | `80a6606` | `ws/arch-index` | Index jobs, sandboxed worker (D-022) |
+| #16 | `a106d84` | `ws/history-runner` | History runner |
+| #17 | `3309b83` | `ws/ui-history` | History screens |
+| #19 | `f1f026b` | `ws/arch-explain` | Explain wired to the API (D-023) |
+| #23 | `86e7b5a` | `ws/history-aliases` | Opt-in aliases (D-H14) |
+| #20 | `fa78d58` | `ws/ui-chat` | BYOK chat |
+| #22 | `01c5023` | `ws/lab-acceptance` | CI history, explain, vitest jobs; security suite |
+| #24 | `525bc1d` | `ws/ui-explain-history` | Co-change is a pattern in explain |
+| #25 | `e532644` | `ws/lab-acceptance` | Second repo, ACCEPTANCE.md, demo script |
+| #28 | `83fd127` | `ws/lab-acceptance` | fsft e2e seed, real-snapshot checks, perf baseline |
+| #27 | `b37eef2` | `ws/arch-security` | Isolation fails closed (D-026), F-1 to F-6, consent endpoint (D-027), D-028; migration 0003 |
+| #29 | `0b9b920` | `ws/arch-ui-contract` | Route labels, gap counts, layer reasons, `library` layer (D-029) |
+| #30 | `0c1fa0b` | `ws/lab-acceptance` | Express acceptance (G-4) |
+| #32 | `adb835e` | `ws/history-lineage-breaks` | Lineage restart caveat (D-H15) |
+| #31 | `b98ae5a` | `ws/lab-acceptance` | BYOK chat acceptance with a stub provider (G-5) |
+| #26 | `1b10fe8` | `ws/ui-acceptance-fixes` | F-7 intent routing, F-8, G-3 pages, O-2, O-3, O-4 |
+| #34 | `227310c` | `ws/ui-contract-wiring` | UI wiring for D-029 fields |
+| #35 | `fc7e7b6` | `ws/ui-explain-format` | Format only |
+| #33 | `a8b73a4` | `ws/arch-js-validator` | JS imports (D-030), F-9 trace completeness, process groups, F5, `/meta` isolation, O-9 (D-031) |
+| #36 | `84d2eda` | `ws/ui-explain-fixes-2` | F-11, F-8 JS, O-12 |
+| #37 | `320d4c9` | `ws/ui-manifest-hash` | Manifest rows hash the exact line (O-11) |
+| #38 | `0f32d4d` | `ws/ui-trace-f9` | Trace UI for unresolved-call gaps (F-9) |
+
+Open and not merged: #4 (integration tracking PR, do not merge), #21 (this review package, draft).
+
+## Not done in v1
+
+- **H3**: the index job passes only the pinned SHA to history (one evidence set), so milestone SHAs are not re-indexed. Compare falls back to an identity diff of static claims (D-024).
 - Private repositories. v1 never asks for credentials.
-- No LLM is called by the server. Optional chat is a browser-side bundle after consent. There is no provider adapter in the backend.
-- End-to-end browser tests run on a synthetic seed, not on the Task 002 snapshot. The CI `e2e` job runs on every push and PR (`bash scripts/e2e_ui.sh`, Playwright specs in `web/e2e`). It seeds a 4-file synthetic repo (`octo/synth`) through `scripts/e2e_seed.py`, not `fastapi/full-stack-fastapi-template@b1125d8`. Run [39716507167](https://github.com/ShaileshRawat1403/traces/actions/runs/39716507167) on `35499bc`: 54 passed, 2 skipped. The same script on a fresh clone at `35499bc` (2026-10-23 IST): 54 passed, 2 skipped. Lab is adding a real-snapshot seed on `ws/lab-acceptance`.
-- CI does not yet run `tests/history`, `tests/explain` or the web vitest suite as separate jobs. Lab's CI additions for those are pushed at `ws/lab-acceptance` `bd0a603` and are not merged.
-- D-006 (worker memory cap) is closed by D-022: an RSS watchdog stops the index worker at `TRACES_MAX_RSS_MB` (default 6144). `RLIMIT_AS` stays off.
-- Acceptance evidence is not complete. `docs/ACCEPTANCE.md` (discrepancy table), the demo script, `tests/e2e`, `tests/security` and `tests/perf` are Lab-owned and pending. The draft review package `docs/review/V1_REVIEW_PACKAGE.md` records the section 7 audit on `35499bc`.
-- Compare is not a full rename-aware architecture diff unless those records were stored by a history run that received two evidence sets.
+- No server-side LLM. Chat is browser-side BYOK only, with a stub-provider acceptance; a live provider is untested.
+- JavaScript calls, references, instantiations and named import bindings are not validated (v1.1, D-030).
 
-## CI
-
-GitHub Actions is active. Do not treat a mergeable PR as a tested integration. A green Actions run on `build/traces-v1` after this push is the CI result. The earlier green run `39593694100` predates the six integrated PRs and this checkpoint.
-
-## Verified locally (2026-10-21, this checkpoint)
-
-Not a CI result. Commands used git 2.47.3, CPython 3.14.8, Node 22.23.3, and the pinned CodeGraph 1.6.2.
-
-| Check | Result |
-| --- | --- |
-| `pytest tests/unit tests/api tests/explain tests/history` except `test_index_baseline` | 254 passed, 17 skipped (2 live-network tests were not in this command; the fsft history regression skips without `TRACES_HISTORY_FSFT_REPO`) |
-| `TRACES_NETWORK_TESTS=1 pytest tests/unit/test_ingest.py -k live` | 2 passed (public HEAD, missing/private refused) |
-| `pytest tests/contract tests/regression tests/api/test_index_baseline.py` | 33 passed. Product index of `fastapi/full-stack-fastapi-template@b1125d8`: 4,642 edges = 4,538 verified + 36 observed + 59 unvalidated + 9 rejected; 12 rejected overall, 3 injected; adapter `45600280...`; validation `73db432b...`. History on that index: `done`, `complete=true`, 8,464 records |
-| `mypy`, `ruff` on the Python diff, `npm run check:api`, web `tsc` | clean |
-| Second public repo `pallets/itsdangerous@672971d66a2e` | index succeeded in one run. 674 CodeGraph edges (310 verified, 3 observed, 268 unvalidated, 46 missing_location, 47 rejected). History `done`, 1,988 records. Overview quotes the README heading "ItsDangerous" as interpretation, not as a verified purpose. Graph and explain both answered |
-
-## Open product limits (honest)
+## Product limits (honest)
 
 - A relationship the extractor missed is a gap or an absence, not a claim that the link does not exist.
 - Co-change and hotspots are history patterns. They are not code dependencies and not causes.
 - Library-contract hops (react-hook-form, TanStack Query on the Task 002 chain) stay inferred unless an independent check says otherwise.
 - The persistence path on the Task 002 chain is a static path, not a runtime-observed database write.
-- Rejected CodeGraph imports and the three injected negatives stay rejected and are hidden from the default graph.
-- JavaScript (D-030): only `imports` edges have an independent check (TypeScript 6.0.3 parser plus Node CommonJS resolution of relative specifiers). JavaScript calls, references, instantiations and named import bindings stay unvalidated or observed and are never verified in v1; that check is v1.1. Package, absolute, aliased (bundler or `paths`) and computed specifiers are not resolved, so those imports stay unvalidated.
-- Express mounts (O-7): a router mounted in a computed way, such as `forEach` over an array of routes, keeps its local path without the mount prefix. Literal mounts are composed. Middleware mounts are listed as method `USE` with flag `mount`.
-- Persistence (O-8): only the FastAPI/SQLModel session path is recognised. Mongoose (`Model.create`, `doc.save`) and other ODMs are not detected, so trace and explain say no persistence path is recorded for such apps. That is an honest unknown, not an absence.
+- Rejected CodeGraph imports and the three injected negatives stay rejected, are flagged `injected_control`, and are hidden from the default graph.
+- JavaScript (D-030): only `imports` edges have an independent check. Package, absolute, aliased and computed specifiers are not resolved, so those imports stay unvalidated.
+- Express mounts (O-7): routers mounted through a computed `forEach` keep their local path without the prefix. Literal mounts are composed; middleware mounts show as method `USE` with flag `mount`.
+- Persistence (O-8): only the FastAPI/SQLModel session path is recognised. Mongoose and other ODMs are not detected; trace and explain say no persistence path is recorded.
+- README heading and frameworks on the overview are uncited interpretations, not verified claims.
+- Graph and trace p95 is about 630 ms on fsft (O-5, [acceptance/PERF.md](acceptance/PERF.md), local).
+- The BYOK provider key is stored in the browser (sessionStorage, or localStorage with "Remember on this device"), by design.
+- History git commands run in the job thread with network transports refused and RLIMITs, not inside `unshare -rn`. `docs/contracts/history.md` says the worker runs history under `unshare -rn`.
