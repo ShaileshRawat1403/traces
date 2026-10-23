@@ -1821,7 +1821,7 @@
         "type": "null"
        }
       ],
-      "description": "gap hops for unresolved calls only (F-9): the call names this step makes that the extractor stored as unresolved references",
+      "description": "gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references",
       "title": "Unresolved Calls"
      }
     },

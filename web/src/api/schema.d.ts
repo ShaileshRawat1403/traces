@@ -1257,7 +1257,7 @@ export interface components {
             type: "edge" | "gap" | "library_contract";
             /**
              * Unresolved Calls
-             * @description gap hops for unresolved calls only (F-9): the call names this step makes that the extractor stored as unresolved references
+             * @description gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references
              */
             unresolved_calls?: string[] | null;
         };

@@ -678,13 +678,14 @@ def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include
         hops = [_hop(i, rec, start, (rec.get("to") or {}).get("symbol") or start) for i, rec in enumerate(recs[:MAX_TRACE_HOPS])]
         if not hops:
             hops = [gap(0, start, start, "This symbol has no outgoing static relationship shown.")]
-    # F-9: a step whose outgoing calls are stored only as unresolved references is not fully traced. Each such step gets
-    # a gap that names them, and an edge hop that is not verified or observed also keeps the trace from being complete.
+    # F-9: listing what a symbol calls (no `to`): calls stored only as unresolved references are not followed, so each
+    # gets named in a gap and the listing is not complete. A from -> to path is judged by its own hops: side calls of a
+    # step that do not lie on the path are not gaps in it. A call already shown as a hop from the same step is no gap.
     steps = [start] if start is not None and not to else []
-    steps += [h["from_symbol"] for h in hops if h["type"] != "gap"]
     unresolved = _unresolved_calls(st, snapshot_id, set(steps), include_rejected) if steps else {}
     for sym in dict.fromkeys(steps):
-        names = unresolved.get(sym)
+        shown_tails = {h["to_symbol"].split("::")[-1] for h in hops if h["type"] != "gap" and h["from_symbol"] == sym}
+        names = [n for n in unresolved.get(sym, []) if n not in shown_tails]
         if names:
             shown = ", ".join(names[:MAX_UNRESOLVED_NAMES]) + (f", and {len(names) - MAX_UNRESOLVED_NAMES} more" if len(names) > MAX_UNRESOLVED_NAMES else "")
             g = _hop(len(hops), None, sym, "(unresolved)", gap=(
