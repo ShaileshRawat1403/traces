@@ -153,7 +153,10 @@ def test_history_absent_is_skipped_and_failure_is_safe(synth, settings_env):
     res = IndexRun(st, "h2", ref, "0" * 40, s).execute()
     j = get_job(st, "h2")
     assert j["state"] == "failed" and j["error_code"] == "sha_not_found"
-    assert st.get_snapshot(f"{ref.cache_key}@{'0' * 40}")["state"] == "failed"
+    # F-6: a commit that does not exist leaves no failed snapshot row and no empty cache directory behind
+    assert j["snapshot_id"] is None and st.get_snapshot(f"{ref.cache_key}@{'0' * 40}") is None
+    assert not (s.targets_dir / ref.cache_key / ("0" * 40)).exists()
+    assert st.get_snapshot(f"{ref.cache_key}@{sha}")["state"] == "ready"  # the real snapshot is untouched
     st.close()
 
 

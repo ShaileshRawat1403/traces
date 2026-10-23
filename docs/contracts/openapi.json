@@ -193,10 +193,16 @@
       "title": "From Symbol"
      },
      "injected": {
-      "default": false,
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "description": "true for an injected negative control (Task 002 regression fixture): fed to the validators to prove they reject it, never a statement about the repository",
-      "title": "Injected",
-      "type": "boolean"
+      "title": "Injected"
      },
      "kind": {
       "anyOf": [
@@ -519,10 +525,16 @@
       "type": "string"
      },
      "injected": {
-      "default": false,
-      "description": "true for an injected negative control, never a statement about the repository",
-      "title": "Injected",
-      "type": "boolean"
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true for an injected negative control, never a statement about the repository; always sent",
+      "title": "Injected"
      },
      "kind": {
       "title": "Kind",
@@ -679,13 +691,19 @@
       "type": "boolean"
      },
      "truncated_counts": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "default": {},
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "integer"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "description": "edges matched but cut by `limit`, by status (empty when not truncated)",
-      "title": "Truncated Counts",
-      "type": "object"
+      "title": "Truncated Counts"
      }
     },
     "required": [
@@ -1548,10 +1566,16 @@
       "type": "object"
      },
      "unisolated": {
-      "default": false,
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "description": "true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is never acceptance evidence (D-026)",
-      "title": "Unisolated",
-      "type": "boolean"
+      "title": "Unisolated"
      }
     },
     "required": [
@@ -1666,10 +1690,16 @@
       "type": "integer"
      },
      "injected": {
-      "default": false,
-      "description": "true when the hop is an injected negative control, never a repository fact",
-      "title": "Injected",
-      "type": "boolean"
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true when the hop is an injected negative control, never a repository fact; sent for edge hops",
+      "title": "Injected"
      },
      "kind": {
       "title": "Kind",

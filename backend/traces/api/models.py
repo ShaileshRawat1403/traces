@@ -95,7 +95,7 @@ class Snapshot(Strict):
     isolation: Literal["unshare", "off"] | None = Field(None, description="how the analysis workers ran for the stored evidence: "
                                                         "unshare (no network, probe-checked) or off (explicit dev override). null "
                                                         "before indexing or for snapshots stored before D-026")
-    unisolated: bool = Field(False, description="true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is "
+    unisolated: bool | None = Field(None, description="true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is "
                                                "never acceptance evidence (D-026)")
 
 
@@ -152,7 +152,7 @@ class ClaimSummary(Strict):
     statement: str
     qualifier: str | None = None
     flags: list[str] = Field([], description="record flags; injected records also carry injected_control")
-    injected: bool = Field(False, description="true for an injected negative control (Task 002 regression fixture): fed to the "
+    injected: bool | None = Field(None, description="true for an injected negative control (Task 002 regression fixture): fed to the "
                                               "validators to prove they reject it, never a statement about the repository")
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -223,7 +223,7 @@ class GraphEdge(Strict):
     label: Label
     qualifier: str | None = None
     flags: list[str] = Field([], description="record flags; injected records also carry injected_control")
-    injected: bool = Field(False, description="true for an injected negative control, never a statement about the repository")
+    injected: bool | None = Field(None, description="true for an injected negative control, never a statement about the repository; always sent")
 
 
 class GraphResponse(Strict):
@@ -233,7 +233,7 @@ class GraphResponse(Strict):
     hidden_counts: HiddenCounts = Field(description="edges hidden by the status filter, by status, scoped like the edges: the "
                                                     "filtered snapshot when unfocused, the focused neighbourhood or component otherwise")
     truncated: bool
-    truncated_counts: dict[str, int] = Field({}, description="edges matched but cut by `limit`, by status (empty when not truncated)")
+    truncated_counts: dict[str, int] | None = Field(None, description="edges matched but cut by `limit`, by status (empty when not truncated)")
     limit: int
 
 
@@ -262,7 +262,7 @@ class TraceHop(Strict):
     reason: str | None = Field(None, description="required for gap and library_contract hops (both are inferred)")
     qualifier: str | None = None
     evidence_scope: Literal["static"] = "static"
-    injected: bool = Field(False, description="true when the hop is an injected negative control, never a repository fact")
+    injected: bool | None = Field(None, description="true when the hop is an injected negative control, never a repository fact; sent for edge hops")
 
 
 class TraceResponse(Strict):

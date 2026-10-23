@@ -1,7 +1,7 @@
 """CodeGraph 1.6.2 -> Traces evidence records (pipeline format traces-evidence/0.3; migrated to 0.4 downstream).
 Ported from research/task002/adapter/cg_adapter.py (ADAPTER_CONTRACT v2 with Decision 002-B amendments).
 Changes from research: package imports, portable paths from the manifest, the registry record is a committed JSON
-file (toolchain/registry_record.json) instead of a setup log, and a documented isolation fallback (section 9).
+file (toolchain/registry_record.json) instead of a setup log, and no isolation fallback: check 4.7 is skipped only for the explicit TRACES_ISOLATION=off dev override (D-026).
 CodeGraph is an extractor only: the adapter never sets observed or verified. Reads the index with mode=ro&immutable=1.
 Usage: python -m traces.adapter.codegraph --manifest <manifest.json>
 Exit 0 with records.jsonl + report.json, or exit 2 with errors.json and no records (fail closed)."""

@@ -203,6 +203,21 @@ class Store:
                             (json.dumps(extractor, sort_keys=True), json.dumps(languages, sort_keys=True), json.dumps(frameworks),
                              json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), isolation, snapshot_id))
 
+    def drop_unindexed_snapshot(self, snapshot_id: str) -> bool:
+        """Remove a snapshot row that never held evidence (F-6: a commit that does not exist). Jobs keep their record
+        with snapshot_id NULL; a ready snapshot or one with claims is never removed. Returns True when removed."""
+        with self.write_lock, self.db:
+            row = self.db.execute("SELECT state FROM snapshots WHERE id=?", (snapshot_id,)).fetchone()
+            if row is None or row[0] == "ready":
+                return False
+            if self.db.execute("SELECT 1 FROM claims WHERE snapshot_id=? LIMIT 1", (snapshot_id,)).fetchone():
+                return False
+            self.db.execute("UPDATE jobs SET snapshot_id=NULL WHERE snapshot_id=?", (snapshot_id,))
+            for t in ("runs", "components"):
+                self.db.execute(f"DELETE FROM {t} WHERE snapshot_id=?", (snapshot_id,))  # noqa: S608  fixed table names
+            self.db.execute("DELETE FROM snapshots WHERE id=?", (snapshot_id,))
+        return True
+
     def set_ai_consent(self, repo_id: str, consent: bool, text_version: str | None, at: str) -> None:
         """Record the repo-level external AI consent decision (D-027). Revoking keeps the time of the change."""
         with self.write_lock, self.db:

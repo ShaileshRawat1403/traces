@@ -164,12 +164,28 @@ class IndexRun:
                 self.st.set_snapshot_state(self.sid, "failed")
             update_job(self.st, self.job_id, state="failed", phase="failed", message=msg, error_code=code, error_detail=msg, level="error")
             self._record_run(started)
+            if code == "sha_not_found" and not was_ready:
+                self._forget_missing_commit()
             if not isinstance(e, Exception):
                 raise
             return self.result
         update_job(self.st, self.job_id, state="succeeded", phase="done", progress=1.0, message="index complete")
         self._record_run(started)
         return self.result
+
+    def _forget_missing_commit(self) -> None:
+        """F-6: a commit that does not exist leaves nothing behind: no failed snapshot row at that SHA and no empty
+        cache directories. The failed job (code sha_not_found) stays, with snapshot_id NULL."""
+        try:
+            self.st.drop_unindexed_snapshot(self.sid)
+        except Exception:  # noqa: BLE001  cleanup must never mask the job outcome
+            pass
+        sha_dir = self.s.targets_dir / self.ref.cache_key / self.sha
+        for d in (sha_dir, sha_dir.parent):
+            try:
+                d.rmdir()  # only removes empty directories; a populated cache is never touched
+            except OSError:
+                break
 
     def _failure(self, e: BaseException) -> tuple[str, str, dict[str, Any]]:
         if isinstance(e, IngestError):

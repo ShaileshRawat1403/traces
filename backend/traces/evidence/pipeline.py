@@ -286,6 +286,9 @@ class Inside:
                 ev = [json.loads(line) for line in open(vd / "validation" / "evidence.jsonl")]
                 vt[k]["canonical_hash"] = canonical_hash(ev)
                 self.sh([self.py, "-m", "traces.evidence.schema_check", SCHEMA_03, vd / "validation" / "evidence.jsonl"], out=vd / "schema_evidence.json")
+                if k == "v1":  # steps 8 to 10 artifacts (chain.json, coverage.json), as the research run produced them (F7)
+                    rr = self.sh([self.py, "-m", "traces.evidence.report", vd / "validation"])
+                    vt[k]["report"] = {"exit": rr.returncode, "stdout": rr.stdout[-2000:], "stderr": rr.stderr[-2000:]}
         res["validation"] = vt
         res["finished"] = now_ist()
         (R / "inside_result.json").write_text(json.dumps(res, indent=1, default=str))

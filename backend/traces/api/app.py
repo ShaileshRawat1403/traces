@@ -325,6 +325,11 @@ def create_index_job(repo_id: str, body: IndexJobCreate, st: StoreDep, probe: Pr
             st.record_remote_head(repo_id, head.sha, head.default_branch, head.checked_at)
             sha = head.sha
     snap = st.get_snapshot(f"{repo_id}@{sha}")
+    if body.sha is not None and sha != r["latest_discovered_sha"] and not (snap and snap["state"] == "ready"):
+        # F-6: refuse an unknown commit before any snapshot row, job or clone exists
+        check = getattr(probe, "commit_exists", None)
+        if callable(check) and not check(ref, sha):
+            raise ApiError(422, "sha_not_found", f"commit {sha} is not in {ref.slug} (checked anonymously); no job was created")
     if snap and snap["state"] == "ready" and not body.reindex and not st.active_job(snap["id"]):
         raise ApiError(409, "already_indexed", f"{snap['id']} is already indexed; send reindex=true to index it again",
                        detail={"snapshot_id": snap["id"]})
