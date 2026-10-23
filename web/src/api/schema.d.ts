@@ -665,13 +665,19 @@ export interface components {
             kind: string;
             /**
              * Layer
+             * @description library: code of a repository that declares a package and has no application framework or entrypoint (D-029); otherwise the path-and-extension rule
              * @enum {string}
              */
-            layer: "frontend" | "api" | "backend" | "data" | "infra" | "docs" | "tests" | "other";
+            layer: "frontend" | "api" | "backend" | "library" | "data" | "infra" | "docs" | "tests" | "other";
             /** Name */
             name: string;
             /** Paths */
             paths: string[];
+            /**
+             * Reason
+             * @description why this layer: the counted files and rule behind it (D-029); null for snapshots indexed before D-029
+             */
+            reason?: string | null;
             /**
              * Rule
              * @description deterministic grouping rule that produced this component
@@ -1105,6 +1111,11 @@ export interface components {
             flags: string[];
             /** Handler Symbol */
             handler_symbol: string | null;
+            /**
+             * Label
+             * @description the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for display; null when none was recorded. Never synthesized
+             */
+            label?: string | null;
             /** Line */
             line: number;
             /**
@@ -1209,6 +1220,11 @@ export interface components {
             evidence_scope: "static";
             /** From Symbol */
             from_symbol: string;
+            /**
+             * Hidden Rejected
+             * @description gap hops only: rejected relationships leaving this step that the request hides (include_rejected=false); the reason text states all hidden counts
+             */
+            hidden_rejected?: number | null;
             /** Index */
             index: number;
             /**

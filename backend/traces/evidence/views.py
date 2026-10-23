@@ -14,7 +14,7 @@ from typing import Any
 
 from traces.evidence.store import Store
 
-LAYERS = {"frontend", "api", "backend", "data", "infra", "docs", "tests", "other"}
+LAYERS = {"frontend", "api", "backend", "library", "data", "infra", "docs", "tests", "other"}
 ENTITIES = {"symbol", "file", "component", "route", "operation", "commit", "dependency", "repo"}
 STATUSES = ("verified", "observed", "unvalidated", "missing_location", "rejected")
 STATUS_WEIGHT = {"verified": 1, "observed": 2, "unvalidated": 5, "missing_location": 8, "rejected": 50}
@@ -179,7 +179,8 @@ def components_view(st: Store, snapshot_id: str) -> list[dict[str, Any]]:
             file_of[p] = row["component_id"]
         layer = row["layer"] if row["layer"] in LAYERS else "other"
         out.append({"id": row["component_id"], "name": row["name"], "layer": layer, "kind": row["kind"] or "directory",
-                    "paths": paths, "rule": row["rule"], "claim_counts": {}})
+                    "paths": paths, "rule": row["rule"], "claim_counts": {},
+                    "reason": (_loads(row.get("record_json"), {}) or {}).get("reason")})
     by_id = {c["id"]: c for c in out}
     counts: dict[str, Counter[str]] = defaultdict(Counter)
     for (ff, tf, status) in st.db.execute("SELECT from_file, to_file, status FROM claims WHERE snapshot_id=?", (snapshot_id,)):
@@ -254,10 +255,14 @@ def routes_view(st: Store, snapshot_id: str) -> list[dict[str, Any]]:
             flags.append("mount")
         if method == "UNKNOWN" and "method_not_recorded" not in flags:
             flags.append("method_not_recorded")
+        raw = rec.get("provenance_raw") or {}
+        row = raw.get("row") if isinstance(raw.get("row"), dict) else {}
+        name = row.get("name") if isinstance(row, dict) else None
         items.append({
             "method": method, "path": path, "handler_symbol": handler, "operation_id": None,
             "file": file or "(file not recorded)", "line": line, "status": rec["status"],
             "claim_id": rec["claim_id"], "flags": flags,
+            "label": name.strip()[:200] if isinstance(name, str) and name.strip() else None,
         })
     items.sort(key=lambda r: (r["path"], r["method"], r["claim_id"]))
     return items
@@ -614,12 +619,17 @@ def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include
     hidden: Counter[str] = Counter()
     outgoing: dict[str, list[tuple[int, str, dict[str, Any]]]] = defaultdict(list)
     nodes: set[str] = set()
+    hidden_out: dict[str, Counter[str]] = defaultdict(Counter)  # per-step hidden edges, for gap reasons
+    hidden_syms: set[str] = set()
     for rec in load_records(st, snapshot_id, scopes={"static"}, claim_kind="relationship"):
-        if rec.get("status") not in allowed:
-            hidden[str(rec.get("status"))] += 1
-            continue
         src = (rec.get("from") or {}).get("symbol")
         dst = (rec.get("to") or {}).get("symbol")
+        if rec.get("status") not in allowed:
+            hidden[str(rec.get("status"))] += 1
+            if src and dst and src != dst:
+                hidden_out[src][str(rec.get("status"))] += 1
+                hidden_syms.update((src, dst))
+            continue
         if not src or not dst or src == dst:
             continue
         nodes.add(src)
@@ -635,22 +645,39 @@ def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include
             prev.pop(i)
         prev.append((w, dst, rec))
 
-    start = _resolve(frm, nodes)
-    goal = _resolve(to, nodes) if to else None
+    known = nodes | hidden_syms  # a symbol whose only edges are hidden still resolves, so the gap can say why
+
+    def gap(i: int, a: str, b: str, text: str) -> dict[str, Any]:
+        """A gap hop whose reason also states how many edges leaving `a` this request hides, by status."""
+        h = hidden_out.get(a) or Counter()
+        rej = int(h.get("rejected", 0))
+        if h:
+            parts = ", ".join(f"{n} {k}" for k, n in sorted(h.items()))
+            text += (f" {sum(h.values())} outgoing static relationship(s) from this step are hidden ({parts});"
+                     " send include_rejected=true to see rejected ones.")
+        else:
+            text += " No outgoing relationship from this step is hidden."
+        hop = _hop(i, None, a, b, gap=text)
+        hop["hidden_rejected"] = rej
+        return hop
+
+    start = _resolve(frm, known)
+    goal = _resolve(to, known) if to else None
     hops: list[dict[str, Any]] = []
     if start is None:
         hops = [_hop(0, None, frm, to or frm, gap=f"No stored static symbol matches {frm!r}.")]
+        hops[0]["hidden_rejected"] = 0
     elif to and goal is None:
-        hops = [_hop(0, None, start, to, gap=f"No stored static symbol matches {to!r}.")]
+        hops = [gap(0, start, to, f"No stored static symbol matches {to!r}.")]
     elif to and goal is not None:
         found = _shortest(outgoing, start, goal)
-        hops = found if found is not None else [_hop(
-            0, None, start, goal,
-            gap="No recorded static relationship connects these symbols. Absence is not proof they are unrelated.")]
+        hops = found if found is not None else [gap(
+            0, start, goal, "No recorded static relationship connects these symbols. Absence is not proof they are unrelated.")]
     else:
         recs = sorted((rec for _w, _d, rec in outgoing.get(start, [])), key=lambda r: (_rank_status(r.get("status")), r["claim_id"]))
         hops = [_hop(i, rec, start, (rec.get("to") or {}).get("symbol") or start) for i, rec in enumerate(recs[:MAX_TRACE_HOPS])]
         if not hops:
+<<<<<<< HEAD
             hops = [_hop(0, None, start, start, gap="This symbol has no outgoing static relationship in the store.")]
     # F-9: a step whose outgoing calls are stored only as unresolved references is not fully traced. Each such step gets
     # a gap that names them, and an edge hop that is not verified or observed also keeps the trace from being complete.
@@ -674,6 +701,10 @@ def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include
         incomplete.append(f"{len(weak)} step(s) rest on relationships that are not verified or observed")
     for i, h in enumerate(hops):
         h["index"] = i
+=======
+            hops = [gap(0, start, start, "This symbol has no outgoing static relationship shown.")]
+    complete = not any(h["type"] == "gap" for h in hops)
+>>>>>>> origin/build/traces-v1
     return {"snapshot_id": snapshot_id, "from_symbol": start or frm, "to_symbol": goal or to, "hops": hops,
             "hidden_counts": dict(hidden), "complete": not incomplete, "incomplete_reasons": incomplete}
 

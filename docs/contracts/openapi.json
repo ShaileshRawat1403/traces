@@ -295,10 +295,12 @@
       "type": "string"
      },
      "layer": {
+      "description": "library: code of a repository that declares a package and has no application framework or entrypoint (D-029); otherwise the path-and-extension rule",
       "enum": [
        "frontend",
        "api",
        "backend",
+       "library",
        "data",
        "infra",
        "docs",
@@ -318,6 +320,18 @@
       },
       "title": "Paths",
       "type": "array"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "why this layer: the counted files and rule behind it (D-029); null for snapshots indexed before D-029",
+      "title": "Reason"
      },
      "rule": {
       "description": "deterministic grouping rule that produced this component",
@@ -1427,6 +1441,18 @@
       ],
       "title": "Handler Symbol"
      },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for display; null when none was recorded. Never synthesized",
+      "title": "Label"
+     },
      "line": {
       "title": "Line",
       "type": "integer"
@@ -1686,6 +1712,18 @@
      "from_symbol": {
       "title": "From Symbol",
       "type": "string"
+     },
+     "hidden_rejected": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "gap hops only: rejected relationships leaving this step that the request hides (include_rejected=false); the reason text states all hidden counts",
+      "title": "Hidden Rejected"
      },
      "index": {
       "title": "Index",
