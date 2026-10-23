@@ -12,6 +12,15 @@ export function gapHiddenNote(hidden: Record<string, number> | null | undefined)
   return `${n.toLocaleString("en-US")} rejected relationship${n === 1 ? " is" : "s are"} hidden from this trace, so a rejected one may touch this step. The API's note below does not count them.`;
 }
 
+/** The per-step hidden count the API gives on a gap hop (hidden_rejected), or null when it gives none. */
+export function stepHiddenRejected(hop: Pick<TraceHop, "type" | "hidden_rejected">): number | null {
+  return hop.type === "gap" && typeof hop.hidden_rejected === "number" && hop.hidden_rejected >= 0 ? hop.hidden_rejected : null;
+}
+
+export function stepHiddenText(n: number): string {
+  return `${n.toLocaleString("en-US")} rejected claim${n === 1 ? "" : "s"} hidden here.`;
+}
+
 export type HopKind = "edge" | "gap" | "library_contract" | "hidden";
 
 export interface HopView {

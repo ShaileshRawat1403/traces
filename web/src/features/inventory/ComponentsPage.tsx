@@ -8,9 +8,20 @@ import { EXPECTED_LABEL, isStatus } from "../../status/status";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
+import { LAYERS, LAYER_COLOR } from "../layers";
 import { useParam } from "./useDrawer";
 
 const PATHS_SHOWN = 40;
+
+/** Shown when the API gives no layer reason (snapshots indexed before reasons existed). */
+export const PATH_RULE_NOTE =
+  "Components and layers are assigned by the API from file paths with a named rule (shown on each component). The layer is the API's label, not a reading of what the code does, so a library's source folder can be labelled backend.";
+export const REASON_NOTE = "Components and layers are assigned by the API. Each component shows the API's own reason for its layer: the files it counted and the rule it applied.";
+
+/** The page note: the API's reasons when every component has one, otherwise the path-rule note. */
+export function layerNote(items: readonly Component[]): string {
+  return items.length > 0 && items.every((c) => !!c.reason) ? REASON_NOTE : PATH_RULE_NOTE;
+}
 
 export function filterComponents(items: readonly Component[], text: string, layer: string): Component[] {
   const t = text.trim().toLowerCase();
@@ -29,14 +40,14 @@ export function ComponentsView({ items, base }: { items: Component[]; base: stri
   const [text, setText] = useParam("q");
   const [layer, setLayer] = useParam("layer");
   const ids = { q: useId(), l: useId() };
-  const layers = [...new Set(items.map((c) => c.layer))].sort();
+  const present = new Set(items.map((c) => c.layer));
+  const layers = LAYERS.filter((l) => present.has(l));
   const shown = filterComponents(items, text, layer);
   const rejected = items.reduce((n, c) => n + (c.claim_counts.rejected ?? 0), 0);
   return (
     <section aria-label="Components" data-testid="components">
       <p className="mb-3 rounded-md border border-line bg-surface p-3 text-sm text-ink-2" data-testid="layer-note">
-        Components and layers are assigned by the API from file paths with a named rule (shown on each component). The layer is the API's label, not a reading of what the code
-        does, so a library's source folder can be labelled backend.
+        {layerNote(items)}
       </p>
       <form role="search" className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-3" onSubmit={(e) => e.preventDefault()}>
         <label htmlFor={ids.q} className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
@@ -74,9 +85,26 @@ export function ComponentsView({ items, base }: { items: Component[]; base: stri
                 <h2 className="break-all font-mono text-sm font-semibold">{c.name}</h2>
                 <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
                   <dt className="text-muted">Layer</dt>
-                  <dd data-testid="component-layer">{c.layer}</dd>
-                  <dt className="text-muted">Rule</dt>
-                  <dd className="break-all font-mono text-xs">{c.rule}</dd>
+                  <dd className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: LAYER_COLOR[c.layer] }} aria-hidden="true" />
+                    <span data-testid="component-layer">{c.layer}</span>
+                  </dd>
+                  {c.reason ? (
+                    <>
+                      <dt className="text-muted">Why</dt>
+                      <dd className="break-words text-xs" data-testid="component-reason">
+                        {c.reason}
+                      </dd>
+                    </>
+                  ) : (
+                    <>
+                      <dt className="text-muted">Rule</dt>
+                      <dd className="break-all text-xs" data-testid="component-rule">
+                        <span className="font-mono">{c.rule}</span>
+                        <span className="block text-muted">Path rule only; the API gave no reason for this layer.</span>
+                      </dd>
+                    </>
+                  )}
                   <dt className="text-muted">Files</dt>
                   <dd>{c.paths.length}</dd>
                 </dl>

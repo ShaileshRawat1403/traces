@@ -9,17 +9,7 @@ import { StatusChip } from "../../ui/StatusChip";
 import { EndpointView } from "./EndpointView";
 import { OverviewView } from "./OverviewView";
 
-const LAYER_SWATCH: Record<string, string> = {
-  frontend: "#8fd9cf",
-  api: "#7eb6ff",
-  backend: "#d7fff8",
-  data: "#e2b16a",
-  infra: "#b7c4ce",
-  docs: "#c4b4ea",
-  tests: "#ef8d86",
-  other: "#8ea399",
-};
-import { LAYERS } from "../graph/graphModel";
+import { LAYERS, LAYER_COLOR } from "../layers";
 const LABEL_FOR: Record<string, string> = { verified: "verified", observed: "observed", unvalidated: "inferred", missing_location: "inferred", rejected: "rejected" };
 
 function SnapshotCounts() {
@@ -74,14 +64,19 @@ function ComponentMap() {
     <section className="mb-4 rounded-lg border border-line bg-surface p-4" aria-label="Components by layer">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Architecture, by stored layer</h2>
-        <p className="max-w-xl text-xs text-muted">Each band is the API's layer label from a file path rule, not a reading of the code and not a runtime boundary; a library's source folder can show as backend. The bar is how many claims were recorded, not a connection to the next band.</p>
+        <p className="max-w-xl text-xs text-muted" data-testid="overview-layer-note">
+          {q.data.length > 0 && q.data.every((c) => !!c.reason)
+            ? "Each band is the API's layer label; the Components page shows the API's reason for each one. It is not a runtime boundary."
+            : "Each band is the API's layer label from a file path rule, not a reading of the code and not a runtime boundary; a library's source folder can show as backend."}{" "}
+          The bar is how many claims were recorded, not a connection to the next band.
+        </p>
       </div>
       <ol className="flex flex-col gap-2">
         {layers.map((layer, i) => (
           <li key={layer} className="grid grid-cols-1 gap-2 rounded-md border border-line bg-canvas p-2 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:items-start">
             <div className="flex items-center gap-2 px-1">
               <span className="text-xs tabular-nums text-muted">{i + 1}</span>
-              <span className="inline-block h-3 w-3 rounded-sm" style={{ background: LAYER_SWATCH[layer] }} aria-hidden="true" />
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ background: LAYER_COLOR[layer] }} aria-hidden="true" />
               <h3 className="text-sm font-semibold capitalize">{layer}</h3>
             </div>
             <ul className="flex flex-wrap gap-2">
@@ -92,12 +87,12 @@ function ComponentMap() {
                     <Link
                       to={`${base}/graph?focus=${encodeURIComponent(c.id)}`}
                       className="block rounded-md border-2 bg-surface px-2 py-1.5 text-ink no-underline hover:bg-sunken"
-                      style={{ borderColor: LAYER_SWATCH[layer] }}
+                      style={{ borderColor: LAYER_COLOR[layer] }}
                       title={c.paths.join(", ")}
                     >
                       <span className="block truncate text-sm font-medium">{c.name}</span>
                       <span className="mt-1 block h-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
-                        <span className="block h-1 rounded-full" style={{ width: `${Math.max(8, (n / max) * 100)}%`, background: LAYER_SWATCH[layer] }} />
+                        <span className="block h-1 rounded-full" style={{ width: `${Math.max(8, (n / max) * 100)}%`, background: LAYER_COLOR[layer] }} />
                       </span>
                       <span className="mt-1 block text-xs text-muted tabular-nums">{n.toLocaleString("en-US")} claims</span>
                     </Link>
