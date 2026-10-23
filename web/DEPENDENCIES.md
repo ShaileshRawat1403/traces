@@ -16,6 +16,8 @@ Checked from each package's own `package.json` in `node_modules` on 2026-10-21 (
 | @radix-ui/react-tabs | 1.2.1 | MIT | Accessible tabs (arrow-key roving focus, aria-selected) for the overview layers. Added in ws/ui-overview |
 | shiki, @shikijs/langs, @shikijs/themes | 4.5.0 | MIT | Syntax highlighting of pinned source lines with the JavaScript regex engine (no WASM). Tokens are rendered as React text, never as HTML. Loaded lazily with the source panel; only 17 grammars and one theme are bundled. Added in ws/ui-graph |
 
+ws/ui-chat (BYOK chat) adds no dependency: the consent dialog reuses @radix-ui/react-dialog and the Explain/Chat switch reuses @radix-ui/react-tabs. Provider calls use the browser's own `fetch`, and the e2e stub provider uses Node's built-in `http` module.
+
 Full production tree (`npm ls --omit=dev --all`): 86 packages MIT, 1 package 0BSD (`tslib`, pulled in by Radix), 1 package ISC (`@ungap/structured-clone`, pulled in by Shiki through hast-util-to-html; the UI does not call the HTML path). No copyleft code ships to the browser.
 
 ## Build time only (not shipped)

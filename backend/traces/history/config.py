@@ -108,9 +108,12 @@ class HistoryConfig:
     limits: Limits = field(default_factory=Limits)
     code_extensions: tuple[str, ...] = DEFAULT_CODE_EXTENSIONS
     verify: bool = True  # run independent git plumbing checks and recounts (needed for observed status)
+    aliases: bool = False  # opt in to the run() aliases stage (D-H14); off keeps it skipped with not_in_v1_default
 
     def validate(self) -> HistoryConfig:
         self.thresholds.validate()
+        if not isinstance(self.aliases, bool):
+            raise HistoryError(E_CONFIG, "aliases must be a bool", "config")
         if self.mailmap not in ("pinned_blob", "none"):
             raise HistoryError(E_CONFIG, "mailmap must be 'pinned_blob' or 'none'", "config")
         import re

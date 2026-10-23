@@ -1,12 +1,21 @@
 """Read-only views over traces-evidence/0.4 records for the explain engine. Pure functions, no store access."""
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 GROUNDED = ("verified", "observed")
 INFERRED = ("unvalidated", "missing_location")
+# History records that describe patterns or inferences over commit history (docs/contracts/history.md 6). They are never
+# code structure, never verified and never a "fact" sentence: co-change is a pattern, not a dependency or a cause.
+HISTORY_PATTERN_CLASSES = ("history_pattern", "history_inferred")
+HISTORY_PATTERN_KINDS = ("co_changed_with", "history_impact_candidate", "file_history_metrics", "component_history_metrics",
+                         "deleted_soon_after_add", "prefix_moved")
+# Criteria keys echoed with a history pattern, in this order, when the record's parameters carry them.
+CRITERIA_KEYS = ("level", "min_revs", "min_shared_revs", "min_coupling", "max_changeset_size", "commits", "metric_set",
+                 "rename_normalization", "bot_filter", "generated_filter", "filters")
 EXPECTED_LABEL = {"verified": "verified", "observed": "observed", "unvalidated": "inferred", "missing_location": "inferred", "rejected": "rejected"}
 
 
@@ -39,15 +48,26 @@ class ClaimView:
     flags: tuple[str, ...] = ()
     status_reason: str | None = None
     route: str | None = None
+    record_class: str = ""
+    qualifier: str | None = None
+    # Echoed criteria of a history pattern as (key, compact JSON value) pairs, in CRITERIA_KEYS order.
+    criteria: tuple[tuple[str, str], ...] = ()
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
+    def history_pattern(self) -> bool:
+        """A pattern or inference over commit history (co-change, hotspots, churn, impact candidates, lifecycle guesses)."""
+        return self.record_class in HISTORY_PATTERN_CLASSES or self.kind in HISTORY_PATTERN_KINDS
+
+    @property
     def grounded(self) -> bool:
-        return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label
+        """Grounded code evidence. A history pattern is never grounded, whatever its status: observed only means its
+        counts were rechecked against Git."""
+        return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label and not self.history_pattern
 
     @property
     def inferred(self) -> bool:
-        return self.status in INFERRED
+        return self.status in INFERRED and not self.history_pattern
 
     @property
     def rejected(self) -> bool:
@@ -76,6 +96,20 @@ def words_of(*texts: str | None) -> frozenset[str]:
         spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", t)
         out.update(w for w in _WORD.findall(spaced.lower()) if len(w) >= 2)
     return frozenset(out)
+
+
+def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """The record's own criteria, echoed verbatim (compact, key-sorted JSON per value). Reads parameters.values, then
+    parameters, then a top-level criteria object."""
+    prm = record.get("parameters")
+    src: Any = None
+    if isinstance(prm, dict):
+        src = prm.get("values") if isinstance(prm.get("values"), dict) else prm
+    if not isinstance(src, dict) or not any(k in src for k in CRITERIA_KEYS):
+        src = record.get("criteria") if isinstance(record.get("criteria"), dict) else src
+    if not isinstance(src, dict):
+        return ()
+    return tuple((k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False)) for k in CRITERIA_KEYS if k in src)
 
 
 def view(record: dict[str, Any]) -> ClaimView | None:
@@ -108,5 +142,8 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         flags=tuple(f for f in record.get("flags") or [] if isinstance(f, str)),
         status_reason=record.get("status_reason") if isinstance(record.get("status_reason"), str) else None,
         route=route,
+        record_class=str(record.get("class") or ""),
+        qualifier=record.get("qualifier") if isinstance(record.get("qualifier"), str) else None,
+        criteria=criteria_of(record),
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )
