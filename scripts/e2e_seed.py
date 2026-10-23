@@ -1,10 +1,19 @@
-"""Index one tiny local repository into TRACES_DATA_DIR so Playwright can drive a real snapshot.
+"""Index one local repository into TRACES_DATA_DIR so Playwright can drive a real snapshot.
 
-No network. The repository is a file path, not a GitHub fetch. History may fail on an old git;
-static evidence is still stored.
+Two seeds, both without network (the repository is a file path, not a GitHub fetch):
+  synthetic (default)  a tiny 4-file repo, octo/synth; fast local runs. History may fail on an old git;
+                       static evidence is still stored.
+  fsft                 the pinned target fastapi/full-stack-fastapi-template@b1125d8, indexed from the
+                       cached full-history clone (CI `target` job, or `make target`). Same repo id and SHA
+                       as a real ingest, so the browser tests run against the real snapshot.
+
+usage: e2e_seed.py DATA_DIR [--seed synthetic|fsft] [--fsft-repo PATH]
+       (--seed also reads TRACES_E2E_SEED; --fsft-repo also reads TRACES_E2E_FSFT_REPO)
 """
+
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
@@ -20,6 +29,9 @@ ENV = {
     "GIT_COMMITTER_EMAIL": "t@example.invalid",
     "PATH": os.environ.get("PATH", "/usr/bin"),
 }
+
+FSFT_SHA = "b1125d8839482cb7bbae603ddc6d0081bf87532e"
+FSFT_CACHE = Path(".cache/targets/github.com__fastapi__full-stack-fastapi-template") / FSFT_SHA / "source"
 
 
 def git(repo: Path, *args: str) -> str:
@@ -41,11 +53,23 @@ def build_repo(root: Path) -> tuple[Path, str]:
     return r, git(r, "rev-parse", "HEAD").strip()
 
 
+def fsft_repo(path: Path) -> tuple[Path, str]:
+    """The cached pinned clone must be a full-history clone that contains b1125d8; fail loudly otherwise."""
+    if not (path / ".git").exists():
+        raise SystemExit(f"fsft clone not found at {path} (run the CI target job or `make target`)")
+    if git(path, "rev-parse", "--is-shallow-repository").strip() != "false":
+        raise SystemExit(f"fsft clone at {path} is shallow; history needs the full clone")
+    git(path, "cat-file", "-e", f"{FSFT_SHA}^{{commit}}")
+    return path, FSFT_SHA
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: e2e_seed.py DATA_DIR", file=sys.stderr)
-        return 2
-    data = Path(sys.argv[1]).resolve()
+    ap = argparse.ArgumentParser(description="seed one snapshot for the Playwright run")
+    ap.add_argument("data_dir")
+    ap.add_argument("--seed", choices=("synthetic", "fsft"), default=os.environ.get("TRACES_E2E_SEED", "synthetic"))
+    ap.add_argument("--fsft-repo", default=os.environ.get("TRACES_E2E_FSFT_REPO", str(FSFT_CACHE)))
+    a = ap.parse_args()
+    data = Path(a.data_dir).resolve()
     data.mkdir(parents=True, exist_ok=True)
     os.environ["TRACES_DATA_DIR"] = str(data)
     os.environ.setdefault("TRACES_ISOLATION", "unshare")
@@ -63,8 +87,12 @@ def main() -> int:
         def clone_url(self) -> str:
             return self.path
 
-    src, sha = build_repo(data / "src")
-    ref = LocalRef("github.com", "octo", "synth", path=str(src))
+    if a.seed == "fsft":
+        src, sha = fsft_repo(Path(a.fsft_repo).resolve())
+        ref = LocalRef("github.com", "fastapi", "full-stack-fastapi-template", path=str(src))
+    else:
+        src, sha = build_repo(data / "src")
+        ref = LocalRef("github.com", "octo", "synth", path=str(src))
     s = get_settings()
     if not s.codegraph_bin.exists():
         print(f"toolchain missing in {s.toolchain_dir}", file=sys.stderr)

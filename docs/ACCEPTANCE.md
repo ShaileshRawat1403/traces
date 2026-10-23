@@ -1,0 +1,87 @@
+# Traces v1 acceptance (charter section 7)
+
+Owner: Traces Lab (QA, Integration, CI and Security seat). Living document, updated at each Lab checkpoint.
+Last update: 2026-10-23 13:15 IST (checkpoint 4), branch `ws/lab-acceptance` on top of `build/traces-v1` @ `e532644` (includes PR #24).
+
+Labels used below:
+- **CI**: a real GitHub Actions run passed. Run id and commit are given.
+- **Local**: run on the Traces Lab box only (8 CPUs, Linux 6.12, CPython 3.14.8, Node 20.19.2). Not a CI result.
+- **Box app**: checked read-only against the running review app (`/workspace/traces-review/traces`, build `35499bc`, web 5731, API 8731).
+
+CI runs referenced:
+- `39716507167`: push, `build/traces-v1` @ `35499bc`, success, 9 of 9 jobs. unit 47 passed 2 skipped, api 47, contract 17, regression 15, e2e 54 passed 2 skipped.
+- `39914041785`: push, `ws/lab-acceptance` @ `6384c78`, success, 11 of 11 jobs. Adds security 122 passed 3 xfailed, history 163 passed 2 skipped (see G-9), explain 11, vitest 89.
+- `39916007885`: push, `ws/lab-acceptance` @ `17c4335`, success.
+- `39916651720`: push, `build/traces-v1` @ `e532644` (PR #24 and #25 merged), success, 11 of 11 jobs. unit 47 passed 2 skipped, explain 31, security 123 passed 5 xfailed, contract 17, regression 15, api 47, history 172 passed 0 skipped (any skip now fails the job), vitest 108, e2e 68 passed 6 skipped (synthetic seed; the fsft seed is in this checkpoint and has no GitHub run yet, G-1).
+
+Detail: [acceptance/PERF.md](acceptance/PERF.md), [acceptance/SECOND_REPO.md](acceptance/SECOND_REPO.md), [acceptance/DEMO_SCRIPT.md](acceptance/DEMO_SCRIPT.md), [../tests/security/README.md](../tests/security/README.md), [../ci/README.md](../ci/README.md).
+
+## 1. Section 7 checklist
+
+| # | Charter item | Proof | Status |
+| --- | --- | --- | --- |
+| 1 | Valid public GitHub URL, index status, pinned SHA, populated overview | CI: `tests/api` (run 39716507167, includes `test_index_baseline.py`, the product index of fsft@b1125d8). Local: `POST /repos` + `POST /index-jobs` for itsdangerous@672971d (6 s) and markupsafe@4e11127 (8.5 s) on a fresh store. Box app: demo steps 1 to 3 | **Pass** (CI for API; browser on real data local only, G-1) |
+| 2 | Interactive graph, focus, follow cross-file edges, open pinned source | Box app: demo steps 4, 5, 15 (`tests/e2e/demo_walk.cjs`, 15 of 15 local). CI: `web/e2e/graph.spec.ts` on the synthetic seed | **Pass** local on real data, incl. the fsft-seeded Playwright suite (70 passed, 4 skipped by design). CI on real data pending the push of this checkpoint (G-1) |
+| 3 | fsft@b1125d8: nine Task 002 links traceable, persistence static only, H1/H2 inferred | CI: `tests/regression/test_regression.py::test_nine_links_and_library_hops` (runs 39716507167, 39914041785). Box app: demo step 6 (10 steps, 2 inferred library steps, 1 gap, "Static persistence path") | **Pass** (CI) |
+| 4 | Nine wrong CodeGraph imports not verified; three injected negatives rejected; Task 002 16+8 still pass | CI: contract 17 passed (CT1 to CT16 plus count), regression 15 passed (RT1 to RT8, distribution 4,642 = 4,538/36/59/9, canonical hashes). Box app: demo step 7, 12 rejected = 9 imports + 3 injected | **Pass** (CI) |
+| 5 | View and explain a Git-backed architecture change with cited commits; co-change is not causality | CI: `tests/history` 172 passed 0 skipped (run 39916651720). Box app: demo steps 8 to 10 (milestone 9d703df "Move new-frontend to frontend", 96 renames confirmed with `git show -M50%`; co-change view says "not evidence of a code dependency"). Co-change explain after PR #24, local: `tests/e2e/test_cochange_explain.py` (a real worker-indexed repo; 4 passed on `e532644`, 3 of them fail on `17c4335` without #24), and a live run on a scratch server from `e532644` with fsft@b1125d8 indexed with history: 6 of 6 question/mode runs keep every cited co-change record (144 in the snapshot) in `history_patterns`, kind interpretation, with the caveat, never fact, never `code_structure` or `inference` | **Pass** for view and for the co-change safety rule; **partial** for explain relevance (F-7, F-8) |
+| 6 | No-key mode useful; provider mode refuses unsupported claims, citations, privacy controls | CI: `tests/explain` 11, `tests/security/test_no_key_and_caps.py` (explain cites stored claims, bundle is a manifest, keys cannot be submitted). Box app: demo steps 10, 11 | No-key **pass** (CI). Provider mode **gap** (G-5); F-3 open |
+| 7 | Second, different public repo indexed and explored; unknowns instead of invented links | Local and box app: itsdangerous@672971d verified independently (identical 3,312 claim ids, Git spot-checks 30/30, 20/20, 30/30). Overview shows purpose and entry points as unknown; no routes or frameworks invented | **Partial**: works, but Python only (G-4), and F-4/F-5 reject true claims on it |
+| 8 | Errors, unsupported types, missing keys, index failures, rate limits, malicious paths, oversized repos fail safely and visibly | CI: `tests/security` 122 passed, 3 xfailed (run 39914041785). Covers 28 bad URLs, traversal, symlinks, caps, timeouts, 429, no-key, failed-job visibility | **Pass** with open findings F-1, F-2, F-3, F-6 |
+| 9 | Desktop and mobile browser, touch navigation, evidence inspection | Local, real fsft snapshot: `web/e2e` at desktop and android-360 with axe, 70 passed 4 skipped by design (Ollama absent, desktop-only and phone-only cases); `tests/e2e/real_snapshot.cjs` 21 of 21 (nine fsft screens with real content, axe WCAG 2.2 AA on each at 1280 px and at 360 px touch, no sideways scroll, tap Open evidence in graph list and trace, bottom-bar navigation); same 21 of 21 against the box app. CI: same suites on the synthetic seed (run 39916651720, 68 passed) | **Pass** local on real data; CI on real data after the push (G-1) |
+| 10 | CI: unit, adapter/schema, regression, API, e2e browser; lint/types/build; no critical security risk; no unintended outbound calls; no secrets | CI run 39914041785: lint, types, unit, explain, vitest, build, contract, regression, api, history, security, e2e all green. Outbound: `tests/security/test_outbound.py` (worker clones only the target; app serves inside an empty `unshare -rn` namespace; audit hook sees no off-loopback connect). Secrets: `git log -p --all` scan for GitHub, OpenAI, AWS, Slack and private-key patterns found only the fake test token in `test_repo_urls.py` | **Pass** (CI). G-9 closed by run 39916651720 |
+| 11 | Docs: setup, architecture, licenses, coverage, limitations, reproducibility, rollback; screenshots; guided demo script | `docs/SETUP.md`, `docs/THIRD_PARTY_LICENSES.md`, `docs/TEST_MAPPING.md`, `docs/STATUS.md`, `docs/acceptance/WALKTHROUGH.md` (screenshots), `docs/acceptance/DEMO_SCRIPT.md` (checked 15 of 15 against the box app) | **Partial**: no architecture diagram and no rollback section found (G-6); STATUS.md e2e text stale (G-2) |
+| 12 | Final discrepancy table | Section 2 below | **In progress** |
+
+## 2. Discrepancy table
+
+| Capability | Claimed | Proven | Test | Gap |
+| --- | --- | --- | --- | --- |
+| Public URL ingest and pinning | Public GitHub only, anonymous, pinned SHA | CI + local + box app | `tests/api`, `tests/security/test_repo_urls.py`, `test_fetch_limits.py` | F-6: nonexistent SHA leaves a failed snapshot row and empty cache dir |
+| Sandboxed index (no network, no target code) | `unshare -rn`, credentials stripped, caps | CI + local | CT15, `test_outbound.py`, `test_no_key_and_caps.py` | O-1: clone size checked every 0.5 s, no final check after git exits |
+| Evidence statuses on fsft | 4,642 = 4,538/36/59/9, 12 rejected | CI | contract, regression | none |
+| Evidence statuses on other Python code | Validators judge claims correctly | Not true on library code | `tests/e2e/test_python_package_patterns.py` (xfail) | F-4 relative imports rejected (46 of 47 itsdangerous rejections, 2 of 2 markupsafe); F-5 `@overload` call rejected |
+| Non-ASCII file names | Any public repo | Fails closed | `test_hostile_repo.py::test_non_ascii_path_indexes` (xfail) | F-1: whole index fails with `E_PATH` |
+| Source view | Any tracked path, traversal refused | Traversal refused; odd names readable | `test_hostile_repo.py` | F-2: names starting with `-` refused |
+| Overview, graph, trace, review | Real data, unknowns shown | Box app 15 of 15 demo steps; fsft-seeded Playwright local | `tests/e2e/demo_walk.cjs`, `tests/e2e/real_snapshot.cjs`, `web/e2e` | G-1 until CI runs the fsft seed; O-2 gap reason text when only a rejected edge exists |
+| Route, component and source pages | Route/API inventory screen (charter 4B) | API serves them; UI pages show "scheduled for the next UI checkpoint" | box app `F/routes`, `F/components` | G-3 |
+| History | Timeline, lifecycle, co-change, milestones, compare | CI + Git spot-checks on itsdangerous | `tests/history`, `SECOND_REPO.md` | Compare falls back to identity diff (STATUS.md, H3) |
+| No-key explain | Useful answers with citations | Grounded, but retrieval is keyword based | `tests/explain`, demo 10, 11 | F-7, F-8 |
+| Co-change in explain | A pattern, never a cause, fact or code structure (PR #24) | Local on a worker-indexed repo and live on fsft@b1125d8 with history | `tests/e2e/test_cochange_explain.py`, `.traces-data/acceptance/row5/check.py` (scratch) | F-8 relevance; O-4 |
+| Optional provider chat | Browser-side, consent, BYOK | Bundle and manifest only | `test_no_key_and_caps.py` | G-5; F-3 echoes rejected input |
+| Second repo, different stack | Not overfit to FastAPI + React | Python library only | `SECOND_REPO.md` | G-4 Express or Django not run; layer rule calls a library `backend` |
+| Mobile and accessibility | Touch, 360 px, WCAG 2.2 AA | axe 0 violations on nine real fsft screens at 1280 and 360 px (local); CI on synthetic | `tests/e2e/real_snapshot.cjs`, `web/e2e` (android-360) | axe covers automated WCAG rules only; no screen-reader pass |
+| Performance | Not specified in numbers | Local baseline: index fsft 19.3 s, itsdangerous 4.9 s (median of 3, from local clones, no fetch); API p95 under 110 ms except graph 636 ms and trace 625 ms on fsft | `tests/perf/bench.py`, [acceptance/PERF.md](acceptance/PERF.md) | No targets in the charter; O-5 |
+| CI | All suites | Run 39916651720 green, history 0 skipped | `.github/workflows/ci.yml` | G-1 (fsft e2e not yet run on GitHub) |
+
+## 3. Findings (open)
+
+| Id | Severity | Owner | Summary | Repro |
+| --- | --- | --- | --- | --- |
+| F-1 | High | Traces (adapter / `traces.core.common` blob reader) | A non-ASCII tracked file name makes the adapter fail with `E_PATH`; the whole repository cannot be indexed. Likely `git ls-tree -r` without `-z` | `tests/security/test_hostile_repo.py::test_non_ascii_path_indexes` |
+| F-2 | Low | Traces (`evidence/views.safe_repo_path`) | Source view refuses names starting with `-` with a wrong message | `GET .../source?path=-rf.py` on the hostile fixture |
+| F-3 | Medium | Traces (`api/app.py` validation handler) | 422 envelope echoes rejected input, including a submitted key | `tests/security/test_no_key_and_caps.py::test_submitted_key_not_echoed` |
+| F-4 | High | Traces (`validators/python_ast.py` import check) | Relative imports are rejected (ignores `ImportFrom.level`) | `tests/e2e/test_python_package_patterns.py::test_relative_imports_not_rejected` |
+| F-5 | Medium | Traces (`validators/python_ast.py` binding resolution) | Calls into `@typing.overload` methods resolve to the first stub; correct edge rejected | `...::test_overload_call_to_implementation_not_rejected` |
+| F-6 | Low | Traces (API / ingest) | Nonexistent SHA: full clone, then a permanent failed snapshot row and an empty cache dir | `POST /repos/github.com__pallets__markupsafe/index-jobs {"sha":"000...001"}` (box app job `j_26a08a94da4e467dbba0`) |
+| F-7 | Medium | Traces UI (explain engine, D-023) | No-key explain matches keywords: "What does create_item depend on?" lists `create_random_item` and SDK imports instead of `create_item depends_on get_db`; "What changed in commit 9d703df25491?" answers with an unrelated persistence fact | `POST F/explain` on the box app with those questions |
+| F-8 | Medium | Traces (explain engine, history questions, PR #24) | History questions ignore the file they name. On fsft@b1125d8, "Which files changed together with backend/app/crud.py?" cites 8 co-change patterns, none involving crud.py, while the stored pair crud.py and backend/tests/api/routes/test_users.py (5 of 26 commits) is not cited. "What changes with backend/app/crud.py and backend/tests/api/routes/test_users.py?" is answered from the route inventory (23 route facts, no history) | Index fsft with history, `POST .../explain {"question": "Which files changed together with backend/app/crud.py?"}`; compare with `GET .../history/cochange?target=backend/app/crud.py` |
+| O-1 | Note | Traces (ingest) | No final clone-size check after git exits | code read, `ingest/fetch.py::_clone_capped` |
+| O-2 | Note | Traces (views) | Trace gap reason says "no outgoing static relationship" when the only one is rejected and hidden | itsdangerous trace from `TimestampSigner::validate` |
+| O-3 | Note | Traces (components) | Layer rule labels a library's `src/<pkg>` as `backend` | itsdangerous overview |
+| O-4 | Note | Traces (explain engine) | A summary sentence ("Taken together, the closest matching evidence (1 co changed with, 3 commit modifies, ...) sits in 2 files") cites a co-change record next to code records without the pattern caveat. Kind is interpretation, never fact; seen on the small worker-indexed repo, not on fsft | `tests/e2e/test_cochange_explain.py` fixture, question "What changes with alpha.py and beta.py?" |
+| O-5 | Note | Traces (views) | `graph` and `trace` take about 0.55 s p50 on fsft, ten times the next slowest read endpoint | `tests/perf/bench.py` |
+
+## 4. Gaps (open)
+
+| Id | Owner | Gap | Plan |
+| --- | --- | --- | --- |
+| G-1 | Traces Lab | CI e2e seeded a synthetic 4-file repo. **Fixed in checkpoint 4, pending a GitHub run**: the e2e job now needs `target`, restores the cached full-history clone and runs `scripts/e2e_seed.py --seed fsft`, then `tests/e2e/real_snapshot.cjs`. Local: 70 passed 4 skipped, 21 of 21. `TRACES_E2E_SEED=synthetic` keeps the fast seed | Close when the first GitHub run of the pushed commit passes |
+| G-2 | Architect | `docs/STATUS.md` line 39 still says the e2e job is opt-in and a placeholder (checked at `e532644`); CI runs it on every push | Architect1 updates STATUS.md |
+| G-3 | Traces UI | Routes, Components and Source pages are placeholders in the UI | UI checkpoint |
+| G-4 | Traces Lab | Second repo is Python; no Express or Django app run | After checkpoint 4 |
+| G-5 | Traces UI | Provider (BYOK) chat path not exercised end to end; no AI calls are allowed in Lab runs. PR #20 (ws/ui-chat) landed in `build/traces-v1` @ `01c5023` after the runs above; the box app (`35499bc`) does not have it | Lab: test consent, rejected-claim exclusion and the outbound manifest with a stub provider (no network) |
+| G-6 | Architect | No architecture diagram or rollback section found in `docs/` | Architect |
+| G-7 | Traces Lab | **Closed (local)**: baseline in [acceptance/PERF.md](acceptance/PERF.md). Not a CI measurement; GitHub-hosted runners vary too much for latency gates | Re-run `tests/perf/bench.py` at release |
+| G-8 | Traces Lab | **Closed locally**: axe (WCAG 2.2 AA tags) and 360 px touch on the real fsft snapshot, 0 violations, 21 of 21. In CI with G-1 | Close with G-1 |
+| G-9 | Traces Lab | **Closed (CI)**: run 39916651720 (`e532644`) history 172 passed, 0 skipped, with the any-skip guard | none |

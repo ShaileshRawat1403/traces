@@ -52,18 +52,24 @@ job_target() {
 need_target()   { [ -d "$TARGET_PATH/.git" ] || { echo "target cache missing (run the target job first)" >&2; return 1; }; }
 job_contract()  { need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/contract; }
 job_regression(){ need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/regression; }
-job_security() { py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q -rxXs tests/security; }
+job_security() { py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q -rxXs tests/security tests/e2e; }
 job_history() {
-  need_target && py_env || return 1
+  need_target && py_env && userns || return 1
   if [ "$(git -C "$TARGET_PATH" rev-parse --is-shallow-repository)" != "false" ] || ! git -C "$TARGET_PATH" cat-file -e "${TARGET_SHA}^{commit}"; then
     echo "target cache is not a full-history clone" >&2; return 1
   fi
   local out; out=$(mktemp)
   TRACES_HISTORY_FSFT_REPO="$ROOT/$TARGET_PATH" uv run --frozen pytest -q -rs tests/history | tee "$out" || { rm -f "$out"; return 1; }
-  if grep -q "SKIPPED.*fsft" "$out"; then rm -f "$out"; echo "fsft regression skipped" >&2; return 1; fi
+  if grep -q "SKIPPED" "$out"; then rm -f "$out"; echo "a history test skipped (fsft clone or user namespaces missing)" >&2; return 1; fi
   rm -f "$out"
 }
-job_e2e()       { py_env && toolchain_env && web_env && userns && TRACES_ISOLATION=unshare bash scripts/e2e_ui.sh; }
+# Same seed as CI (fsft@b1125d8 from the cached clone). TRACES_E2E_SEED=synthetic ci/run_local.sh e2e for a fast run.
+job_e2e() {
+  local seed="${TRACES_E2E_SEED:-fsft}"
+  if [ "$seed" = "fsft" ]; then need_target || return 1; fi
+  py_env && toolchain_env && web_env && userns || return 1
+  TRACES_ISOLATION=unshare TRACES_E2E_SEED="$seed" TRACES_E2E_FSFT_REPO="$ROOT/$TARGET_PATH" bash scripts/e2e_ui.sh
+}
 
 {
   echo "date: $(date '+%Y-%m-%d %H:%M:%S %Z')"

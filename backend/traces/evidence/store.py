@@ -195,12 +195,34 @@ class Store:
             self.db.execute("UPDATE snapshots SET state=? WHERE id=?", (state, snapshot_id))
 
     def finish_snapshot(self, snapshot_id: str, *, extractor: dict[str, Any], languages: dict[str, int], frameworks: list[str],
-                        generated_paths: list[str], stats: dict[str, Any]) -> None:
+                        generated_paths: list[str], stats: dict[str, Any], isolation: str | None = None) -> None:
+        """Mark ready. `isolation` is 'unshare' or 'off' (explicit dev override, stored so the API shows it unisolated)."""
         with self.write_lock, self.db:
             self.db.execute("UPDATE snapshots SET state='ready', extractor_json=?, languages_json=?, frameworks_json=?, generated_paths_json=?, "
-                            "stats_json=?, indexed_at=? WHERE id=?",
+                            "stats_json=?, indexed_at=?, isolation=? WHERE id=?",
                             (json.dumps(extractor, sort_keys=True), json.dumps(languages, sort_keys=True), json.dumps(frameworks),
-                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), snapshot_id))
+                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), isolation, snapshot_id))
+
+    def drop_unindexed_snapshot(self, snapshot_id: str) -> bool:
+        """Remove a snapshot row that never held evidence (F-6: a commit that does not exist). Jobs keep their record
+        with snapshot_id NULL; a ready snapshot or one with claims is never removed. Returns True when removed."""
+        with self.write_lock, self.db:
+            row = self.db.execute("SELECT state FROM snapshots WHERE id=?", (snapshot_id,)).fetchone()
+            if row is None or row[0] == "ready":
+                return False
+            if self.db.execute("SELECT 1 FROM claims WHERE snapshot_id=? LIMIT 1", (snapshot_id,)).fetchone():
+                return False
+            self.db.execute("UPDATE jobs SET snapshot_id=NULL WHERE snapshot_id=?", (snapshot_id,))
+            for t in ("runs", "components"):
+                self.db.execute(f"DELETE FROM {t} WHERE snapshot_id=?", (snapshot_id,))  # noqa: S608  fixed table names
+            self.db.execute("DELETE FROM snapshots WHERE id=?", (snapshot_id,))
+        return True
+
+    def set_ai_consent(self, repo_id: str, consent: bool, text_version: str | None, at: str) -> None:
+        """Record the repo-level external AI consent decision (D-027). Revoking keeps the time of the change."""
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE repos SET external_ai_consent=?, external_ai_consent_at=?, external_ai_consent_text_version=? WHERE id=?",
+                            (1 if consent else 0, at, text_version, repo_id))
 
     def update_snapshot_stats(self, snapshot_id: str, stats: dict[str, Any]) -> None:
         with self.write_lock, self.db:
@@ -212,8 +234,10 @@ class Store:
         with self.write_lock, self.db:
             self.db.execute("DELETE FROM components WHERE snapshot_id=?", (snapshot_id,))
             for c in components:
-                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule) VALUES (?,?,?,?,?,?,?)",
-                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule))
+                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule, record_json) "
+                                "VALUES (?,?,?,?,?,?,?,?)",
+                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule,
+                                 json.dumps({"reason": getattr(c, "reason", "") or None}, sort_keys=True)))
                 n += 1
         return n
 
