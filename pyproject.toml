@@ -1,0 +1,87 @@
+[project]
+name = "traces"
+version = "0.1.0"
+description = "Evidence-first repository intelligence workbench (read-only analysis)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+# Python 3.14 is required: the validators parse target sources with this interpreter's `ast`, and
+# full-stack-fastapi-template@b1125d8 uses 3.14 syntax (backend/app/api/deps.py, PEP 758). Task 002 ran CPython 3.14.8.
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.120",
+    "uvicorn>=0.38",
+    "pydantic>=2.12",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "httpx>=0.28",
+    "ruff>=0.14",
+    "mypy>=1.18",
+    "jsonschema>=4.25",
+]
+
+[project.scripts]
+traces = "traces.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/traces"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"backend/traces/evidence/schema" = "traces/evidence/schema"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["backend"]
+markers = [
+    "baseline: needs the pinned target checkout and toolchain; runs the full Task 002 pipeline once per session",
+]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+src = ["backend", "tests"]
+# Ported Task 002 modules keep their dense research style so their logic stays reviewable against research/;
+# they are linted for correctness rules only (see per-file-ignores).
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP"]
+ignore = ["E501", "E701", "E702", "E731", "E741", "B023", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/traces/validators/python_ast.py" = ["B", "UP", "I", "E", "F841"]
+"backend/traces/validators/orchestrator.py" = ["B", "UP", "I", "E", "F841"]
+"backend/traces/adapter/codegraph.py" = ["B", "UP", "I", "E"]
+"backend/traces/fixtures/task002/chain.py" = ["B", "UP", "I", "E"]
+"backend/traces/evidence/schema_check.py" = ["B", "UP", "I", "E"]
+"backend/traces/evidence/report.py" = ["B", "UP", "I", "E"]
+"backend/traces/core/common.py" = ["UP", "I", "E"]
+"backend/traces/validators/checker/*.py" = ["ALL"]
+"tests/contract/_ct.py" = ["B", "UP", "I", "E", "F841"]
+"tests/regression/_rt.py" = ["B", "UP", "I", "E", "F841"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["backend/traces/core/config.py", "backend/traces/evidence/store.py", "backend/traces/evidence/migrate.py", "backend/traces/evidence/views.py", "backend/traces/api", "backend/traces/history", "backend/traces/ingest", "backend/traces/evidence/types.py", "backend/traces/evidence/schema_check.py", "backend/traces/explain", "backend/traces/cli.py"]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["traces.evidence.schema_check"]
+# strict for this module (a per-module `strict = true` leaks to every checked file)
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+extra_checks = true

@@ -1,0 +1,1774 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://traces.local/schema/traces-evidence/0.4",
+ "title": "Traces evidence record, traces-evidence/0.4",
+ "description": "Traces-owned evidence record 0.4. Extends 0.3 (Task 002) with history and documented-rationale records (evidence_scope history|documented, history classes, citations, parameters, metrics), entity-typed endpoints, open kinds (x- prefix), the reviewer label rejected, the no_source_location flag and review_state. No 0.3 value is removed; 0.3 records migrate with traces.evidence.migrate.",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "schema_version",
+  "claim_id",
+  "run_id",
+  "repo",
+  "repo_sha",
+  "claim_kind",
+  "granularity",
+  "statement",
+  "class",
+  "originator",
+  "provenance_raw",
+  "provenance",
+  "origin",
+  "injected",
+  "evidence_scope",
+  "locations",
+  "checks",
+  "status",
+  "label",
+  "status_history",
+  "visible_to_reviewer"
+ ],
+ "properties": {
+  "schema_version": {
+   "const": "traces-evidence/0.4"
+  },
+  "claim_id": {
+   "type": "string",
+   "pattern": "^c_[0-9a-f]{64}$",
+   "description": "c_ + sha256 of canonical JSON of the claim identity (Decision 002-B ruling 2): relationship identity, normalized source location, unresolved target name, extractor identity"
+  },
+  "run_id": {
+   "type": "string",
+   "minLength": 1
+  },
+  "repo": {
+   "type": "string",
+   "minLength": 1
+  },
+  "repo_sha": {
+   "type": "string",
+   "pattern": "^[0-9a-f]{40}$"
+  },
+  "claim_kind": {
+   "enum": [
+    "node",
+    "relationship",
+    "unresolved_reference"
+   ]
+  },
+  "node_kind": {
+   "type": "string"
+  },
+  "relationship_kind": {
+   "anyOf": [
+    {
+     "enum": [
+      "contains",
+      "imports",
+      "calls",
+      "renders",
+      "references",
+      "instantiates",
+      "extends",
+      "navigates",
+      "binds_handler",
+      "implements_operation",
+      "routes_to",
+      "depends_on",
+      "model_validation",
+      "session_stage",
+      "session_commit",
+      "session_reload",
+      "persistence_path",
+      "uses_crud",
+      "uses_model",
+      "returns_model",
+      "library_contract",
+      "commit_adds",
+      "commit_deletes",
+      "commit_modifies",
+      "commit_type_changes",
+      "renamed_to",
+      "copied_to",
+      "dependency_added",
+      "dependency_removed",
+      "dependency_version_changed",
+      "component_added",
+      "component_removed",
+      "continues_as",
+      "alias_of",
+      "prefix_moved",
+      "co_changed_with",
+      "reverts",
+      "deleted_soon_after_add",
+      "merged_as",
+      "documents_rationale",
+      "snapshot_added",
+      "snapshot_removed",
+      "history_impact_candidate"
+     ]
+    },
+    {
+     "type": "string",
+     "pattern": "^x-[a-z][a-z0-9_]*$"
+    }
+   ]
+  },
+  "granularity": {
+   "anyOf": [
+    {
+     "enum": [
+      "file",
+      "symbol",
+      "handler",
+      "statement",
+      "path",
+      "commit",
+      "component",
+      "dependency",
+      "repo"
+     ]
+    },
+    {
+     "type": "string",
+     "pattern": "^x-[a-z][a-z0-9_]*$"
+    }
+   ]
+  },
+  "from": {
+   "$ref": "#/$defs/endpoint"
+  },
+  "to": {
+   "$ref": "#/$defs/endpoint"
+  },
+  "statement": {
+   "type": "string",
+   "minLength": 1
+  },
+  "class": {
+   "enum": [
+    "source_backed_declaration",
+    "statically_derived",
+    "analyzer_inference",
+    "runtime_observed",
+    "git_object_fact",
+    "history_pattern",
+    "history_inferred",
+    "documented_rationale",
+    "snapshot_diff"
+   ],
+   "description": "Origin classification only (how the claim was produced). Independent of status and label; validation never changes it (Decision 002-B ruling 5)."
+  },
+  "originator": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "name",
+    "version",
+    "role"
+   ],
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "version": {
+     "type": "string"
+    },
+    "role": {
+     "enum": [
+      "extractor",
+      "external",
+      "fixture",
+      "history_analyzer"
+     ]
+    }
+   }
+  },
+  "provenance_raw": {
+   "type": "object"
+  },
+  "provenance": {
+   "type": "string",
+   "pattern": "^(codegraph:(structural|declaration|unresolved|resolved-import|resolved-qualified|resolved-instance|resolved-function-ref|resolved-framework|resolved-file-path|name-match|fuzzy|value-ref|tree-sitter|scip|synthesized:[a-z0-9-]+)|external:[a-z0-9-]+|fixture:(expected-chain|negative-control)|git:(log|diff-tree|ls-tree|cat-file)|history:(replay|lifecycle|cochange|churn|hotspot|revert-match|manifest-diff|alias-suggest|milestone|snapshot-diff|impact)|github-cache:(pr-body|pr-review-comment|pr-metadata)|x-[a-z0-9-]+:[a-z0-9:-]+)$"
+  },
+  "origin": {
+   "type": "object",
+   "required": [
+    "kind"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "tool_output",
+      "external_document",
+      "fixture",
+      "git_object",
+      "history_derived",
+      "cached_pr"
+     ]
+    },
+    "artifact": {
+     "type": "string"
+    },
+    "row_ref": {
+     "type": "string"
+    },
+    "sha256": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{64}$"
+    },
+    "quote": {
+     "type": "string"
+    },
+    "fixture_id": {
+     "type": "string"
+    },
+    "fixture_file": {
+     "type": "string"
+    },
+    "derived_from": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "commit": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{40}$"
+    },
+    "paths": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "pattern": "^(?!/)(?!\\.\\./)(?!.*/\\.\\./).*[^/]$"
+     }
+    }
+   }
+  },
+  "injected": {
+   "type": "boolean"
+  },
+  "evidence_scope": {
+   "enum": [
+    "static",
+    "history",
+    "documented"
+   ],
+   "description": "runtime stays reserved and invalid"
+  },
+  "qualifier": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "locations": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/location"
+   }
+  },
+  "checks": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/check"
+   }
+  },
+  "status": {
+   "enum": [
+    "observed",
+    "verified",
+    "unvalidated",
+    "missing_location",
+    "rejected"
+   ]
+  },
+  "label": {
+   "enum": [
+    "observed",
+    "verified",
+    "inferred",
+    "rejected"
+   ]
+  },
+  "status_reason": {
+   "type": "string"
+  },
+  "status_history": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "from",
+     "to",
+     "at",
+     "run_id",
+     "check_ids",
+     "by"
+    ],
+    "properties": {
+     "from": {
+      "enum": [
+       null,
+       "observed",
+       "verified",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ]
+     },
+     "to": {
+      "enum": [
+       "observed",
+       "verified",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ]
+     },
+     "at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "run_id": {
+      "type": "string"
+     },
+     "check_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "by": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "supersedes": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "visible_to_reviewer": {
+   "const": true
+  },
+  "flags": {
+   "type": "array",
+   "items": {
+    "anyOf": [
+     {
+      "enum": [
+       "generated_file",
+       "conditional_route",
+       "runtime_config_dependent",
+       "extractor_location_is_body",
+       "extractor_file_errors",
+       "library_contract",
+       "no_source_location",
+       "bot_commit",
+       "generated_path",
+       "merge_commit",
+       "similarity_rename",
+       "rename_detection_limited",
+       "non_utf8_path",
+       "complexity_proxy",
+       "component_map_missing",
+       "pr_sha_mismatch"
+      ]
+     },
+     {
+      "type": "string",
+      "pattern": "^x-[a-z][a-z0-9_]*$"
+     }
+    ]
+   }
+  },
+  "consolidation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "rule",
+    "count",
+    "members"
+   ],
+   "properties": {
+    "rule": {
+     "type": "string",
+     "minLength": 1
+    },
+    "count": {
+     "type": "integer",
+     "minimum": 2
+    },
+    "members": {
+     "type": "array",
+     "minItems": 2,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "row_ref",
+       "provenance_raw",
+       "status_history"
+      ],
+      "properties": {
+       "row_ref": {
+        "type": "string"
+       },
+       "provenance_raw": {
+        "type": "object"
+       },
+       "status_history": {
+        "type": "array",
+        "minItems": 1
+       }
+      }
+     }
+    }
+   }
+  },
+  "citations": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/citation"
+   }
+  },
+  "parameters": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "digest",
+    "values"
+   ],
+   "properties": {
+    "digest": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{64}$"
+    },
+    "values": {
+     "type": "object"
+    }
+   }
+  },
+  "metrics": {
+   "type": [
+    "object",
+    "null"
+   ]
+  },
+  "review_state": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "state"
+   ],
+   "description": "Reviewer annotation. Never changes status, label or class.",
+   "properties": {
+    "state": {
+     "enum": [
+      "none",
+      "confirmed",
+      "disputed"
+     ]
+    },
+    "reviewer": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "at": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "format": "date-time"
+    },
+    "note": {
+     "type": "string"
+    }
+   }
+  },
+  "migrated_from": {
+   "enum": [
+    "traces-evidence/0.3"
+   ],
+   "description": "Set by traces.evidence.migrate"
+  }
+ },
+ "allOf": [
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "verified"
+     }
+    },
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "label": {
+      "const": "verified"
+     },
+     "claim_kind": {
+      "const": "relationship"
+     },
+     "injected": {
+      "const": false
+     },
+     "locations": {
+      "minItems": 1
+     },
+     "checks": {
+      "contains": {
+       "type": "object",
+       "required": [
+        "independent",
+        "result",
+        "method",
+        "establishes"
+       ],
+       "properties": {
+        "independent": {
+         "const": true
+        },
+        "result": {
+         "const": "pass"
+        },
+        "establishes": {
+         "const": "relationship"
+        },
+        "method": {
+         "enum": [
+          "syntax_structure",
+          "binding_resolution",
+          "deterministic_rule"
+         ]
+        }
+       }
+      }
+     },
+     "evidence_scope": {
+      "const": "static"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "observed"
+     },
+     "evidence_scope": {
+      "const": "static"
+     }
+    },
+    "required": [
+     "evidence_scope",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "label": {
+      "const": "observed"
+     },
+     "claim_kind": {
+      "enum": [
+       "node",
+       "unresolved_reference",
+       "relationship"
+      ]
+     },
+     "locations": {
+      "minItems": 1
+     },
+     "checks": {
+      "contains": {
+       "type": "object",
+       "required": [
+        "independent",
+        "result",
+        "method"
+       ],
+       "properties": {
+        "independent": {
+         "const": true
+        },
+        "result": {
+         "const": "pass"
+        },
+        "method": {
+         "const": "parser_presence"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "observed"
+     },
+     "claim_kind": {
+      "const": "relationship"
+     },
+     "evidence_scope": {
+      "const": "static"
+     }
+    },
+    "required": [
+     "claim_kind",
+     "evidence_scope",
+     "status"
+    ]
+   },
+   "then": {
+    "required": [
+     "qualifier"
+    ],
+    "properties": {
+     "relationship_kind": {
+      "const": "imports"
+     },
+     "qualifier": {
+      "const": "observed import statement"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "enum": [
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ]
+     }
+    },
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "required": [
+     "status_reason"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "enum": [
+       "unvalidated",
+       "missing_location"
+      ]
+     }
+    },
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "label": {
+      "const": "inferred"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "rejected"
+     }
+    },
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "label": {
+      "const": "rejected"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "missing_location"
+     }
+    },
+    "required": [
+     "status"
+    ]
+   },
+   "then": {
+    "required": [
+     "flags"
+    ],
+    "properties": {
+     "flags": {
+      "contains": {
+       "const": "no_source_location"
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "not": {
+       "const": "missing_location"
+      }
+     },
+     "evidence_scope": {
+      "const": "static"
+     }
+    },
+    "required": [
+     "evidence_scope",
+     "status"
+    ]
+   },
+   "then": {
+    "properties": {
+     "locations": {
+      "minItems": 1
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "relationship_kind": {
+      "const": "persistence_path"
+     }
+    },
+    "required": [
+     "relationship_kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "qualifier"
+    ],
+    "properties": {
+     "qualifier": {
+      "const": "statically established persistence path"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "relationship_kind": {
+      "const": "library_contract"
+     }
+    },
+    "required": [
+     "relationship_kind"
+    ]
+   },
+   "then": {
+    "properties": {
+     "status": {
+      "not": {
+       "const": "verified"
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "injected": {
+      "const": true
+     }
+    },
+    "required": [
+     "injected"
+    ]
+   },
+   "then": {
+    "properties": {
+     "class": {
+      "const": "analyzer_inference"
+     },
+     "origin": {
+      "properties": {
+       "kind": {
+        "enum": [
+         "external_document",
+         "fixture"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "claim_kind": {
+      "const": "relationship"
+     }
+    },
+    "required": [
+     "claim_kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "relationship_kind",
+     "from",
+     "to"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "claim_kind": {
+      "const": "unresolved_reference"
+     }
+    },
+    "required": [
+     "claim_kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "from"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "claim_kind": {
+      "const": "node"
+     }
+    },
+    "required": [
+     "claim_kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "node_kind"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "evidence_scope": {
+      "enum": [
+       "history",
+       "documented"
+      ]
+     }
+    },
+    "required": [
+     "evidence_scope"
+    ]
+   },
+   "then": {
+    "required": [
+     "citations"
+    ],
+    "properties": {
+     "citations": {
+      "minItems": 1
+     },
+     "status": {
+      "enum": [
+       "observed",
+       "unvalidated",
+       "rejected"
+      ]
+     },
+     "class": {
+      "enum": [
+       "git_object_fact",
+       "history_pattern",
+       "history_inferred",
+       "documented_rationale",
+       "snapshot_diff",
+       "analyzer_inference"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "class": {
+      "enum": [
+       "git_object_fact",
+       "history_pattern",
+       "history_inferred",
+       "documented_rationale",
+       "snapshot_diff"
+      ]
+     }
+    },
+    "required": [
+     "class"
+    ]
+   },
+   "then": {
+    "properties": {
+     "evidence_scope": {
+      "enum": [
+       "history",
+       "documented"
+      ]
+     },
+     "status": {
+      "not": {
+       "const": "verified"
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "class": {
+      "const": "history_inferred"
+     }
+    },
+    "required": [
+     "class"
+    ]
+   },
+   "then": {
+    "properties": {
+     "status": {
+      "enum": [
+       "unvalidated",
+       "rejected"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "class": {
+      "const": "documented_rationale"
+     }
+    },
+    "required": [
+     "class"
+    ]
+   },
+   "then": {
+    "properties": {
+     "evidence_scope": {
+      "const": "documented"
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "evidence_scope": {
+      "const": "documented"
+     }
+    },
+    "required": [
+     "evidence_scope"
+    ]
+   },
+   "then": {
+    "properties": {
+     "class": {
+      "enum": [
+       "documented_rationale",
+       "analyzer_inference"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "status": {
+      "const": "observed"
+     },
+     "evidence_scope": {
+      "enum": [
+       "history",
+       "documented"
+      ]
+     }
+    },
+    "required": [
+     "evidence_scope",
+     "status"
+    ]
+   },
+   "then": {
+    "required": [
+     "qualifier"
+    ],
+    "properties": {
+     "label": {
+      "const": "observed"
+     },
+     "qualifier": {
+      "type": "string",
+      "minLength": 1
+     },
+     "checks": {
+      "contains": {
+       "type": "object",
+       "required": [
+        "independent",
+        "result",
+        "method"
+       ],
+       "properties": {
+        "independent": {
+         "const": true
+        },
+        "result": {
+         "const": "pass"
+        },
+        "method": {
+         "enum": [
+          "git_object_check",
+          "git_recount",
+          "quote_match"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "origin": {
+      "properties": {
+       "kind": {
+        "const": "cached_pr"
+       }
+      },
+      "required": [
+       "kind"
+      ]
+     }
+    },
+    "required": [
+     "origin"
+    ]
+   },
+   "then": {
+    "properties": {
+     "origin": {
+      "required": [
+       "artifact",
+       "sha256",
+       "quote"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "class": {
+      "const": "history_pattern"
+     }
+    },
+    "required": [
+     "class"
+    ]
+   },
+   "then": {
+    "required": [
+     "parameters"
+    ]
+   }
+  }
+ ],
+ "$defs": {
+  "endpoint": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "symbol"
+   ],
+   "properties": {
+    "symbol": {
+     "type": "string",
+     "pattern": "^[^:]+::.+$"
+    },
+    "file": {
+     "type": "string"
+    },
+    "start_line": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "end_line": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "original_end_line": {
+     "type": "integer",
+     "minimum": 0,
+     "description": "Extractor end line before EOF normalization (file endpoints only)"
+    },
+    "entity": {
+     "enum": [
+      "symbol",
+      "file",
+      "commit",
+      "component",
+      "dependency",
+      "repo"
+     ]
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "entity": {
+        "enum": [
+         "commit",
+         "component",
+         "dependency",
+         "repo"
+        ]
+       }
+      },
+      "required": [
+       "entity"
+      ]
+     },
+     "then": {
+      "properties": {
+       "entity": {
+        "type": "string"
+       }
+      }
+     },
+     "else": {
+      "required": [
+       "file"
+      ]
+     }
+    }
+   ]
+  },
+  "location": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "file",
+    "start_line",
+    "end_line",
+    "line_base",
+    "col_base",
+    "range_kind",
+    "range_rule",
+    "role",
+    "blob_sha",
+    "source"
+   ],
+   "properties": {
+    "file": {
+     "type": "string",
+     "pattern": "^(?!/)(?!\\.\\./)(?!.*/\\.\\./).*[^/]$"
+    },
+    "start_line": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "end_line": {
+     "type": "integer",
+     "minimum": 0,
+     "description": "Inclusive last addressable line. 0 only for a whole-file range of an empty blob."
+    },
+    "start_col": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "end_col": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "line_base": {
+     "const": 1
+    },
+    "col_base": {
+     "const": 0
+    },
+    "range_kind": {
+     "enum": [
+      "declaration",
+      "body",
+      "site",
+      "enclosing_scope",
+      "file"
+     ]
+    },
+    "range_rule": {
+     "enum": [
+      "decorator_to_body_end",
+      "header_to_body_end",
+      "binding_statement",
+      "body_only",
+      "expression",
+      "file"
+     ]
+    },
+    "role": {
+     "enum": [
+      "site",
+      "from_decl",
+      "to_decl",
+      "input"
+     ]
+    },
+    "blob_sha": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{40}$"
+    },
+    "source": {
+     "enum": [
+      "originator",
+      "validator"
+     ]
+    },
+    "recovered_by": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "original": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "start_line",
+      "end_line"
+     ],
+     "properties": {
+      "start_line": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "end_line": {
+       "type": "integer",
+       "minimum": 0
+      }
+     },
+     "description": "Originator coordinates before normalization (whole-file ranges)"
+    },
+    "end_exclusive_line": {
+     "type": "integer",
+     "minimum": 1,
+     "description": "Exclusive end boundary = end_line + 1; may be the EOF position after a final newline, which is never an addressable line"
+    },
+    "terminal_newline": {
+     "type": [
+      "boolean",
+      "null"
+     ]
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "range_kind": {
+        "const": "file"
+       }
+      },
+      "required": [
+       "range_kind"
+      ]
+     },
+     "then": {
+      "required": [
+       "original",
+       "end_exclusive_line",
+       "terminal_newline"
+      ],
+      "properties": {
+       "start_line": {
+        "const": 1
+       }
+      }
+     },
+     "else": {
+      "properties": {
+       "end_line": {
+        "minimum": 1
+       }
+      },
+      "not": {
+       "anyOf": [
+        {
+         "required": [
+          "original"
+         ]
+        },
+        {
+         "required": [
+          "end_exclusive_line"
+         ]
+        },
+        {
+         "required": [
+          "terminal_newline"
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "check": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "check_id",
+    "method",
+    "establishes",
+    "validator",
+    "reads_originator_output",
+    "independent",
+    "inputs",
+    "result",
+    "detail",
+    "run_id",
+    "at"
+   ],
+   "properties": {
+    "check_id": {
+     "type": "string",
+     "pattern": "^k_[0-9a-f]{64}$"
+    },
+    "method": {
+     "enum": [
+      "L1_path_exists",
+      "L2_range_in_file",
+      "L3_token_at_location",
+      "parser_presence",
+      "syntax_structure",
+      "binding_resolution",
+      "deterministic_rule",
+      "location_recovery",
+      "human_review",
+      "git_object_check",
+      "git_recount",
+      "quote_match"
+     ]
+    },
+    "establishes": {
+     "enum": [
+      "presence",
+      "location",
+      "relationship",
+      "none"
+     ]
+    },
+    "rule_id": {
+     "anyOf": [
+      {
+       "enum": [
+        null,
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R-contains",
+        "R-valueRef",
+        "R-enclosing"
+       ]
+      },
+      {
+       "type": "string",
+       "pattern": "^(R|H|X)[A-Za-z0-9_-]*$"
+      }
+     ]
+    },
+    "validator": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "name",
+      "version",
+      "family"
+     ],
+     "properties": {
+      "name": {
+       "type": "string"
+      },
+      "version": {
+       "type": "string"
+      },
+      "family": {
+       "enum": [
+        "cpython-ast",
+        "typescript-compiler",
+        "git",
+        "text",
+        "human"
+       ]
+      }
+     }
+    },
+    "reads_originator_output": {
+     "type": "boolean"
+    },
+    "independent": {
+     "type": "boolean"
+    },
+    "inputs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/location"
+     }
+    },
+    "expected": {
+     "type": "string"
+    },
+    "result": {
+     "enum": [
+      "pass",
+      "fail",
+      "inconclusive",
+      "error"
+     ]
+    },
+    "detail": {
+     "type": "string",
+     "minLength": 1
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "at": {
+     "type": "string",
+     "format": "date-time"
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "independent": {
+        "const": true
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "validator": {
+        "properties": {
+         "family": {
+          "enum": [
+           "cpython-ast",
+           "typescript-compiler",
+           "git",
+           "text"
+          ]
+         }
+        }
+       },
+       "reads_originator_output": {
+        "const": false
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "enum": [
+         "syntax_structure",
+         "binding_resolution",
+         "deterministic_rule"
+        ]
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "validator": {
+        "properties": {
+         "family": {
+          "enum": [
+           "cpython-ast",
+           "typescript-compiler"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "const": "parser_presence"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "establishes": {
+        "const": "presence"
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "enum": [
+         "L1_path_exists",
+         "L2_range_in_file",
+         "L3_token_at_location",
+         "location_recovery"
+        ]
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "establishes": {
+        "const": "location"
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "const": "human_review"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "establishes": {
+        "const": "none"
+       },
+       "independent": {
+        "const": false
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "enum": [
+         "parser_presence"
+        ]
+       },
+       "independent": {
+        "const": true
+       }
+      },
+      "required": [
+       "method",
+       "independent"
+      ]
+     },
+     "then": {
+      "properties": {
+       "validator": {
+        "properties": {
+         "family": {
+          "enum": [
+           "cpython-ast",
+           "typescript-compiler"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "if": {
+      "properties": {
+       "method": {
+        "enum": [
+         "git_object_check",
+         "git_recount",
+         "quote_match"
+        ]
+       }
+      },
+      "required": [
+       "method"
+      ]
+     },
+     "then": {
+      "properties": {
+       "establishes": {
+        "const": "presence"
+       },
+       "validator": {
+        "properties": {
+         "family": {
+          "enum": [
+           "git",
+           "text"
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "citation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "commit",
+    "parents",
+    "paths"
+   ],
+   "properties": {
+    "commit": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{40}$"
+    },
+    "parents": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+     }
+    },
+    "paths": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "path",
+       "status"
+      ],
+      "properties": {
+       "path": {
+        "type": "string",
+        "pattern": "^(?!/)(?!\\.\\./)(?!.*/\\.\\./).*[^/]$"
+       },
+       "old_path": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "status": {
+        "enum": [
+         "A",
+         "M",
+         "D",
+         "R",
+         "C",
+         "T"
+        ]
+       },
+       "similarity": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "blob_before": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "blob_after": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      }
+     }
+    },
+    "pr": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "number"
+     ],
+     "properties": {
+      "number": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "merge_commit_sha": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "fetched_at": {
+       "type": "string",
+       "format": "date-time"
+      }
+     }
+    }
+   }
+  }
+ }
+}

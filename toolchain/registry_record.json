@@ -1,0 +1,28 @@
+{
+ "note": "npm registry metadata recorded by: npm view <pkg>@<ver> name version license dist.integrity dist.shasum dist.tarball --json (2026-10-21). The adapter pin check (ADAPTER_CONTRACT 4.1) compares the installed package, package-lock.json and this record.",
+ "packages": {
+  "@colbymchenry/codegraph@1.6.2": {
+   "name": "@colbymchenry/codegraph",
+   "version": "1.6.2",
+   "license": "MIT",
+   "dist.integrity": "sha512-hODH/mGnCf3IUMs6rzktv/zbecJIKJfdZAYHZ9mqecb0G7ZkHaA8CZafDVnswANFEL1YFcG+lfAwc5SIXzUH6Q==",
+   "dist.shasum": "372b7b4f0190197b07d444116d6692240883a2d5",
+   "dist.tarball": "https://registry.npmjs.org/@colbymchenry/codegraph/-/codegraph-1.6.2.tgz"
+  },
+  "@colbymchenry/codegraph-linux-x64@1.6.2": {
+   "name": "@colbymchenry/codegraph-linux-x64",
+   "version": "1.6.2",
+   "license": "MIT",
+   "dist.integrity": "sha512-DJWizz1qHNr1MsbK6fz1mjVUQjeTH3T+L0D2BGaLkygWzBnNMG30MvLq1ae0m6cUV414U8aEow5Eb/kIORA8+w==",
+   "dist.shasum": "7fca3d49db06571846ca98bca778c4ee6e83553c"
+  },
+  "typescript@6.0.3": {
+   "name": "typescript",
+   "version": "6.0.3",
+   "license": "Apache-2.0",
+   "dist.integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+   "dist.shasum": "90251dc007916e972786cb94d74d15b185577d21",
+   "dist.tarball": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz"
+  }
+ }
+}
