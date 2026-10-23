@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from traces.evidence.types import ComponentMap, EvidenceSet, Sha
 
+from .aliases import alias_suggestions
 from .churn import churn, hotspots
 from .cochange import cochange
 from .config import EXTRACTOR, MAX_MILESTONES_DEFAULT, MAX_MILESTONES_ON_DEMAND, HistoryConfig
@@ -53,7 +54,7 @@ STAGE_ORDER: Final[tuple[str, ...]] = (
     "cochange_component",   # needs a component map
     "manifests",
     "reverts",              # reverts and quick deletes
-    "aliases",              # alias_suggestions (8.8); not in v1, always skipped with reason not_in_v1
+    "aliases",              # alias_suggestions (8.8); opt-in via HistoryConfig.aliases, else skipped not_in_v1_default
     "milestones",           # select_milestones(max_milestones) and milestone records
     "snapshot_compare",     # consecutive milestone pairs, oldest first
     "evidence_set_diff",    # consecutive milestone pairs that both have an evidence set
@@ -67,7 +68,7 @@ STAGE_STATUSES: Final[tuple[str, ...]] = ("completed", "truncated", "skipped", "
 # Reasons a stage did not complete in full. Budget reasons make the run partial; the others do not.
 BUDGET_REASONS: Final[frozenset[str]] = frozenset({"budget_time", "budget_memory", "budget_records"})
 INPUT_REASONS: Final[frozenset[str]] = frozenset({
-    "no_component_map", "no_evidence_sets", "no_pr_provider", "not_in_v1", "too_few_milestones",
+    "no_component_map", "no_evidence_sets", "no_pr_provider", "not_in_v1", "not_in_v1_default", "too_few_milestones",
     "dependency_not_completed"})
 TRUNCATION_REASONS: Final[frozenset[str]] = frozenset({
     "milestone_cap", "rename_detection_limited", "evidence_sets_missing_for_some_milestones",
@@ -271,7 +272,10 @@ def _st_cochange_component(st: _State) -> _StageRun:
 
 
 def _st_aliases(st: _State) -> _StageRun:
-    raise _Skip("not_in_v1", "alias suggestions (section 8.8) are not in v1")
+    if not st.config.aliases:
+        raise _Skip("not_in_v1_default", "alias suggestions (section 8.8) are off by default; set HistoryConfig.aliases")
+    res = alias_suggestions(_need_log(st), components=st.components, ctx=st.ctx)
+    return _StageRun(_recs(res.records), dict(res.report))
 
 
 def _st_milestones(st: _State) -> _StageRun:
