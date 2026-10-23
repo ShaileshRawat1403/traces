@@ -1,5 +1,7 @@
 import { useMeta } from "../../api/queries";
 import { Card, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { ProviderSettings } from "../chat/ProviderSettings";
+import { SentRecord } from "../chat/SentRecord";
 
 export function SettingsPage() {
   const meta = useMeta();
@@ -8,13 +10,16 @@ export function SettingsPage() {
       <PageHeader title="Settings" />
       <div className="grid gap-4">
         <Card>
-          <h2 className="mb-1 font-semibold">AI provider (optional)</h2>
-          <p className="text-sm text-ink-2">
-            Traces works without any AI key. Optional chat will use a key you provide. The key stays in this browser (session storage by default, or this device if you choose
-            "Remember on this device"), is sent only to the provider you configure, and never reaches the Traces API or its logs. Before anything leaves the browser you will see
-            exactly which snippets would be sent.
+          <h2 className="mb-1 font-semibold">AI provider for chat (optional)</h2>
+          <p className="mb-3 text-sm text-ink-2">
+            Traces works without any AI key. Chat sends a scoped set of evidence from this browser directly to the provider below, after you approve exactly what is sent. The key
+            stays in this browser and is never sent to the Traces API or written to any log. Providers that do not accept requests from a web page (CORS) are not supported:
+            Traces does not relay requests.
           </p>
-          <p className="mt-2 text-sm text-muted">Provider setup arrives with the explain and chat milestone.</p>
+          <ProviderSettings />
+        </Card>
+        <Card>
+          <SentRecord />
         </Card>
         <Card>
           <h2 className="mb-2 font-semibold">This build</h2>

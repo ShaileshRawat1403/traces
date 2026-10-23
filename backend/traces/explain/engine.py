@@ -258,19 +258,42 @@ def _item(kind: str, text: str, c: ClaimView | None = None) -> dict[str, Any]:
     }
 
 
+FENCE_TAG = re.compile(r"<(/?)\s*(evidence|question)\b[^>]*>", re.I)
+FORMAT_VERSION = "traces-bundle/1"
+
+
+def fence_text(text: str) -> str:
+    """Repo text and questions are data: collapse line breaks (so an item cannot start a forged evidence line) and defang
+    anything that looks like the evidence or question fence tags (so an item cannot close its own fence)."""
+    flat = " ".join(text.split())
+    return FENCE_TAG.sub(lambda m: f"\u2039{m.group(1)}{m.group(2).lower()}\u203a", flat)
+
+
+def evidence_line(e: dict[str, Any]) -> str:
+    """One fenced evidence line. web/src/features/chat/bundle.ts assembles the same format when the user removes items."""
+    return f"[{e['claim_id']}] ({e['label']}, {e['where']}) {e['statement']}"
+
+
+def assemble_prompt(instructions: str, evidence: list[dict[str, Any]], question: str) -> str:
+    lines = [instructions, "", "<evidence>"]
+    lines += [evidence_line(e) for e in evidence]
+    lines += ["</evidence>", "", "<question>", question, "</question>"]
+    return "\n".join(lines)
+
+
 def bundle(question: str, cited: list[ClaimView]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Prompt bundle for the browser to send after consent, and the manifest of exactly what it contains. No keys, ever."""
+    """Prompt bundle for the browser to send after consent, and the manifest of exactly what it contains. No keys, ever.
+    Every evidence field and the question pass through fence_text, and the manifest hashes the fenced text that is sent."""
     evidence = []
     manifest = [_item("instructions", INSTRUCTIONS)]
     for c in cited:
-        stmt = c.statement or _rel_sentence(c)
-        evidence.append({"claim_id": c.claim_id, "status": c.status, "label": c.label, "where": c.where, "statement": stmt})
+        stmt = fence_text(c.statement or _rel_sentence(c))
+        evidence.append({"claim_id": c.claim_id, "status": c.status, "label": c.label, "where": fence_text(c.where), "statement": stmt})
         manifest.append(_item("claim_statement", stmt, c))
-    manifest.append(_item("question", question))
-    lines = [INSTRUCTIONS, "", "<evidence>"]
-    lines += [f"[{e['claim_id']}] ({e['label']}, {e['where']}) {e['statement']}" for e in evidence]
-    lines += ["</evidence>", "", "<question>", question, "</question>"]
-    return {"instructions": INSTRUCTIONS, "evidence": evidence, "question": question, "prompt": "\n".join(lines)}, manifest
+    q = fence_text(question)
+    manifest.append(_item("question", q))
+    return {"format": FORMAT_VERSION, "instructions": INSTRUCTIONS, "evidence": evidence, "question": q,
+            "prompt": assemble_prompt(INSTRUCTIONS, evidence, q)}, manifest
 
 
 def explain_records(records: Iterable[dict[str, Any] | ClaimView], *, snapshot_id: str, sha: str | None, question: str,

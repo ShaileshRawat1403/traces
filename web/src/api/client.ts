@@ -128,4 +128,6 @@ export const api = {
     request<TraceResponse>("GET", `${snapPath(repoId, sha)}/trace${qs({ from, to })}`),
   historyTimeline: (repoId: string, sha: string) => request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/timeline`),
   explain: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/explain`, body),
+  /** Scoped prompt bundle for browser-side chat. The request never carries a provider key. */
+  chatBundle: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/chat/bundle`, body),
 };
