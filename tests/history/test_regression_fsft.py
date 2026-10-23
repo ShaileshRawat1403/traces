@@ -257,7 +257,13 @@ def test_run_end_to_end_totals(fsft_repo: RepoRef, tmp_path_factory: pytest.Temp
     for a, b in zip(ms, ms[1:], strict=False):
         direct += list(snapshot_compare(log, a.sha, b.sha, ctx=CTX).records)
     assert rep["records_digest"] == canonical_hash(finalize(direct))
-    assert rep["records_digest"].startswith("402d3d34eff4")  # unchanged by D-H14 (aliases off by default)
+    # D-H15 moved the digest from 402d3d34eff4 to 2fb288167ebf: the same 8402 claim_ids, 4 records gain lineage
+    # fields (churn for CONTRIBUTING.md, frontend/src/index.css, frontend/src/utils.ts; hotspot for utils.ts).
+    assert rep["records_digest"].startswith("2fb288167ebf")  # aliases off by default (D-H14)
+    flagged = sorted((r["provenance"], r["from"]["file"]) for r in res.records if "x-lineage_restart" in r["flags"])
+    assert flagged == [("history:churn", "CONTRIBUTING.md"), ("history:churn", "frontend/src/index.css"),
+                       ("history:churn", "frontend/src/utils.ts"), ("history:hotspot", "frontend/src/utils.ts")]
+    assert all(r["metrics"]["lineage_breaks"] == 1 for r in res.records if "x-lineage_restart" in r["flags"])
     assert st["aliases"] == ("skipped", "not_in_v1_default", 0)
     v = rep["volatile"]
     assert v["finalize_s"] > 0 and v["elapsed_s"] >= v["finalize_s"]
@@ -293,3 +299,4 @@ def test_run_aliases_enabled_adds_54(fsft_repo: RepoRef, log_default: HistoryLog
     al = alias_suggestions(log_default, ctx=CTX).records
     assert a.report["records_digest"] == canonical_hash(finalize(list(base.records) + list(al)))
     assert b.report["records_digest"] == a.report["records_digest"]
+    assert a.report["records_digest"].startswith("832325576eaa")  # D-H15; was 8d7313302536 before lineage fields
