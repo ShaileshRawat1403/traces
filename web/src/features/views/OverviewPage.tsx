@@ -74,7 +74,7 @@ function ComponentMap() {
     <section className="mb-4 rounded-lg border border-line bg-surface p-4" aria-label="Components by layer">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-semibold">Architecture, by stored layer</h2>
-        <p className="max-w-xl text-xs text-muted">Each band is a stored grouping rule, not a runtime boundary. The bar is how many claims were recorded, not a connection to the next band.</p>
+        <p className="max-w-xl text-xs text-muted">Each band is the API's layer label from a file path rule, not a reading of the code and not a runtime boundary; a library's source folder can show as backend. The bar is how many claims were recorded, not a connection to the next band.</p>
       </div>
       <ol className="flex flex-col gap-2">
         {layers.map((layer, i) => (

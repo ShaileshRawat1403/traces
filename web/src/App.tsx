@@ -15,7 +15,8 @@ import { SourcePage } from "./features/source/SourcePage";
 import { TracePage } from "./features/trace/TracePage";
 import { OverviewPage } from "./features/views/OverviewPage";
 import { HistoryPage } from "./features/history/HistoryPage";
-import { ComponentsPage, RoutesPage } from "./features/views/simpleViews";
+import { ComponentsPage } from "./features/inventory/ComponentsPage";
+import { RoutesPage } from "./features/inventory/RoutesPage";
 import { Loading } from "./ui/States";
 
 // Cytoscape is only downloaded when the graph route opens.

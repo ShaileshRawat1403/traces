@@ -16,7 +16,10 @@ describe("TraceView", () => {
     );
     const steps = within(screen.getByRole("list", { name: "Trace steps in order" })).getAllByRole("listitem");
     expect(steps.map((li) => li.getAttribute("data-hop"))).toEqual(["edge", "edge", "library_contract", "gap", "edge"]);
-    expect(steps[3]!.textContent).toContain("Why this is inferred");
+    expect(steps[3]!.textContent).toContain("What this gap means");
+    expect(steps[3]!.textContent).toContain("No static evidence that Traces accepts connects these two steps");
+    expect(steps[3]!.textContent).not.toMatch(/no outgoing|is not called|never calls/i);
+    expect(steps[3]!.textContent).toContain("API note");
     expect(steps[3]!.textContent).toContain("no evidence to open");
     expect(within(steps[3]!).queryByRole("button")).toBeNull();
     expect(steps[2]!.textContent).toContain("Library contract step");
@@ -25,5 +28,15 @@ describe("TraceView", () => {
     expect(onEvidence).toHaveBeenCalledWith(traceSample.hops.find((h) => h.type === "library_contract")!.claim_id);
     const r = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(r.violations.map((v) => v.id)).toEqual([]);
+  });
+
+  it("says a rejected relationship may sit behind a gap when rejected ones are hidden (O-2)", () => {
+    const t = { ...traceSample, hidden_counts: { rejected: 47 } };
+    const { container } = render(
+      <MemoryRouter>
+        <TraceView t={t} reviewHref="/review" onEvidence={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(within(container).getAllByTestId("gap-hidden")[0]!.textContent).toContain("47 rejected relationships are hidden from this trace");
   });
 });

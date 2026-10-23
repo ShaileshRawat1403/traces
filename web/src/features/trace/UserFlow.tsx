@@ -1,3 +1,4 @@
+import { GAP_MEANING } from "./traceModel";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type ClaimSummary, type Component, type TraceHop } from "../../api/client";
@@ -91,7 +92,18 @@ function Step({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {index}. </span>
         {flowLine(kind, short(from), short(to))}
       </p>
-      {reason ? <p className="flow-span text-sm text-ink-2">{reason}</p> : null}
+      {tone === "gap" ? (
+        <p className="flow-span text-sm" data-testid="gap-meaning">
+          <span className="font-semibold">What this gap means: </span>
+          {GAP_MEANING}
+        </p>
+      ) : null}
+      {reason ? (
+        <p className="flow-span text-sm text-ink-2">
+          {tone === "gap" ? <span className="font-semibold">API note: </span> : null}
+          {reason}
+        </p>
+      ) : null}
       {note ? <p className="flow-span text-sm text-ink-2">{note}</p> : null}
       {persistence ? (
         <div className="flow-span rounded-md border border-line bg-canvas p-2 text-sm">
@@ -249,7 +261,7 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
           <span className="inline-block h-0.5 w-6 border-t-2 border-dotted border-unknown" aria-hidden="true" /> Dotted, inferred library
         </li>
         <li className="inline-flex items-center gap-1">
-          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap left open
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap: no accepted static evidence
         </li>
       </ul>
       <ol className="flow-list mt-3" aria-label="User flow steps">
