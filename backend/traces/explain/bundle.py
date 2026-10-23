@@ -4,6 +4,7 @@ The API (api/app.py, Traces seat) is expected to call these with the snapshot it
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from typing import Any
 
@@ -43,12 +44,42 @@ def _sha(st: Store, snapshot_id: str) -> str | None:
     return snap.get("sha")
 
 
+def _context(st: Store, snapshot_id: str) -> dict[str, Any]:
+    """Snapshot data that explain may quote but that is not stored as claim records (F-11): the frameworks the indexer
+    read from dependency manifests, and the README heading at the pinned commit when a local checkout exists. Read-only;
+    any failure leaves the field out rather than guessing."""
+    out: dict[str, Any] = {}
+    snap = st.get_snapshot(snapshot_id) or {}
+    try:
+        fw = json.loads(snap.get("frameworks_json") or "[]")
+        if isinstance(fw, list):
+            out["frameworks"] = [str(f) for f in fw if isinstance(f, str)]
+    except TypeError, ValueError:
+        pass
+    repo_id, sha = snap.get("repo_id"), snap.get("sha")
+    if isinstance(repo_id, str) and isinstance(sha, str):
+        try:
+            from traces.core.config import get_settings
+            from traces.evidence.views import _readme_heading
+
+            checkout = get_settings().targets_dir / repo_id / sha / "source"
+            out["readme"] = _readme_heading(checkout if checkout.exists() else None, sha)
+        except Exception:  # noqa: BLE001 - a README that cannot be read is simply not quoted
+            out["readme"] = None
+    return out
+
+
 def explain(snapshot_id: str, question: str, focus_claim_ids: list[str], store: Store | None = None) -> dict[str, Any]:
     """ExplainResponse (mode no_llm): template-built answer from the snapshot's records, every sentence tagged."""
     st = _store(store)
     sha = _sha(st, snapshot_id)
     return explain_records(
-        _records(st, snapshot_id), snapshot_id=snapshot_id, sha=sha, question=question, focus_claim_ids=focus_claim_ids
+        _records(st, snapshot_id),
+        snapshot_id=snapshot_id,
+        sha=sha,
+        question=question,
+        focus_claim_ids=focus_claim_ids,
+        context=_context(st, snapshot_id),
     )
 
 
@@ -66,4 +97,5 @@ def prompt_bundle(
         question=question,
         focus_claim_ids=focus_claim_ids,
         mode="prepare_bundle",
+        context=_context(st, snapshot_id),
     )

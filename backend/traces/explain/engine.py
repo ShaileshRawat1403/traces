@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from collections import Counter, deque
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from traces.explain.intents import SUGGESTIONS, classify
@@ -261,12 +261,76 @@ def _support_key(c: ClaimView) -> tuple[float, float, str]:
     return (-sup, -ratio, c.claim_id)
 
 
+# Manifest history records (git facts over dependency manifests), most informative first.
+DEPENDENCY_KINDS = ("dependency_added", "dependency_version_changed", "dependency_removed")
+
+
+def _package(symbol: str | None) -> str:
+    """Package name of a dep:: endpoint (dep::npm:package.json:dependencies:express gives express), lower-cased."""
+    if not symbol or not symbol.startswith("dep::"):
+        return ""
+    return symbol.rsplit(":", 1)[-1].lower()
+
+
+def _route_parts(route: str | None) -> tuple[str, str]:
+    """('POST', '/register') from a stored local route 'POST /register'; method '' when none was recorded."""
+    r = (route or "").strip()
+    if " " in r:
+        m, p = r.split(" ", 1)
+        return m.upper(), p.strip()
+    return "", r
+
+
+def _norm_path(p: str) -> str:
+    return "/" + p.strip().strip("/") if p.strip() not in ("", "/") else "/"
+
+
+def _match_routes(decl: list[ClaimView], method: str, path: str) -> list[ClaimView]:
+    """Exact route resolution: the method (when asked) and the local path. If none is exact, a stored local path that is
+    a trailing part of the asked path (a mounted router: /v1/auth/register ends with /register). Never a word overlap."""
+    want = _norm_path(path)
+
+    def method_ok(c: ClaimView) -> bool:
+        m, _ = _route_parts(c.route)
+        return not method or m == method or (m in ("", "UNKNOWN") and method != "USE")
+
+    pool = [c for c in decl if method_ok(c)]
+    exact = [c for c in pool if _norm_path(_route_parts(c.route)[1]) == want]
+    if exact:
+        return sorted(exact, key=_order)
+    tail = [c for c in pool if (lp := _norm_path(_route_parts(c.route)[1])) != "/" and want.endswith(lp)]
+    return sorted(tail, key=_order)
+
+
+def _move_ends(c: ClaimView) -> tuple[str, ...]:
+    return tuple(
+        d.strip("/") or "." for d in (endpoint_path(c.from_symbol), endpoint_path(c.to_symbol)) if d is not None
+    )
+
+
+def _dir_matches(d: str, name: str) -> bool:
+    """A directory matches a name when it is the name, ends with it, or has it as a whole path segment run."""
+    n = name.strip("/")
+    return d == n or d.endswith("/" + n) or d.startswith(n + "/") or f"/{n}/" in f"/{d}/"
+
+
+def _move_key(c: ClaimView) -> tuple[int, int, str]:
+    """Rank moves by files moved, then a move that crosses a top-level directory (a top-level rename) first, then id."""
+    files = int(c.files or 0)
+    ends = _move_ends(c)
+    crosses = len(ends) == 2 and ends[0].split("/")[0] != ends[1].split("/")[0]
+    return (-files, 0 if crosses else 1, c.claim_id)
+
+
 def _suggest(reason: str) -> str:
     return f"{reason} Nothing was guessed. Try one of: " + "; ".join(SUGGESTIONS) + "."
 
 
 def build_answer(
-    records: Iterable[dict[str, Any] | ClaimView], question: str, focus_claim_ids: Iterable[str] = ()
+    records: Iterable[dict[str, Any] | ClaimView],
+    question: str,
+    focus_claim_ids: Iterable[str] = (),
+    context: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], list[ClaimView], int]:
     """Return (answer facts, cited claims, rejected-skipped count). Pure: same records and question give the same answer.
 
@@ -288,6 +352,46 @@ def build_answer(
 
     intent = classify(question)
     focus = sorted(set(focus_claim_ids))
+    ctx = context or {}
+    frameworks = [str(f) for f in ctx.get("frameworks") or [] if isinstance(f, str) and f.strip()]
+    readme = ctx.get("readme")
+
+    def project_docs(why: str) -> None:
+        """README and manifest evidence (F-11). The README heading and the manifest framework list are snapshot data,
+        not claim records, so they are stated without a citation and tagged as interpretation; manifest history records
+        (dependency_added and the like, git facts) are cited."""
+        if isinstance(readme, (list, tuple)) and len(readme) == 2 and readme[1]:
+            what = "README heading" if readme[0] == "heading" else "First README line"
+            answer.append(
+                _fact(
+                    f'{what} at this commit: "{fence_text(str(readme[1]))}". That is documentation text, not a verified capability'
+                    f"{why}.",
+                    "interpretation",
+                )
+            )
+        deps = [c for c in usable if c.kind in DEPENDENCY_KINDS and c.to_symbol]
+        if frameworks:
+            answer.append(
+                _fact(
+                    "Dependency manifests at this commit name: "
+                    + ", ".join(frameworks)
+                    + ". A named library is not a verified "
+                    f"architecture edge{why}.",
+                    "interpretation",
+                )
+            )
+            wanted = {f.lower() for f in frameworks}
+            picked: dict[str, ClaimView] = {}
+            for c in sorted(deps, key=lambda c: (DEPENDENCY_KINDS.index(c.kind), c.claim_id)):
+                pkg = _package(c.to_symbol)
+                if pkg in wanted and pkg not in picked:
+                    picked[pkg] = c
+            for pkg in sorted(picked):
+                c = picked[pkg]
+                answer.append(_fact(f"Manifest history: {c.statement or _rel_sentence(c)}", tag(c), [cite(c)]))
+        elif deps:
+            for c in sorted(deps, key=lambda c: (DEPENDENCY_KINDS.index(c.kind), c.claim_id))[:3]:
+                answer.append(_fact(f"Manifest history: {c.statement or _rel_sentence(c)}", tag(c), [cite(c)]))
 
     # Runtime questions are always unknown, and nothing else is said: static evidence cannot answer them.
     if intent.name == "runtime":
@@ -517,6 +621,79 @@ def build_answer(
             )
             answer.append(_fact(_suggest(why), "unknown"))
 
+    elif n == "route":
+        r_method, r_path = intent.entities
+        r_decl = [x for x in code if x.kind == "route" and x.claim_kind == "node"]
+        r_hits = _match_routes(r_decl, r_method, r_path)
+        asked = f"{r_method + ' ' if r_method else ''}{r_path}"
+        if not r_hits:
+            answer.append(
+                _fact(
+                    _suggest(f"No stored route is declared as {asked!r}, so nothing can be said about it."), "unknown"
+                )
+            )
+        elif len(r_hits) > MAX_AMBIGUOUS:
+            listed = ", ".join(sorted({x.route or "?" for x in r_hits})[:5])
+            answer.append(
+                _fact(
+                    _suggest(
+                        f"{len(r_hits)} stored routes match {asked!r} ({listed}), so the question is ambiguous. Ask with the method "
+                        "and the full local path."
+                    ),
+                    "unknown",
+                )
+            )
+        else:
+            for rc in r_hits:
+                answer.append(_fact(_rel_sentence(rc), tag(rc), [cite(rc)]))
+                if rc.from_symbol:
+                    edges("out", rc.from_symbol)
+            answer.append(
+                _fact(
+                    f"What {asked} does when the code runs is not established: static evidence records where the route is declared "
+                    "and what it refers to, not its runtime behavior.",
+                    "unknown",
+                )
+            )
+            project_docs(", and it does not say what this route does")
+
+    elif n == "move":
+        moves = [c for c in usable if c.kind == "prefix_moved"]
+        named = intent.entities
+        if not moves:
+            answer.append(
+                _fact(
+                    "No directory moves are recorded for this snapshot, so when directories moved is unknown here.",
+                    "unknown",
+                )
+            )
+        else:
+            hit = [c for c in moves if not named or any(_dir_matches(d, n) for n in named for d in _move_ends(c))]
+            hit.sort(key=_move_key)
+            label = " or ".join(named)
+            if not hit:
+                answer.append(
+                    _fact(
+                        f"No recorded directory move involves {label}. Moves below the bulk-move threshold are not recorded, so this is "
+                        "unknown, not proof that it never moved.",
+                        "unknown",
+                    )
+                )
+            else:
+                shown = hit[:MAX_MATCHES]
+                if len(hit) > 1:
+                    answer.append(
+                        _fact(
+                            f"History patterns: {len(hit)} recorded directory moves{f' involve {label}' if named else ''}, ranked by files moved, "
+                            "then top-level directory renames first"
+                            f"{f'; the top {len(shown)} are listed' if len(hit) > len(shown) else ''}.",
+                            "interpretation",
+                            [cite(c) for c in shown],
+                        )
+                    )
+                for c in shown:
+                    answer.append(_fact(_rel_sentence(c), "interpretation", [cite(c)]))
+
     elif n == "routes":
         terms = _terms(question)
         routes = sorted((c for c in code if c.kind == "route"), key=lambda c: (c.route or "", c.claim_id))
@@ -633,10 +810,9 @@ def build_answer(
                 answer.append(_fact(_rel_sentence(c), "interpretation", [cite(c)]))
 
     elif n == "docs":
-        docs = [c for c in usable if c.kind in ("readme", "manifest", "document", "dependency")]
-        for c in docs[:MAX_MATCHES]:
-            answer.append(_fact(c.statement or _rel_sentence(c), tag(c), [cite(c)]))
-        if not docs:
+        before = len(answer)
+        project_docs("")
+        if len(answer) == before:
             answer.append(
                 _fact(
                     "This snapshot has no README or manifest records, so the project's stated purpose and dependencies are unknown here.",
@@ -770,11 +946,12 @@ def explain_records(
     question: str,
     focus_claim_ids: Iterable[str] = (),
     mode: str = "no_llm",
+    context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """ExplainResponse-shaped dict (docs/contracts/openapi.json) from records. mode is no_llm or prepare_bundle."""
     if mode not in ("no_llm", "prepare_bundle"):
         raise ValueError(f"unknown explain mode {mode!r}")
-    answer, cited, _ = build_answer(records, question, focus_claim_ids)
+    answer, cited, _ = build_answer(records, question, focus_claim_ids, context)
     out: dict[str, Any] = {
         "snapshot_id": snapshot_id,
         "answer": answer,
