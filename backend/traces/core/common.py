@@ -85,8 +85,12 @@ class Blobs:
     def __init__(self, root, sha):
         self.root, self.sha = root, sha
         self.tree = {}
-        for line in git(root, "ls-tree", "-r", sha).splitlines():
-            meta, path = line.split("\t", 1)
+        # -z: NUL-terminated entries with raw path bytes. Without it Git C-quotes non-ASCII or odd names ("\303\251.py"),
+        # so the path would not match the index and the adapter would refuse the repository (security finding F-1).
+        for entry in git(root, "ls-tree", "-r", "-z", "--full-tree", sha).split("\0"):
+            if not entry:
+                continue
+            meta, path = entry.split("\t", 1)
             self.tree[path] = meta.split()[2]
         self._cache = {}
 

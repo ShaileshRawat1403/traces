@@ -20,6 +20,7 @@ import os
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -37,14 +38,40 @@ CODEGRAPH_PIN = {"package": "@colbymchenry/codegraph", "version": "1.6.2",
                  "npm_shasum": "372b7b4f0190197b07d444116d6692240883a2d5", "schema_version_max": 11, "extraction_version": "27"}
 
 
+ISOLATION_OFF = "off"
+
+
+class IsolationUnavailable(RuntimeError):
+    """Network isolation for the analysis workers cannot be shown (E_ISOLATION). The run must stop (D-Q5, D-002A.6, D-026)."""
+
+    code = "E_ISOLATION"
+
+
 def resolve_isolation(s: Settings) -> str:
-    if s.isolation in ("unshare", "none"):
-        return s.isolation
+    """Return "unshare" when `unshare -rn` works, or "off" only for the explicit dev override TRACES_ISOLATION=off.
+    Fails closed (IsolationUnavailable) otherwise: "auto" never falls back to running without isolation, an explicit
+    "unshare" that does not work is an error, and any other value (including the old "none") is refused (D-026)."""
+    mode = (s.isolation or "auto").strip().lower()
+    if mode == ISOLATION_OFF:
+        return ISOLATION_OFF
+    if mode not in ("auto", "unshare"):
+        raise IsolationUnavailable(f"TRACES_ISOLATION={s.isolation!r} is not supported (use auto, unshare, or off for an "
+                                   "explicit unisolated dev run)")
+    # Probe through the real wrapper (workers/sandbox.sh with unshare), so the check is exactly what the workers will get
+    # and every non-git process the worker starts is still the sandbox.
     try:
-        ok = subprocess.run(["unshare", "-rn", "true"], capture_output=True, timeout=20).returncode == 0
+        with tempfile.TemporaryDirectory(prefix="traces-isoprobe-") as home:
+            env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "TRACES_SANDBOX_HOME": home,
+                   "TRACES_TOOLCHAIN_DIR": str(s.toolchain_dir), "TRACES_ISOLATION": "unshare"}
+            ok = subprocess.run(["bash", str(s.workers_dir / "sandbox.sh"), "true"], env=env, capture_output=True,
+                                timeout=20, stdin=subprocess.DEVNULL).returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         ok = False
-    return "unshare" if ok else "none"
+    if not ok:
+        raise IsolationUnavailable("no network namespace is available (`unshare -rn` failed), so the indexer cannot be shown "
+                                   "to run without network; the run stops. Set TRACES_ISOLATION=off only for an explicit, "
+                                   "unisolated dev run (never acceptance evidence)")
+    return "unshare"
 
 
 def target_checkout(s: Settings) -> Path:
@@ -90,7 +117,10 @@ def sandbox_cmd(s: Settings, iso: str, cmd: list[str], run: Path) -> tuple[list[
 
 def run_baseline(run_id: str | None = None, s: Settings | None = None) -> Path:
     s = s or get_settings()
-    iso = resolve_isolation(s)
+    try:
+        iso = resolve_isolation(s)
+    except IsolationUnavailable as e:
+        raise SystemExit(f"E_ISOLATION: {e}") from None
     source = target_checkout(s)
     rid = run_id or "t002-" + time.strftime("%Y%m%dT%H%M%S")
     run = s.runs_dir / rid
@@ -256,6 +286,9 @@ class Inside:
                 ev = [json.loads(line) for line in open(vd / "validation" / "evidence.jsonl")]
                 vt[k]["canonical_hash"] = canonical_hash(ev)
                 self.sh([self.py, "-m", "traces.evidence.schema_check", SCHEMA_03, vd / "validation" / "evidence.jsonl"], out=vd / "schema_evidence.json")
+                if k == "v1":  # steps 8 to 10 artifacts (chain.json, coverage.json), as the research run produced them (F7)
+                    rr = self.sh([self.py, "-m", "traces.evidence.report", vd / "validation"])
+                    vt[k]["report"] = {"exit": rr.returncode, "stdout": rr.stdout[-2000:], "stderr": rr.stderr[-2000:]}
         res["validation"] = vt
         res["finished"] = now_ist()
         (R / "inside_result.json").write_text(json.dumps(res, indent=1, default=str))

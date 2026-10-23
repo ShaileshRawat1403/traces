@@ -34,7 +34,7 @@ cd web && npm run check:api                      # generated TS types match docs
 | `TRACES_DATA_DIR` | `.traces-data` | store (`traces.sqlite3`) and runs |
 | `TRACES_CACHE_DIR` | `.cache` | pinned target checkouts |
 | `TRACES_TOOLCHAIN_DIR` | `toolchain` | CodeGraph and TypeScript install |
-| `TRACES_ISOLATION` | `auto` | `unshare` or `none` (fallback; CT15 then fails by design) |
+| `TRACES_ISOLATION` | `auto` | `auto`/`unshare` (fail closed with `E_ISOLATION` when `unshare -rn` does not work) or `off` (explicit dev override: unisolated snapshot, never acceptance evidence, CT15 fails; D-026) |
 | `TRACES_LIMIT_AS_KB` | unset | opt-in address-space limit (breaks CodeGraph today, D-006) |
 | `TRACES_MAX_CLONE_MB` | 1024 | clone size cap, measured while `git clone` runs (D-021) |
 | `TRACES_CLONE_TIMEOUT_S` | 900 | clone wall-clock cap |
@@ -49,7 +49,7 @@ If `unshare -rn true` fails on Ubuntu 24.04+, allow unprivileged user namespaces
 
 ## Host notes for a real index
 
-These are required for the sandboxed index and for history. A missing one fails closed. It is not a reason to set `TRACES_ISOLATION=none` unless user namespaces themselves are unavailable.
+These are required for the sandboxed index and for history. A missing one fails closed. It is not a reason to set `TRACES_ISOLATION=off`, which is for local development only (D-026).
 
 | Need | Why |
 | --- | --- |
