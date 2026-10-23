@@ -18,7 +18,7 @@ from typing import Any, Literal
 from .errors import E_COMPONENT_MAP, E_CONFIG, HistoryError
 from .filters import Filters
 from .ingest import ls_tree_paths, open_runner
-from .lifecycle import identities
+from .lifecycle import LINEAGE_FLAG, identities, lineage_breaks, lineage_caveat
 from .model import Change, Commit, HistoryLog
 from .records import RunContext, citation, ep_component, ep_file, finalize, make_record
 from .shapes import ComponentMap, HistoryResult, Record, default_context, validate_component_map
@@ -48,6 +48,7 @@ def cochange(log: HistoryLog, *, level: Literal["file", "component"] = "file", c
     with open_runner(log.repo, log.config) as runner:
         alive = set(ls_tree_paths(runner, log.repo.sha))
         ids = identities(log, alive)
+        breaks = lineage_breaks(log, ids) if level == "file" else {}
         revs: Counter[str] = Counter()
         pairs: Counter[tuple[str, str]] = Counter()
         support_commits: dict[tuple[str, str], list[str]] = defaultdict(list)
@@ -121,10 +122,18 @@ def cochange(log: HistoryLog, *, level: Literal["file", "component"] = "file", c
             cits.sort(key=lambda x: (times[x["commit"]], x["commit"]))
             ep = ep_file if level == "file" else ep_component
             reason = None if level == "file" else "component-level counts use the component map; no independent recount in v1"
+            prov: dict[str, Any] = {"support": s, "revs_a": ra, "revs_b": rb}
+            stmt = statement_for(a, b, s, union, level)
+            flags: list[str] = []
+            ba, bb = breaks.get(a, 0), breaks.get(b, 0)
+            if ba or bb:  # D-H15: only pairs with a delete then re-add gap on either side change
+                m.update({"lineage_breaks": ba + bb, "lineage_breaks_a": ba, "lineage_breaks_b": bb})
+                prov["caveat"] = " ".join(lineage_caveat(x, n) for x, n in ((a, ba), (b, bb)) if n)
+                stmt = f"{stmt} {prov['caveat']}"
+                flags.append(LINEAGE_FLAG)
             out.append(make_record(
                 ctx, claim_kind="relationship", kind="co_changed_with", granularity=level, frm=ep(a), to=ep(b),
-                statement=statement_for(a, b, s, union, level), cls="history_pattern", provenance="history:cochange",
-                provenance_raw={"support": s, "revs_a": ra, "revs_b": rb},
+                statement=stmt, cls="history_pattern", provenance="history:cochange", provenance_raw=prov, flags=flags,
                 origin={"kind": "history_derived", "derived_from": support_commits[(a, b)]},
                 qualifier=f"changed together in {s} of {union} commits", citations=cits,
                 anchor={"range": [None, log.repo.sha], "first_parent": False}, params=params,
@@ -135,6 +144,7 @@ def cochange(log: HistoryLog, *, level: Literal["file", "component"] = "file", c
               "skipped_commits": dict(skipped), "parameters": params, "filters": flt.criteria(),
               "filter_removals": flt.removals(log.commits),
               "observed": sum(1 for r in recs if r["status"] == "observed"),
+              "lineage_break_records": sum(1 for r in recs if LINEAGE_FLAG in r["flags"]),
               "wording": "changed together in N of M commits; never causation"}
     return HistoryResult(recs, report)
 
