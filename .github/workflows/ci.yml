@@ -294,7 +294,7 @@ jobs:
           retention-days: 7
 
   security:
-    name: security and safe-failure tests (tests/security, unshare -rn)
+    name: security, safe-failure and package-pattern tests (tests/security, tests/e2e, unshare -rn)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -319,10 +319,10 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           sudo sysctl -w net.core.fb_tunnels_only_for_init_net=1 || true
           unshare -rn true && echo "unshare available"
-      - name: security tests (xfail-strict entries are open findings, listed by -rxX)
+      - name: security and package-pattern tests (xfail-strict entries are open findings, listed by -rxX)
         env:
           TRACES_ISOLATION: unshare
-        run: uv run --frozen pytest -q -rxXs tests/security
+        run: uv run --frozen pytest -q -rxXs tests/security tests/e2e
 
   history:
     name: history tests (incl. fsft regressions on the cached full-history clone)

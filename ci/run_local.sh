@@ -52,7 +52,7 @@ job_target() {
 need_target()   { [ -d "$TARGET_PATH/.git" ] || { echo "target cache missing (run the target job first)" >&2; return 1; }; }
 job_contract()  { need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/contract; }
 job_regression(){ need_target && py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q tests/regression; }
-job_security() { py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q -rxXs tests/security; }
+job_security() { py_env && toolchain_env && userns && TRACES_ISOLATION=unshare uv run --frozen pytest -q -rxXs tests/security tests/e2e; }
 job_history() {
   need_target && py_env || return 1
   if [ "$(git -C "$TARGET_PATH" rev-parse --is-shallow-repository)" != "false" ] || ! git -C "$TARGET_PATH" cat-file -e "${TARGET_SHA}^{commit}"; then
