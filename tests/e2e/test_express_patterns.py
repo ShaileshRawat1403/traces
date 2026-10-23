@@ -124,18 +124,13 @@ def test_commonjs_requires_and_express_routes_are_recorded(client, snap):
 
 
 def test_unvalidated_javascript_claims_are_never_shown_as_verified(client, snap):
-    """Without a JavaScript validator nothing may be verified; the overview says so instead of inventing certainty."""
-    ov = client.get(f"{snap['base']}/overview").json()
-    assert ov["counts"]["verified"] == 0
-    assert any(f["kind"] == "unknown" and "verified" in f["text"] for f in ov["start_here"]), ov["start_here"]
+    """v1 validates JavaScript imports only (D-030): calls and references may never be verified."""
+    verified = _claims(client, snap, claim_kind="relationship", status="verified")
+    assert verified, "correct requires should verify"
+    assert {c["kind"] for c in verified} == {"imports"}, sorted({c["kind"] for c in verified})
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="FINDING F-10 (Traces seat, validators): JavaScript files have no validator family ('no validator family for "
-    "this file language'), so a true CommonJS require or call is never verified. node-express-boilerplate@179ae84: 0 of 712 "
-    "static relationships verified, 107 of 107 relative requires correct on manual check; the default graph is empty.",
-)
+# Regression guard for F-10, fixed in PR #33.
 def test_true_commonjs_require_is_verified(client, snap):
     rels = _claims(client, snap, claim_kind="relationship", status="verified")
     assert any(
@@ -143,12 +138,7 @@ def test_true_commonjs_require_is_verified(client, snap):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="FINDING F-9 (Traces seat, views trace_view): a trace reports complete with 0 gaps although the traced symbol has "
-    "stored unresolved call references (here userService.createUser through a services/index.js barrel). "
-    "node-express-boilerplate@179ae84: trace from register shows 3 steps, 'Complete', and omits 3 unresolved service calls.",
-)
+# Regression guard for F-9, fixed in PR #33.
 def test_trace_with_unresolved_calls_is_not_complete(client, snap):
     unresolved = _claims(client, snap, claim_kind="unresolved_reference")
     assert any("userService.createUser" in c["statement"] for c in unresolved), (
