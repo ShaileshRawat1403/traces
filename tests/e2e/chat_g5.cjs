@@ -51,24 +51,24 @@ function parsePrompt(p) {
   const [instr, rest] = p.split('\n\n<evidence>\n');
   const [ev, q] = rest.split('\n</evidence>\n\n<question>\n');
   const lines = ev ? ev.split('\n').filter(Boolean) : [];
-  const items = lines.map((l) => { const m = /^\[(c_[0-9a-f]+)\] \(([^,]+), (.*?)\) (.*)$/.exec(l); return m ? { id: m[1], label: m[2], where: m[3], statement: m[4] } : { bad: l }; });
+  const items = lines.map((l) => { const m = /^\[(c_[0-9a-f]+)\] \(([^,]+), (.*?)\) (.*)$/.exec(l); return m ? { id: m[1], label: m[2], where: m[3], statement: m[4], line: l } : { bad: l }; });
   return { instructions: instr, items, question: q.replace(/\n<\/question>$/, '') };
 }
 
-/** Every outbound byte the manifest promises, and nothing else: ids, hashes of the fenced statements, instructions, question. */
+/** Every outbound byte the manifest promises, and nothing else: ids, hashes of the exact evidence lines, instructions, question. */
 function checkManifest(prompt, manifest) {
   const p = parsePrompt(prompt);
   must(!p.items.some((i) => i.bad), 'unparsable evidence line');
   const rows = manifest.filter((m) => m.kind === 'claim_statement');
   const sentIds = p.items.map((i) => i.id);
   must(JSON.stringify(sentIds) === JSON.stringify(rows.map((r) => r.claim_id)), `ids differ: sent ${sentIds.length}, manifest ${rows.length}`);
-  p.items.forEach((it, i) => must(sha256(it.statement) === rows[i].sha256 && it.statement.length === rows[i].chars, `statement hash differs for ${it.id}`));
+  p.items.forEach((it, i) => must(sha256(it.line) === rows[i].sha256 && [...it.line].length === rows[i].chars, `line hash differs for ${it.id}`));
   const ins = manifest.find((m) => m.kind === 'instructions'); const q = manifest.find((m) => m.kind === 'question');
   must(ins && sha256(p.instructions) === ins.sha256, 'instructions hash differs');
   must(q && sha256(p.question) === q.sha256, 'question hash differs');
   const other = manifest.filter((m) => !['claim_statement', 'instructions', 'question'].includes(m.kind));
   must(other.length === 0, `manifest has kinds not in the prompt: ${other.map((m) => m.kind)}`);
-  return `${rows.length} statements + instructions + question match by sha256`;
+  return `${rows.length} evidence lines + instructions + question match by sha256`;
 }
 
 (async () => {
