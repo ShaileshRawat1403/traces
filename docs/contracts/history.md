@@ -30,6 +30,7 @@ Non-goals:
 - No Code Maat code, translated code or line-by-line ports. Formulas only, from published descriptions. No GitNexus code or artifacts.
 - No reuse of Lab C scripts as code. This is a clean rewrite with tests; Lab C's techniques and measured results are reused as requirements and regression baselines.
 - Issue and Discussion threads are deferred past v1.
+- Component-level alias suggestions are deferred past v1 (D-H14). v1 alias suggestions are file level only.
 
 ## 2. Package layout (owned by this seat)
 
@@ -413,6 +414,7 @@ class HistoryConfig:
     filters: FilterSpec = ...           # defaults in section 12
     mailmap: Literal["pinned_blob", "none"] = "pinned_blob"
     limits: "Limits" = ...
+    aliases: bool = False               # opt in to the run() aliases stage (D-H14)
     def digest(self) -> str: ...
 
 @dataclass(frozen=True)
@@ -494,6 +496,7 @@ def manifest_changes(log: HistoryLog) -> HistoryResult: ...
 def alias_suggestions(log: HistoryLog, *, components: ComponentMap | None = None, ctx: RunContext | None = None) -> HistoryResult: ...
     # same-commit delete x add pairs, normalized line-set containment >= alias_min_similarity (0.5), best target per
     # deleted file; alias_of, history_inferred, unvalidated, no promoting check; file granularity only in v1
+    # parameters carry aliases=True, so alias claim_ids reflect the opt-in; component aliases deferred past v1 (D-H14)
 def set_review_state(record, state: Literal["none", "confirmed", "disputed"], *, reviewer: str | None, at: str | None, note: str | None = None) -> dict: ...
     # copy with review_state set (D-H4); status, label, class, claim_id, status_history unchanged
 def review_wording(record) -> str: ...    # "suggested, not confirmed" / "confirmed by <r>" / "disputed by <r>" (section 17)
@@ -545,7 +548,7 @@ FINALIZE_STAGE = "finalize"     # always runs last, outside the budgeted stages
 StageStatus = Literal["completed", "truncated", "skipped", "aborted"]
 
 BUDGET_REASONS = {"budget_time", "budget_memory", "budget_records"}
-INPUT_REASONS = {"no_component_map", "no_evidence_sets", "no_pr_provider", "not_in_v1",
+INPUT_REASONS = {"no_component_map", "no_evidence_sets", "no_pr_provider", "not_in_v1", "not_in_v1_default",
                  "too_few_milestones", "dependency_not_completed"}
 TRUNCATION_REASONS = {"milestone_cap", "rename_detection_limited",
                       "evidence_sets_missing_for_some_milestones", "pr_data_missing_for_some_prs"}
@@ -608,12 +611,14 @@ class GitHistoryRunner:                                        # satisfies inter
 | 7 | `cochange_component` | `cochange(level="component")` | ingest, component map | `no_component_map` |
 | 8 | `manifests` | `manifest_changes` | ingest | |
 | 9 | `reverts` | `reverts` (reverts and quick deletes) | ingest | |
-| 10 | `aliases` | `alias_suggestions` (8.8) | ingest | `not_in_v1` (always in v1) |
+| 10 | `aliases` | `alias_suggestions` (8.8) | ingest | `not_in_v1_default` unless `HistoryConfig.aliases` is True (D-H14) |
 | 11 | `milestones` | `select_milestones(max_milestones)` and `milestone_records` | ingest | |
 | 12 | `snapshot_compare` | `snapshot_compare` over consecutive milestone pairs, oldest first | milestones | `too_few_milestones` |
 | 13 | `evidence_set_diff` | `evidence_set_diff` over consecutive pairs of the milestones that have a set, oldest first (`truncated` when some milestones have none) | milestones, evidence sets | `no_evidence_sets` (fewer than two) |
 | 14 | `pr_context` | `pr_context(provider)` | ingest, provider | `no_pr_provider` |
 | | `finalize` | cross-stage `E_COLLISION`, `E_SCHEMA` (every record against 0.4 with the Traces stdlib validator; the jsonschema cross-check of every record runs in tests, D-H13), sort by `claim_id`, records digest | always runs | never skipped |
+
+`not_in_v1` stays in `INPUT_REASONS` for compatibility but is no longer emitted. A default run (aliases off) has the same records and digest as before D-H14; `config.aliases` changes only the run report's `config` and `config_digest`, and the claim_ids of alias records.
 
 A stage whose dependency did not complete (completed or truncated both count as complete) is skipped with `dependency_not_completed`. `history_impact` is a query-time API and is not a run stage.
 
@@ -900,3 +905,4 @@ Binding. They supersede any conflicting text above.
 | D-H11 | No new check method in v1. `evidence_set_diff` keeps `git_recount` (family `text`); a dedicated method is deferred to schema 0.5. | 5, 9.8 |
 | D-H12 | Accepted: `run()` signature, `RunBudget`, `STAGE_ORDER`, stage statuses and reasons, and report layout are frozen. | 8.11, 13, 14 |
 | D-H13 | `interface.HistoryRunner.run` takes `config` and `budget`, `select_milestones` takes `config`; the constructor milestone cap is a ceiling (higher is `E_CONFIG`); git children get `RLIMIT_AS` and `RLIMIT_CPU` derived from `RunBudget`, with RSS-growth checks kept; defaults 600 s, 1024 MiB, 250,000 records, 30 s reserve; finalize validates every record. Finalize validation: option C chosen. The 10% of run time line was a tripwire, not a requirement. Before, on fsft with both validators in the worker: total about 17.2 to 17.9 s, finalize 11.7 s (jsonschema 8.5 s, stdlib validator 2.7 s, collision check 0.5 s). Option C: the worker validates every record with the stdlib validator only and keeps the collision check; tests/history cross-check every record with jsonschema as well, so CI covers both. After, re-measured over three fsft runs: total 8.5 to 9.2 s, finalize 3.1 s (about 35%), stages about 5.0 to 5.6 s, same 8,402 records and digest. `traces/evidence/schema_check.py` is loaded by module name until the API lane adds its mypy annotations; follow-up: switch to a normal import then. | 8.11 |
+| D-H14 | Alias suggestions are opt-in in `run()`: `HistoryConfig.aliases: bool = False`. Off, the `aliases` stage is skipped with `not_in_v1_default` (an input reason, so the run stays complete). On, it runs `alias_suggestions` with the run's component map and context. The flag is in the config digest and in alias record parameters (`aliases: true`); no other stage's parameters change, so default claim_ids and the fsft default digest stay as they were (8,402 records, 402d3d34eff4). On fsft, enabling it adds 54 records. Component-level aliases are deferred past v1. The `run()` signature is unchanged. | 8.8, 8.11, 12 |

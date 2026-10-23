@@ -81,7 +81,7 @@ def alias_suggestions(log: HistoryLog, *, components: ComponentMap | None = None
             skipped["pairs_over_cap"] += 1
             continue
         plan.append((c, dels, adds))
-    params = {"alias_min_similarity": t.alias_min_similarity, "min_line_chars": MIN_LINE_CHARS,
+    params = {"aliases": True, "alias_min_similarity": t.alias_min_similarity, "min_line_chars": MIN_LINE_CHARS,
               "min_lines": MIN_LINES, "max_pairs_per_commit": MAX_PAIRS_PER_COMMIT, "scope": "same commit",
               "measure": "containment = |lines(from) & lines(to)| / |lines(from)| over normalized distinct lines",
               "filters": flt.criteria(), "rename_threshold": t.rename_threshold}
