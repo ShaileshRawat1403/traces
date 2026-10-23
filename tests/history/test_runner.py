@@ -66,7 +66,7 @@ def test_defaults_missing_inputs_not_partial_and_deterministic(built: Any, tmp_p
     assert st["cochange_component"] == ("skipped", "no_component_map", 0)
     assert st["evidence_set_diff"] == ("skipped", "no_evidence_sets", 0)
     assert st["pr_context"] == ("skipped", "no_pr_provider", 0)
-    assert st["aliases"] == ("skipped", "not_in_v1", 0)
+    assert st["aliases"] == ("skipped", "not_in_v1_default", 0)
     assert st["commit_facts"][0] == "completed" and st["snapshot_compare"][0] == "completed"
     assert rep["records"] == len(a.records) == sum(v[2] for v in st.values())
     assert [x["claim_id"] for x in a.records] == sorted(x["claim_id"] for x in a.records)
@@ -313,3 +313,32 @@ def test_runtime_finalize_uses_stdlib_validator_only() -> None:
     mods |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
     assert not any(m.split(".")[0] == "jsonschema" for m in mods)
     assert R.VALIDATE_EVERY_RECORD is True
+
+
+def test_aliases_opt_in_stage(synth: SynthRepo, tmp_path: Path) -> None:
+    """D-H14: HistoryConfig.aliases=True runs the aliases stage; other stages' records and claim_ids are unchanged."""
+    from traces.history.aliases import alias_suggestions
+
+    from .test_aliases import _build as _build_alias
+
+    r = synth
+    _build_alias(r)
+    off = run(ref(r), HistoryConfig(), run_id="h-a", at=AT)
+    on = run(ref(r), HistoryConfig(aliases=True), run_id="h-a", at=AT)
+    on2 = run(ref(r), HistoryConfig(aliases=True), cache_dir=tmp_path / "c", run_id="h-b",
+              at="2026-10-22T09:00:00+05:30")
+    assert_valid(on.records)
+    st = _stages(on)
+    direct = alias_suggestions(ingest(ref(r), HistoryConfig()),
+                               ctx=RunContext("h-a", AT, ref(r).repo, ref(r).sha)).records
+    assert len(direct) == 2 and st["aliases"] == ("completed", None, 2)
+    assert _stages(off)["aliases"] == ("skipped", "not_in_v1_default", 0)
+    alias_ids = {x["claim_id"] for x in direct}
+    assert {x["claim_id"] for x in on.records} - alias_ids == {x["claim_id"] for x in off.records}
+    assert all(x["parameters"]["values"]["aliases"] is True for x in direct)
+    assert on.report["config"]["aliases"] is True and off.report["config"]["aliases"] is False
+    assert on.report["config_digest"] != off.report["config_digest"]
+    assert canonical_hash(on2.records) == canonical_hash(on.records) == on.report["records_digest"]
+    with pytest.raises(HistoryError) as ei:
+        HistoryConfig(aliases="yes").validate()  # type: ignore[arg-type]
+    assert ei.value.code == "E_CONFIG"
