@@ -1046,11 +1046,12 @@
       "type": "object"
      },
      "isolation": {
-      "description": "configured worker isolation: unshare (default; auto resolves to unshare or fails closed), off (explicit dev override, snapshots indexed this way are unisolated). none is no longer emitted (D-026)",
+      "description": "worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no longer emitted (D-026). The probe result is cached for 60 s",
       "enum": [
        "unshare",
        "none",
-       "off"
+       "off",
+       "unavailable"
       ],
       "title": "Isolation",
       "type": "string"
@@ -1457,6 +1458,7 @@
       "type": "integer"
      },
      "method": {
+      "description": "HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount (flag `mount`), which is not an HTTP operation",
       "title": "Method",
       "type": "string"
      },
@@ -1806,6 +1808,21 @@
       ],
       "title": "Type",
       "type": "string"
+     },
+     "unresolved_calls": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references",
+      "title": "Unresolved Calls"
      }
     },
     "required": [
@@ -1824,7 +1841,7 @@
     "additionalProperties": false,
     "properties": {
      "complete": {
-      "description": "false when the trace contains gaps",
+      "description": "false when the trace contains gaps (including steps with unresolved outgoing calls) or a step that rests on a relationship that is not verified or observed",
       "title": "Complete",
       "type": "boolean"
      },
@@ -1850,6 +1867,21 @@
       },
       "title": "Hops",
       "type": "array"
+     },
+     "incomplete_reasons": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "why complete is false; empty when complete",
+      "title": "Incomplete Reasons"
      },
      "snapshot_id": {
       "title": "Snapshot Id",

@@ -62,3 +62,6 @@ Not a CI result. Commands used git 2.47.3, CPython 3.14.8, Node 22.23.3, and the
 - Library-contract hops (react-hook-form, TanStack Query on the Task 002 chain) stay inferred unless an independent check says otherwise.
 - The persistence path on the Task 002 chain is a static path, not a runtime-observed database write.
 - Rejected CodeGraph imports and the three injected negatives stay rejected and are hidden from the default graph.
+- JavaScript (D-030): only `imports` edges have an independent check (TypeScript 6.0.3 parser plus Node CommonJS resolution of relative specifiers). JavaScript calls, references, instantiations and named import bindings stay unvalidated or observed and are never verified in v1; that check is v1.1. Package, absolute, aliased (bundler or `paths`) and computed specifiers are not resolved, so those imports stay unvalidated.
+- Express mounts (O-7): a router mounted in a computed way, such as `forEach` over an array of routes, keeps its local path without the mount prefix. Literal mounts are composed. Middleware mounts are listed as method `USE` with flag `mount`.
+- Persistence (O-8): only the FastAPI/SQLModel session path is recognised. Mongoose (`Model.create`, `doc.save`) and other ODMs are not detected, so trace and explain say no persistence path is recorded for such apps. That is an honest unknown, not an absence.

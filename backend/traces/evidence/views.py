@@ -249,6 +249,10 @@ def routes_view(st: Store, snapshot_id: str) -> list[dict[str, Any]]:
             continue
         seen.add(key)
         flags = list(rec.get("flags") or [])
+        row = (rec.get("provenance_raw") or {}).get("row") or {}
+        if method == "UNKNOWN" and isinstance(row, dict) and str(row.get("name") or "").startswith("USE "):
+            method = "USE"  # O-7: an app.use()/router.use() mount as recorded, not an HTTP operation with an unknown method
+            flags.append("mount")
         if method == "UNKNOWN" and "method_not_recorded" not in flags:
             flags.append("method_not_recorded")
         raw = rec.get("provenance_raw") or {}
@@ -455,6 +459,7 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
     focus_id: str | None = None
     focus_ep: dict[str, Any] | None = None
     focus_scope: set[str] | None = None  # symbols whose hidden edges count toward hidden_counts when focused
+    neighbourhood_rule = False  # symbol focus: a hidden edge counts only with both ends in scope, as shown edges do
     if focus:
         focus_id = _resolve(focus, set(nodes_eps))
         comp_focus = by_comp.get(focus) if focus_id is None else None
@@ -480,25 +485,23 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
             assert focus_id is not None
             focus_ep = nodes_eps.get(focus_id)
             depth = max(0, min(4, depth))
-            seen = {focus_id}
-            frontier = {focus_id}
-            for _ in range(depth):
-                nxt: set[str] = set()
-                for cur in frontier:
-                    for rec in by_src.get(cur, []) + by_dst.get(cur, []):
-                        for ep in (rec.get("from") or {}, rec.get("to") or {}):
-                            sym = ep.get("symbol")
-                            if sym and sym not in seen:
-                                nxt.add(sym)
-                seen |= nxt
-                frontier = nxt
-                if not frontier:
-                    break
-            focus_scope = seen if depth > 0 else {focus_id}
+            seen = _neighbourhood(focus_id, depth, by_src, by_dst)
             if depth == 0:
                 chosen = []
+                focus_scope = {focus_id}
+                neighbourhood_rule = True  # depth 0 shows no edges, so none counts as hidden either
             else:
                 chosen = [r for r in edges_all if (r.get("from") or {}).get("symbol") in seen and (r.get("to") or {}).get("symbol") in seen]
+                # F5 consistency: a hidden edge counts when it is exactly an edge that showing its status would add, i.e.
+                # both ends in the neighbourhood computed with the hidden edges included (the same rule as the shown edges)
+                h_src, h_dst = defaultdict(list, {k: list(v) for k, v in by_src.items()}), defaultdict(list, {k: list(v) for k, v in by_dst.items()})
+                for rec in hidden_recs:
+                    a, b = (rec.get("from") or {}).get("symbol"), (rec.get("to") or {}).get("symbol")
+                    if a and b:
+                        h_src[a].append(rec)
+                        h_dst[b].append(rec)
+                focus_scope = _neighbourhood(focus_id, depth, h_src, h_dst)
+                neighbourhood_rule = True
 
     # hidden_counts are scoped like the edges: the whole (filtered) snapshot when unfocused, otherwise only hidden
     # edges that touch the focused neighbourhood or component (F5).
@@ -510,7 +513,7 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
     elif focus_scope is None:
         scope_hidden = []
     else:
-        scope_hidden = [r for r in hidden_recs if any(e in focus_scope for e in ends(r))]
+        scope_hidden = [r for r in hidden_recs if (all if neighbourhood_rule else any)(e in focus_scope for e in ends(r))]
     hidden: Counter[str] = Counter(str(r.get("status")) for r in scope_hidden)
 
     def rank(rec: dict[str, Any]) -> tuple[int, int, str]:
@@ -592,6 +595,24 @@ def _hop(i: int, rec: dict[str, Any] | None, frm: str, to: str, *, gap: str | No
             "qualifier": rec.get("qualifier"), "evidence_scope": "static", "injected": bool(rec.get("injected"))}
 
 
+def _neighbourhood(start: str, depth: int, by_src: dict[str, list[dict[str, Any]]], by_dst: dict[str, list[dict[str, Any]]]) -> set[str]:
+    seen = {start}
+    frontier = {start}
+    for _ in range(depth):
+        nxt: set[str] = set()
+        for cur in frontier:
+            for rec in by_src.get(cur, []) + by_dst.get(cur, []):
+                for ep in (rec.get("from") or {}, rec.get("to") or {}):
+                    sym = ep.get("symbol")
+                    if sym and sym not in seen:
+                        nxt.add(sym)
+        seen |= nxt
+        frontier = nxt
+        if not frontier:
+            break
+    return seen
+
+
 def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include_rejected: bool = False) -> dict[str, Any]:
     """Shortest static path. Rejected claims are not bridges. Library-contract hops stay labeled as such."""
     allowed = _allowed(None, include_rejected)
@@ -657,9 +678,50 @@ def trace_view(st: Store, snapshot_id: str, *, frm: str, to: str | None, include
         hops = [_hop(i, rec, start, (rec.get("to") or {}).get("symbol") or start) for i, rec in enumerate(recs[:MAX_TRACE_HOPS])]
         if not hops:
             hops = [gap(0, start, start, "This symbol has no outgoing static relationship shown.")]
-    complete = not any(h["type"] == "gap" for h in hops)
+    # F-9: listing what a symbol calls (no `to`): calls stored only as unresolved references are not followed, so each
+    # gets named in a gap and the listing is not complete. A from -> to path is judged by its own hops: side calls of a
+    # step that do not lie on the path are not gaps in it. A call already shown as a hop from the same step is no gap.
+    steps = [start] if start is not None and not to else []
+    unresolved = _unresolved_calls(st, snapshot_id, set(steps), include_rejected) if steps else {}
+    for sym in dict.fromkeys(steps):
+        shown_tails = {h["to_symbol"].split("::")[-1] for h in hops if h["type"] != "gap" and h["from_symbol"] == sym}
+        names = [n for n in unresolved.get(sym, []) if n not in shown_tails]
+        if names:
+            shown = ", ".join(names[:MAX_UNRESOLVED_NAMES]) + (f", and {len(names) - MAX_UNRESOLVED_NAMES} more" if len(names) > MAX_UNRESOLVED_NAMES else "")
+            g = _hop(len(hops), None, sym, "(unresolved)", gap=(
+                f"{len(names)} outgoing call(s) from this step are recorded only as unresolved references ({shown}): the "
+                "extractor did not resolve them to a declaration, so the trace cannot follow them. They may lead to other code."))
+            g["unresolved_calls"] = names
+            hops.append(g)
+    weak = [h for h in hops if h["type"] == "edge" and h["status"] not in ("verified", "observed")]
+    incomplete: list[str] = []
+    if any(h["type"] == "gap" for h in hops):
+        incomplete.append("gaps: " + str(sum(1 for h in hops if h["type"] == "gap")))
+    if weak:
+        incomplete.append(f"{len(weak)} step(s) rest on relationships that are not verified or observed")
+    for i, h in enumerate(hops):
+        h["index"] = i
     return {"snapshot_id": snapshot_id, "from_symbol": start or frm, "to_symbol": goal or to, "hops": hops,
-            "hidden_counts": dict(hidden), "complete": complete}
+            "hidden_counts": dict(hidden), "complete": not incomplete, "incomplete_reasons": incomplete}
+
+
+MAX_UNRESOLVED_NAMES = 5
+
+
+def _unresolved_calls(st: Store, snapshot_id: str, symbols: set[str], include_rejected: bool) -> dict[str, list[str]]:
+    """Unresolved call references stored for these source symbols, by symbol (sorted, unique names)."""
+    out: dict[str, set[str]] = defaultdict(set)
+    for rec in load_records(st, snapshot_id, scopes={"static"}, claim_kind="unresolved_reference"):
+        sym = (rec.get("from") or {}).get("symbol")
+        if sym not in symbols or (rec.get("status") == "rejected" and not include_rejected):
+            continue
+        row = (rec.get("provenance_raw") or {}).get("row") or {}
+        if row.get("reference_kind") not in ("calls", "instantiates"):
+            continue
+        name = row.get("reference_name")
+        if isinstance(name, str) and name and name != "require":  # require() is the module import, checked as `imports`
+            out[sym].add(name[:200])
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def _shortest(outgoing: dict[str, list[tuple[int, str, dict[str, Any]]]], start: str, goal: str) -> list[dict[str, Any]] | None:

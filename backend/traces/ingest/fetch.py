@@ -14,6 +14,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from traces.ingest.errors import IngestError
 from traces.ingest.urls import RepoRef, require_sha
@@ -82,9 +83,23 @@ def classify_git_failure(stderr: str, slug: str) -> IngestError:
     return IngestError("fetch_failed", f"git failed for {slug}", {"git": tail})
 
 
+def run_in_group(cmd: list[str], *, timeout: float, cwd: str | Path | None = None) -> subprocess.CompletedProcess[str]:
+    """`subprocess.run(capture_output=True, text=True)` for git, but in its own session: a timeout or interrupt kills the
+    whole process group (git and every helper it started), not just git, and waits for it. Raises TimeoutExpired."""
+    p = subprocess.Popen(cmd, cwd=cwd, env=git_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                         text=True, start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except BaseException:
+        _kill_group(p)
+        p.communicate()
+        raise
+    _kill_group(p)  # git exited; a helper it left behind in its group must not outlive it
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def git(*args: str, cwd: str | Path | None = None, timeout: int = 600) -> str:
-    p = subprocess.run(["git", *SAFE_GIT_CONFIG, *args], cwd=cwd, env=git_env(), capture_output=True, text=True, timeout=timeout,
-                       stdin=subprocess.DEVNULL)
+    p = run_in_group(["git", *SAFE_GIT_CONFIG, *args], cwd=cwd, timeout=timeout)
     if p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args[:3])} failed ({p.returncode}): {p.stderr.strip()[-500:]}")
     return p.stdout
@@ -101,7 +116,7 @@ def dir_bytes(root: Path) -> int:
     return total
 
 
-def _kill_group(p: subprocess.Popen[bytes], grace_s: float = 5.0) -> None:
+def _kill_group(p: subprocess.Popen[Any], grace_s: float = 5.0) -> None:
     """Kill git and every helper it started (git-remote-https, index-pack, fetch-pack). Killing only the parent leaves
     the helpers writing pack temp files into the partial clone after it was removed (acceptance audit, D-021)."""
     try:
@@ -144,8 +159,7 @@ def _clone_capped(url: str, dest: Path, slug: str, limits: FetchLimits) -> None:
                     if killed:
                         break
             finally:
-                if killed or p.poll() is None:
-                    _kill_group(p)
+                _kill_group(p)  # always: on a cap, timeout or interrupt, and after a normal exit (no helper outlives git)
             err.seek(0)
             stderr = err.read()
     finally:

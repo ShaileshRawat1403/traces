@@ -10,7 +10,7 @@ import re
 from collections.abc import Callable, Iterator
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -138,7 +138,17 @@ async def _validation_error(_: Request, e: RequestValidationError) -> JSONRespon
 
 @lru_cache(maxsize=1)
 def _default_store() -> Store:
-    return Store(get_settings().db_path)
+    s = get_settings()
+    st = Store(s.db_path)
+    try:  # O-9: idempotent startup cleanup of pre-F-6 rows for commits that do not exist (logged)
+        from traces.evidence.maintenance import purge_missing_commit_snapshots
+
+        purge_missing_commit_snapshots(st, s.targets_dir)
+    except Exception:  # noqa: BLE001  maintenance must never stop the API from starting
+        import logging
+
+        logging.getLogger("traces.maintenance").exception("O-9 startup cleanup failed; nothing was changed by this step")
+    return st
 
 
 def get_store() -> Store:
@@ -206,13 +216,37 @@ def health(st: StoreDep) -> Health:
     return Health(status="ok", version=__version__, store_migration=st.schema_version())
 
 
+IsoState = Literal["unshare", "off", "unavailable"]
+_ISO_CACHE: dict[str, tuple[float, IsoState]] = {}
+
+
+def _probed_isolation(s: Any) -> IsoState:
+    """What an index job would get now (D-026): the real sandbox probe, not the configured value. Cached for 60 s."""
+    import time
+
+    from traces.evidence.pipeline import IsolationUnavailable, resolve_isolation
+
+    key = f"{s.isolation}|{s.workers_dir}"
+    hit = _ISO_CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < 60:
+        return hit[1]
+    out: IsoState
+    try:
+        out = "off" if resolve_isolation(s) == "off" else "unshare"
+    except IsolationUnavailable:
+        out = "unavailable"
+    _ISO_CACHE[key] = (time.monotonic(), out)
+    return out
+
+
 @app.get(f"{API}/meta", response_model=Meta, tags=["service"])
 def meta() -> Meta:
     s = get_settings()
     return Meta(version=__version__, evidence_schema=CURRENT, evidence_schemas_readable=sorted(SCHEMAS),
                 extractor={"codegraph": "@colbymchenry/codegraph@1.6.2"},
-                validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api"},
-                isolation="off" if s.isolation.strip().lower() == "off" else "unshare",
+                validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api",
+                            "javascript": "typescript@6.0.3 parser, imports only (D-030)"},
+                isolation=_probed_isolation(s),
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
                               "index_jobs": True, "head": True, "overview": True, "components": True, "routes": True,
                               "graph": True, "source": True, "trace": True, "history": True, "compare": True,

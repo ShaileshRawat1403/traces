@@ -42,9 +42,11 @@ class Meta(Strict):
     evidence_schemas_readable: list[str]
     extractor: dict[str, str]
     validators: dict[str, str]
-    isolation: Literal["unshare", "none", "off"] = Field(description="configured worker isolation: unshare (default; auto resolves "
-                                                       "to unshare or fails closed), off (explicit dev override, snapshots indexed this "
-                                                       "way are unisolated). none is no longer emitted (D-026)")
+    isolation: Literal["unshare", "none", "off", "unavailable"] = Field(
+        description="worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh "
+                    "passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed "
+                    "with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no "
+                    "longer emitted (D-026). The probe result is cached for 60 s")
     capabilities: dict[str, bool] = Field(description="capability -> implemented in this build")
 
 
@@ -181,7 +183,8 @@ class Component(Strict):
 
 
 class RouteItem(Strict):
-    method: str
+    method: str = Field(description="HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount "
+                                    "(flag `mount`), which is not an HTTP operation")
     path: str
     handler_symbol: str | None
     operation_id: str | None
@@ -271,6 +274,8 @@ class TraceHop(Strict):
     injected: bool | None = Field(None, description="true when the hop is an injected negative control, never a repository fact; sent for edge hops")
     hidden_rejected: int | None = Field(None, description="gap hops only: rejected relationships leaving this step that the request hides "
                                                     "(include_rejected=false); the reason text states all hidden counts")
+    unresolved_calls: list[str] | None = Field(None, description="gap hops for unresolved calls only (F-9, traces without `to`): the call names "
+                                                                  "this step makes that the extractor stored as unresolved references")
 
 
 class TraceResponse(Strict):
@@ -279,7 +284,9 @@ class TraceResponse(Strict):
     to_symbol: str | None
     hops: list[TraceHop]
     hidden_counts: HiddenCounts
-    complete: bool = Field(description="false when the trace contains gaps")
+    complete: bool = Field(description="false when the trace contains gaps (including steps with unresolved outgoing calls) or a "
+                                        "step that rests on a relationship that is not verified or observed")
+    incomplete_reasons: list[str] | None = Field(None, description="why complete is false; empty when complete")
     disclaimer: str = "Static analysis only. No runtime behavior has been observed."
 
 

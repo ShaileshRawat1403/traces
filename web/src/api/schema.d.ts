@@ -969,10 +969,10 @@ export interface components {
             };
             /**
              * Isolation
-             * @description configured worker isolation: unshare (default; auto resolves to unshare or fails closed), off (explicit dev override, snapshots indexed this way are unisolated). none is no longer emitted (D-026)
+             * @description worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no longer emitted (D-026). The probe result is cached for 60 s
              * @enum {string}
              */
-            isolation: "unshare" | "none" | "off";
+            isolation: "unshare" | "none" | "off" | "unavailable";
             /** Validators */
             validators: {
                 [key: string]: string;
@@ -1118,7 +1118,10 @@ export interface components {
             label?: string | null;
             /** Line */
             line: number;
-            /** Method */
+            /**
+             * Method
+             * @description HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount (flag `mount`), which is not an HTTP operation
+             */
             method: string;
             /** Operation Id */
             operation_id: string | null;
@@ -1252,12 +1255,17 @@ export interface components {
              * @enum {string}
              */
             type: "edge" | "gap" | "library_contract";
+            /**
+             * Unresolved Calls
+             * @description gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references
+             */
+            unresolved_calls?: string[] | null;
         };
         /** TraceResponse */
         TraceResponse: {
             /**
              * Complete
-             * @description false when the trace contains gaps
+             * @description false when the trace contains gaps (including steps with unresolved outgoing calls) or a step that rests on a relationship that is not verified or observed
              */
             complete: boolean;
             /**
@@ -1273,6 +1281,11 @@ export interface components {
             };
             /** Hops */
             hops: components["schemas"]["TraceHop"][];
+            /**
+             * Incomplete Reasons
+             * @description why complete is false; empty when complete
+             */
+            incomplete_reasons?: string[] | null;
             /** Snapshot Id */
             snapshot_id: string;
             /** To Symbol */
