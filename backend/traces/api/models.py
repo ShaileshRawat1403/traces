@@ -18,7 +18,8 @@ class Strict(BaseModel):
 
 
 class ErrorBody(Strict):
-    code: str = Field(description="machine code, e.g. not_implemented, invalid_repo_url, not_found, rate_limited, too_large")
+    code: str = Field(description="machine code, e.g. not_implemented, invalid_repo_url, invalid_sha, not_found, repo_not_public, repo_empty, "
+                                  "sha_not_found, too_large, too_many_files, fetch_timeout, upstream_unavailable, rate_limited, fetch_failed")
     message: str
     owner: str | None = Field(None, description="seat that owns the missing capability (not_implemented only)")
     milestone: str | None = None
@@ -56,6 +57,9 @@ class Repo(Strict):
     latest_discovered_sha: str | None = None
     latest_discovered_at: str | None = None
     default_branch: str | None = None
+    visibility_checked_at: str | None = Field(None, description="when an anonymous (credential-free) ls-remote last confirmed the repo is public")
+    external_ai_consent: bool = Field(False, description="repo-level consent to send source snippets to an external AI provider; "
+                                      "always false in v1 (no endpoint sets it), so explain bundles need per-request consent")
 
 
 class RepoCreate(Strict):

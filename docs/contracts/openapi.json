@@ -298,7 +298,7 @@
     "additionalProperties": false,
     "properties": {
      "code": {
-      "description": "machine code, e.g. not_implemented, invalid_repo_url, not_found, rate_limited, too_large",
+      "description": "machine code, e.g. not_implemented, invalid_repo_url, invalid_sha, not_found, repo_not_public, repo_empty, sha_not_found, too_large, too_many_files, fetch_timeout, upstream_unavailable, rate_limited, fetch_failed",
       "title": "Code",
       "type": "string"
      },
@@ -1186,6 +1186,12 @@
       ],
       "title": "Default Branch"
      },
+     "external_ai_consent": {
+      "default": false,
+      "description": "repo-level consent to send source snippets to an external AI provider; always false in v1 (no endpoint sets it), so explain bundles need per-request consent",
+      "title": "External Ai Consent",
+      "type": "boolean"
+     },
      "host": {
       "title": "Host",
       "type": "string"
@@ -1232,6 +1238,18 @@
       "const": "public",
       "title": "Visibility",
       "type": "string"
+     },
+     "visibility_checked_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "when an anonymous (credential-free) ls-remote last confirmed the repo is public",
+      "title": "Visibility Checked At"
      }
     },
     "required": [
@@ -1832,7 +1850,7 @@
     ]
    },
    "post": {
-    "description": "Validate a public GitHub URL and register the repo. Does not fetch anything; indexing is a separate job.",
+    "description": "Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the\ndefault branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.\nNothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.",
     "operationId": "register_repo_api_v1_repos_post",
     "requestBody": {
      "content": {
@@ -1874,6 +1892,36 @@
        }
       },
       "description": "Unprocessable Content"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Register Repo",
@@ -1936,6 +1984,7 @@
   },
   "/api/v1/repos/{repo_id}/compare": {
    "get": {
+    "description": "Static claims present on only one of two indexed snapshots. Rename-aware snapshot_added records are returned when history stored them; otherwise the underlying claims are returned with their own kinds.",
     "operationId": "compare_api_v1_repos__repo_id__compare_get",
     "parameters": [
      {
@@ -1996,16 +2045,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Compare",
@@ -2016,7 +2055,7 @@
   },
   "/api/v1/repos/{repo_id}/head": {
    "get": {
-    "description": "Latest discovered commit on the default branch vs. the displayed snapshot (cached ls-remote, rate limited).",
+    "description": "Latest discovered commit on the default branch vs. the displayed snapshot (the newest ready one). Anonymous\n`git ls-remote`, cached for 60 s per repo and rate limited (429 rate_limited only when nothing is cached).",
     "operationId": "repo_head_api_v1_repos__repo_id__head_get",
     "parameters": [
      {
@@ -2060,7 +2099,7 @@
       },
       "description": "Unprocessable Content"
      },
-     "501": {
+     "429": {
       "content": {
        "application/json": {
         "schema": {
@@ -2068,7 +2107,27 @@
         }
        }
       },
-      "description": "Not implemented in this build (error.code = not_implemented)"
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Repo Head",
@@ -2079,6 +2138,7 @@
   },
   "/api/v1/repos/{repo_id}/index-jobs": {
    "post": {
+    "description": "Start an index job for `sha` (default: the latest discovered HEAD, discovered now if unknown). Returns the job\n(202); an index already queued or running for the same snapshot is returned instead of a duplicate. Poll\nGET /jobs/{id} with If-None-Match. Phases: fetching, checking_out, indexing, adapting, validating, storing, history.",
     "operationId": "create_index_job_api_v1_repos__repo_id__index_jobs_post",
     "parameters": [
      {
@@ -2122,6 +2182,16 @@
       },
       "description": "Not Found"
      },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "already_indexed (the snapshot is ready; send reindex=true)"
+     },
      "422": {
       "content": {
        "application/json": {
@@ -2132,7 +2202,7 @@
       },
       "description": "Unprocessable Content"
      },
-     "501": {
+     "429": {
       "content": {
        "application/json": {
         "schema": {
@@ -2140,7 +2210,27 @@
         }
        }
       },
-      "description": "Not implemented in this build (error.code = not_implemented)"
+      "description": "rate_limited (HEAD discovery called too often; Retry-After set)"
+     },
+     "502": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "upstream_unavailable or fetch_failed (GitHub unreachable)"
+     },
+     "504": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "fetch_timeout"
      }
     },
     "summary": "Create Index Job",
@@ -2268,6 +2358,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/chat/bundle": {
    "post": {
+    "description": "Prompt bundle for browser-side chat (always prepare_bundle, whatever mode says); the backend never sees provider keys.",
     "operationId": "chat_bundle_api_v1_repos__repo_id__snapshots__sha__chat_bundle_post",
     "parameters": [
      {
@@ -2329,16 +2420,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Chat Bundle",
@@ -2607,6 +2688,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/components": {
    "get": {
+    "description": "Deterministic components stored at index time (rule id on each row) with claim counts by status.",
     "operationId": "components_api_v1_repos__repo_id__snapshots__sha__components_get",
     "parameters": [
      {
@@ -2662,16 +2744,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Components",
@@ -2744,16 +2816,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Explain",
@@ -2818,7 +2880,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/graph": {
    "get": {
-    "description": "Graph query: filters (layer, rel, status, q) and neighborhood (focus + depth). Rejected excluded unless include_rejected.",
+    "description": "Static relationships only. History patterns (co-change, hotspots) are not drawn here. Rejected edges are excluded unless include_rejected.",
     "operationId": "graph_api_v1_repos__repo_id__snapshots__sha__graph_get",
     "parameters": [
      {
@@ -3000,16 +3062,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Graph",
@@ -3020,6 +3072,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/cochange": {
    "get": {
+    "description": "Changed-together records. Coupling is not causation and not a static dependency.",
     "operationId": "history_cochange_api_v1_repos__repo_id__snapshots__sha__history_cochange_get",
     "parameters": [
      {
@@ -3098,16 +3151,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Cochange",
@@ -3118,6 +3161,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/hotspots": {
    "get": {
+    "description": "History-pattern metrics. A hotspot score is not a quality judgment and not a code dependency.",
     "operationId": "history_hotspots_api_v1_repos__repo_id__snapshots__sha__history_hotspots_get",
     "parameters": [
      {
@@ -3180,16 +3224,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Hotspots",
@@ -3260,16 +3294,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Lifecycle",
@@ -3331,16 +3355,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Milestones",
@@ -3351,6 +3365,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/rationale": {
    "get": {
+    "description": "Quoted PR or commit text. A quote is evidence the text exists, not proof of intent.",
     "operationId": "history_rationale_api_v1_repos__repo_id__snapshots__sha__history_rationale_get",
     "parameters": [
      {
@@ -3418,16 +3433,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Rationale",
@@ -3438,6 +3443,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/history/timeline": {
    "get": {
+    "description": "Commit nodes, newest committer time first. A path or component filter switches to the file-change records for that scope.",
     "operationId": "history_timeline_api_v1_repos__repo_id__snapshots__sha__history_timeline_get",
     "parameters": [
      {
@@ -3544,16 +3550,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "History Timeline",
@@ -3564,6 +3560,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/overview": {
    "get": {
+    "description": "Grounded facts, documented interpretations and explicit unknowns. Nothing here is a business claim without a source.",
     "operationId": "overview_api_v1_repos__repo_id__snapshots__sha__overview_get",
     "parameters": [
      {
@@ -3615,16 +3612,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Overview",
@@ -3635,6 +3622,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/routes": {
    "get": {
+    "description": "Route and operation records already stored. A method that was not on the record is UNKNOWN, not guessed from a scan.",
     "operationId": "routes_api_v1_repos__repo_id__snapshots__sha__routes_get",
     "parameters": [
      {
@@ -3690,16 +3678,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Routes",
@@ -3710,7 +3688,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/source": {
    "get": {
-    "description": "Pinned source view at the snapshot SHA (read from Git objects, never from a working tree).",
+    "description": "Pinned source at the snapshot SHA, read from the local checkout's Git objects. Paths cannot escape the tree.",
     "operationId": "source_api_v1_repos__repo_id__snapshots__sha__source_get",
     "parameters": [
      {
@@ -3799,16 +3777,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Source",
@@ -3819,7 +3787,7 @@
   },
   "/api/v1/repos/{repo_id}/snapshots/{sha}/trace": {
    "get": {
-    "description": "Cross-layer trace as ordered hops: edge, gap and library_contract (gap and library_contract are inferred with a reason).",
+    "description": "Ordered static hops. A missing link is a gap (inferred, with a reason). library_contract hops are not verified calls.",
     "operationId": "trace_api_v1_repos__repo_id__snapshots__sha__trace_get",
     "parameters": [
      {
@@ -3906,16 +3874,6 @@
        }
       },
       "description": "Unprocessable Content"
-     },
-     "501": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not implemented in this build (error.code = not_implemented)"
      }
     },
     "summary": "Trace",

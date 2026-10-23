@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import sqlite3
+import threading
+import uuid
 from collections import Counter
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -31,15 +33,67 @@ def migrations(extra_dirs: Iterable[Path] = ()) -> list[tuple[int, str, Path]]:
 
 
 class Store:
+    """One logical store, one SQLite connection per thread.
+
+    The API serves sync endpoints from a thread pool, so a single shared connection (check_same_thread=False) let two
+    threads interleave statements on one connection and fail with sqlite3.InterfaceError. Each thread now opens its own
+    connection on first use (`Store.db`); file stores run in WAL mode so readers never block the writer, every connection
+    has a busy_timeout so concurrent writers wait instead of failing, and `write_lock` serializes read-modify-write
+    sequences inside this process (job version bumps). `:memory:` stores use a uniquely named shared-cache in-memory
+    database so every thread sees the same data; an anchor connection keeps it alive for the Store's lifetime."""
+
+    BUSY_TIMEOUT_MS = 15000
+
     def __init__(self, path: Path | str, extra_migration_dirs: Iterable[Path] = ()):
         self.path = str(path)
-        if self.path != ":memory:":
+        self.memory = self.path == ":memory:"
+        if self.memory:
+            self._target, self._uri = f"file:traces-mem-{uuid.uuid4().hex}?mode=memory&cache=shared", True
+        else:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path, check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
-        self.db.execute("PRAGMA foreign_keys = ON")
-        self.db.execute("PRAGMA journal_mode = WAL") if self.path != ":memory:" else None
-        self.migrate(extra_migration_dirs)
+            self._target, self._uri = self.path, False
+        self._local = threading.local()
+        self._conns: list[sqlite3.Connection] = []
+        self._conns_lock = threading.Lock()
+        self.write_lock = threading.RLock()
+        self._anchor = self._connect()
+        if not self.memory:
+            self._anchor.execute("PRAGMA journal_mode = WAL")
+        self._local.conn = self._anchor
+        with self.write_lock:
+            self.migrate(extra_migration_dirs)
+
+    def _connect(self) -> sqlite3.Connection:
+        c = sqlite3.connect(self._target, uri=self._uri, timeout=self.BUSY_TIMEOUT_MS / 1000, check_same_thread=True)
+        c.row_factory = sqlite3.Row
+        c.execute(f"PRAGMA busy_timeout = {self.BUSY_TIMEOUT_MS}")
+        c.execute("PRAGMA foreign_keys = ON")
+        if not self.memory:
+            c.execute("PRAGMA synchronous = NORMAL")
+        with self._conns_lock:
+            self._conns.append(c)
+        return c
+
+    @property
+    def db(self) -> sqlite3.Connection:
+        """This thread's connection (opened on first use)."""
+        c: sqlite3.Connection | None = getattr(self._local, "conn", None)
+        if c is None:
+            c = self._connect()
+            self._local.conn = c
+        return c
+
+    def close(self) -> None:
+        """Close every connection this store opened (connections of other threads are closed from here too, so only
+        call it when no request is in flight)."""
+        with self._conns_lock:
+            conns, self._conns = self._conns, []
+        for c in conns:
+            try:
+                c.close()
+            except sqlite3.ProgrammingError:  # created in another thread; sqlite3 refuses cross-thread close
+                pass
+        self._local = threading.local()
 
     # ---------------------------------------------------------------- migrations
     def migrate(self, extra_dirs: Iterable[Path] = ()) -> list[int]:
@@ -61,18 +115,37 @@ class Store:
 
     # ---------------------------------------------------------------- repos and snapshots
     def upsert_repo(self, repo_id: str, host: str, owner: str, name: str, url: str) -> None:
-        with self.db:
+        with self.write_lock, self.db:
             self.db.execute("INSERT INTO repos (id, host, owner, name, url, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
                             (repo_id, host, owner, name, url, now()))
 
     def upsert_snapshot(self, repo_id: str, sha: str, state: str, extractor: dict[str, Any] | None = None,
                         stats: dict[str, Any] | None = None, generated_paths: list[str] | None = None) -> str:
         sid = f"{repo_id}@{sha}"
-        with self.db:
+        with self.write_lock, self.db:
             self.db.execute("""INSERT INTO snapshots (id, repo_id, sha, state, evidence_schema, extractor_json, stats_json, generated_paths_json, created_at)
                                VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state, extractor_json=excluded.extractor_json,
                                stats_json=excluded.stats_json, generated_paths_json=excluded.generated_paths_json""",
                             (sid, repo_id, sha, state, CURRENT, json.dumps(extractor or {}), json.dumps(stats or {}), json.dumps(generated_paths or []), now()))
+        return sid
+
+    def record_remote_head(self, repo_id: str, sha: str, default_branch: str | None, checked_at: str) -> None:
+        """Store the latest anonymously discovered HEAD; a successful anonymous probe also confirms visibility=public."""
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE repos SET latest_discovered_sha=?, latest_discovered_at=?, default_branch=coalesce(?, default_branch), "
+                            "visibility_checked_at=? WHERE id=?", (sha, checked_at, default_branch, checked_at, repo_id))
+
+    def newest_ready_snapshot(self, repo_id: str) -> dict[str, Any] | None:
+        r = self.db.execute("SELECT * FROM snapshots WHERE repo_id=? AND state='ready' ORDER BY coalesce(indexed_at, created_at) DESC, created_at DESC "
+                            "LIMIT 1", (repo_id,)).fetchone()
+        return dict(r) if r else None
+
+    def ensure_snapshot(self, repo_id: str, sha: str) -> str:
+        """Pin a snapshot (state `pending`) unless it already exists; never downgrades an indexed snapshot."""
+        sid = f"{repo_id}@{sha}"
+        with self.write_lock, self.db:
+            self.db.execute("INSERT INTO snapshots (id, repo_id, sha, state, evidence_schema, created_at) VALUES (?,?,?,?,?,?) "
+                            "ON CONFLICT(id) DO NOTHING", (sid, repo_id, sha, "pending", CURRENT, now()))
         return sid
 
     def list_repos(self) -> list[dict[str, Any]]:
@@ -92,7 +165,7 @@ class Store:
     # ---------------------------------------------------------------- claims
     def put_claims(self, snapshot_id: str, records: Iterable[dict[str, Any]]) -> int:
         n = 0
-        with self.db:
+        with self.write_lock, self.db:
             for rec in records:
                 r = to_current(rec)
                 fr, to = r.get("from") or {}, r.get("to") or {}
@@ -106,6 +179,59 @@ class Store:
                                     (snapshot_id, r["claim_id"], loc["file"], loc["start_line"], loc["end_line"], loc["role"], loc["range_kind"]))
                 n += 1
         return n
+
+    def delete_claims(self, snapshot_id: str, *, scopes: Iterable[str] | None = None) -> int:
+        """Remove a snapshot's claims (all, or only the given evidence scopes) before a reindex stores fresh ones."""
+        sc = list(scopes) if scopes is not None else None
+        where, args = ("snapshot_id=?", [snapshot_id]) if sc is None else \
+            (f"snapshot_id=? AND evidence_scope IN ({','.join('?' * len(sc))})", [snapshot_id, *sc])
+        with self.write_lock, self.db:
+            self.db.execute(f"DELETE FROM claim_locations WHERE (snapshot_id, claim_id) IN (SELECT snapshot_id, claim_id FROM claims WHERE {where})", args)
+            n = self.db.execute(f"DELETE FROM claims WHERE {where}", args).rowcount
+        return int(n)
+
+    def set_snapshot_state(self, snapshot_id: str, state: str) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET state=? WHERE id=?", (state, snapshot_id))
+
+    def finish_snapshot(self, snapshot_id: str, *, extractor: dict[str, Any], languages: dict[str, int], frameworks: list[str],
+                        generated_paths: list[str], stats: dict[str, Any]) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET state='ready', extractor_json=?, languages_json=?, frameworks_json=?, generated_paths_json=?, "
+                            "stats_json=?, indexed_at=? WHERE id=?",
+                            (json.dumps(extractor, sort_keys=True), json.dumps(languages, sort_keys=True), json.dumps(frameworks),
+                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), snapshot_id))
+
+    def update_snapshot_stats(self, snapshot_id: str, stats: dict[str, Any]) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE snapshots SET stats_json=? WHERE id=?", (json.dumps(stats, sort_keys=True), snapshot_id))
+
+    def put_components(self, snapshot_id: str, components: Iterable[Any]) -> int:
+        """Replace the snapshot's deterministic components (traces.evidence.types.ComponentDef)."""
+        n = 0
+        with self.write_lock, self.db:
+            self.db.execute("DELETE FROM components WHERE snapshot_id=?", (snapshot_id,))
+            for c in components:
+                self.db.execute("INSERT INTO components (snapshot_id, component_id, name, layer, kind, paths_json, rule) VALUES (?,?,?,?,?,?,?)",
+                                (snapshot_id, c.id, c.name, c.layer, "directory", json.dumps(list(c.paths)), c.rule))
+                n += 1
+        return n
+
+    def list_components(self, snapshot_id: str) -> list[dict[str, Any]]:
+        return [dict(r) for r in self.db.execute("SELECT * FROM components WHERE snapshot_id=? ORDER BY component_id", (snapshot_id,))]
+
+    def add_run(self, run_id: str, snapshot_id: str, kind: str, run_dir: str, result: dict[str, Any], started_at: str) -> None:
+        with self.write_lock, self.db:
+            self.db.execute("INSERT OR REPLACE INTO runs (id, snapshot_id, kind, run_dir, result_json, started_at, finished_at) VALUES (?,?,?,?,?,?,?)",
+                            (run_id, snapshot_id, kind, run_dir, json.dumps(result, sort_keys=True, default=str), started_at, now()))
+
+    def active_job(self, snapshot_id: str) -> dict[str, Any] | None:
+        r = self.db.execute("SELECT id FROM jobs WHERE snapshot_id=? AND state IN ('queued','running') ORDER BY created_at DESC LIMIT 1",
+                            (snapshot_id,)).fetchone()
+        return dict(r) if r else None
+
+    def unfinished_jobs(self) -> list[str]:
+        return [r[0] for r in self.db.execute("SELECT id FROM jobs WHERE state IN ('queued','running') ORDER BY created_at")]
 
     def get_claim(self, snapshot_id: str, claim_id: str) -> dict[str, Any] | None:
         r = self.db.execute("SELECT record_json FROM claims WHERE snapshot_id=? AND claim_id=?", (snapshot_id, claim_id)).fetchone()
@@ -173,7 +299,7 @@ def _job_row(st: Store, job_id: str) -> dict[str, Any] | None:
 
 def create_job(st: Store, job_id: str, repo_id: str, kind: str, snapshot_id: str | None = None) -> dict[str, Any]:
     t = now()
-    with st.db:
+    with st.write_lock, st.db:
         st.db.execute("INSERT INTO jobs (id, repo_id, snapshot_id, kind, state, phase, progress, version, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                       (job_id, repo_id, snapshot_id, kind, "queued", "queued", 0.0, 1, t, t))
         st.db.execute("INSERT INTO job_events (job_id, at, phase, level, message) VALUES (?,?,?,?,?)", (job_id, t, "queued", "info", "job queued"))
@@ -182,6 +308,13 @@ def create_job(st: Store, job_id: str, repo_id: str, kind: str, snapshot_id: str
 
 def update_job(st: Store, job_id: str, *, state: str | None = None, phase: str | None = None, progress: float | None = None,
                message: str | None = None, error_code: str | None = None, error_detail: str | None = None, level: str = "info") -> dict[str, Any]:
+    with st.write_lock:
+        return _update_job_locked(st, job_id, state=state, phase=phase, progress=progress, message=message,
+                                  error_code=error_code, error_detail=error_detail, level=level)
+
+
+def _update_job_locked(st: Store, job_id: str, *, state: str | None, phase: str | None, progress: float | None,
+                       message: str | None, error_code: str | None, error_detail: str | None, level: str) -> dict[str, Any]:
     cur = _job_row(st, job_id)
     if cur is None:
         raise KeyError(job_id)
@@ -198,7 +331,7 @@ def update_job(st: Store, job_id: str, *, state: str | None = None, phase: str |
               "error_detail": error_detail or cur["error_detail"], "version": cur["version"] + 1, "updated_at": t,
               "started_at": cur["started_at"] or (t if new_state == "running" else None),
               "finished_at": t if new_state in ("succeeded", "failed", "cancelled") else None}
-    with st.db:
+    with st.write_lock, st.db:
         st.db.execute("UPDATE jobs SET " + ", ".join(f"{k}=?" for k in fields) + " WHERE id=?", (*fields.values(), job_id))
         if message or phase or state:
             st.db.execute("INSERT INTO job_events (job_id, at, phase, level, message) VALUES (?,?,?,?,?)",

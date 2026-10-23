@@ -110,11 +110,14 @@ export function RepoPage() {
                   <li key={s.id}>
                     <Link
                       to={snapshotBase(repoId, s.sha)}
-                      className="tap flex flex-col rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong hover:no-underline"
+                      className="tap panel flex flex-col px-4 py-3 text-ink no-underline hover:border-accent hover:no-underline"
                     >
-                      <span className="font-mono text-sm">@{s.sha.slice(0, 12)}</span>
-                      <span className="text-sm text-muted">
-                        {s.state} · {s.evidence_schema}
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-sm">@{s.sha.slice(0, 12)}</span>
+                        <span className="rounded-sm bg-sunken px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent">{s.state}</span>
+                      </span>
+                      <span className="mt-1 text-sm text-muted">
+                        {s.evidence_schema}
                         {by ? ` · ${Object.values(by).reduce((a, b) => a + b, 0).toLocaleString("en-US")} records` : ""}
                       </span>
                     </Link>

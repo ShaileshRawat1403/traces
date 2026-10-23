@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../../api/client";
 import { useClaim } from "../../api/queries";
-import { readRecord, splitSymbol, type EvidenceRecordView, type RecordLocation } from "../../api/record";
+import { readRecord, splitSymbol, type EvidenceRecordView } from "../../api/record";
+import { HistoryEvidence } from "../history/HistoryEvidence";
+import { SourcePanel } from "../source/SourceLines";
 import { snapshotBase } from "../../app/nav";
 import { presentStatus } from "../../status/status";
 import { Button, ErrorState, Loading } from "../../ui/States";
@@ -27,46 +27,9 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
-/** Source lines at the pinned SHA. Text only: source is untrusted and is never rendered as HTML. */
-function SourcePanel({ repoId, sha, loc }: { repoId: string; sha: string; loc: RecordLocation }) {
-  const start = Math.max(1, loc.start_line - 3);
-  const end = loc.end_line + 3;
-  const q = useQuery({ queryKey: ["source", repoId, sha, loc.file, start, end], queryFn: () => api.source(repoId, sha, loc.file, start, end) });
-  if (q.isPending) return <Loading label="Loading source" />;
-  if (q.isError) return <ErrorState error={q.error} what="Source view" />;
-  const v = q.data;
-  return (
-    <figure className="overflow-hidden rounded-md border border-line">
-      <figcaption className="flex flex-wrap gap-2 border-b border-line bg-sunken px-3 py-1 text-xs text-muted">
-        <span className="font-mono">{v.path}</span>
-        <span>
-          lines {v.start_line} to {v.end_line} of {v.total_lines}
-        </span>
-        <span className="font-mono">blob {v.blob_sha.slice(0, 10)}</span>
-        {v.generated ? <span>generated file</span> : null}
-      </figcaption>
-      <pre className="overflow-x-auto bg-surface p-0 text-[13px] leading-5">
-        <code>
-          {v.lines.map((line, i) => {
-            const n = v.start_line + i;
-            const hit = n >= loc.start_line && n <= loc.end_line;
-            return (
-              <span key={n} className={`flex ${hit ? "bg-accent-soft" : ""}`}>
-                <span className="w-12 shrink-0 select-none pr-3 text-right text-muted" aria-hidden="true">
-                  {n}
-                </span>
-                <span className="whitespace-pre pr-3">{String(line)}</span>
-              </span>
-            );
-          })}
-        </code>
-      </pre>
-    </figure>
-  );
-}
-
-function Locations({ r, repoId, sha }: { r: EvidenceRecordView; repoId: string; sha: string }) {
-  const [open, setOpen] = useState<number | null>(null);
+function Locations({ r, repoId, sha, pinFirst }: { r: EvidenceRecordView; repoId: string; sha: string; pinFirst: boolean }) {
+  // In the evidence drawer the first location's source lines are shown immediately.
+  const [open, setOpen] = useState<number | null>(pinFirst ? 0 : null);
   if (r.locations.length === 0) return <p className="text-sm text-muted">No source locations recorded{r.status === "missing_location" ? " (missing_location)" : ""}.</p>;
   return (
     <ul className="flex flex-col gap-2">
@@ -85,7 +48,7 @@ function Locations({ r, repoId, sha }: { r: EvidenceRecordView; repoId: string; 
               {open === i ? "Hide source" : "Show source"}
             </Button>
           </div>
-          {open === i ? <SourcePanel repoId={repoId} sha={sha} loc={l} /> : null}
+          {open === i ? <SourcePanel repoId={repoId} sha={sha} file={l.file} start={l.start_line} end={Math.max(l.start_line, l.end_line)} /> : null}
         </li>
       ))}
     </ul>
@@ -94,6 +57,11 @@ function Locations({ r, repoId, sha }: { r: EvidenceRecordView; repoId: string; 
 
 export function ClaimPage() {
   const { repoId = "", sha = "", claimId = "" } = useParams();
+  return <ClaimEvidence repoId={repoId} sha={sha} claimId={claimId} />;
+}
+
+/** Evidence for one claim: used by the claim page and the evidence drawer. */
+export function ClaimEvidence({ repoId, sha, claimId, inDrawer = false }: { repoId: string; sha: string; claimId: string; inDrawer?: boolean }) {
   const q = useClaim(repoId, sha, claimId);
   const base = snapshotBase(repoId, sha);
   if (q.isPending) return <Loading label="Loading evidence" />;
@@ -113,9 +81,15 @@ export function ClaimPage() {
 
   return (
     <article className="flex flex-col gap-4" aria-labelledby="claim-h">
-      <p className="text-sm">
-        <Link to={`${base}/${rejected ? "review" : "claims"}`}>{rejected ? "Reviewer view" : "Claims"}</Link>
-      </p>
+      {inDrawer ? (
+        <p className="text-sm">
+          <Link to={`${base}/claim/${r.claim_id}`}>Open as a page</Link>
+        </p>
+      ) : (
+        <p className="text-sm">
+          <Link to={`${base}/${rejected ? "review" : "claims"}`}>{rejected ? "Reviewer view" : "Claims"}</Link>
+        </p>
+      )}
       {rejected ? (
         <p className="rounded-md border border-rejected/40 bg-rejected-soft px-3 py-2 text-sm" role="note">
           This claim was rejected by an independent check. It is kept for audit and is never shown as architecture.
@@ -125,15 +99,25 @@ export function ClaimPage() {
         <div className="mb-2">
           <StatusChip status={r.status} label={r.label} flags={r.flags} qualifier={r.qualifier} context="reviewer" />
         </div>
-        <h1 id="claim-h" className="break-words text-lg font-semibold leading-snug sm:text-xl">
-          {r.statement}
-        </h1>
+        {inDrawer ? (
+          <h2 id="claim-h" className="break-words text-base font-semibold leading-snug">
+            {r.statement}
+          </h2>
+        ) : (
+          <h1 id="claim-h" className="break-words text-lg font-semibold leading-snug sm:text-xl">
+            {r.statement}
+          </h1>
+        )}
         {from || to ? (
           <p className="mt-2 break-words text-sm">
             {from ? <code>{from.name}</code> : null} <span className="text-muted">{r.kind ?? r.claim_kind}</span> {to ? <code>{to.name}</code> : null}
           </p>
         ) : null}
       </header>
+
+      <Section title="Locations at the pinned commit">
+        <Locations r={r} repoId={repoId} sha={sha} pinFirst={inDrawer} />
+      </Section>
 
       <Section title="Status">
         <p className="text-sm">{p.description}</p>
@@ -176,9 +160,8 @@ export function ClaimPage() {
         )}
       </Section>
 
-      <Section title="Locations at the pinned commit">
-        <Locations r={r} repoId={repoId} sha={sha} />
-      </Section>
+
+      <HistoryEvidence raw={q.data} />
 
       <Section title="Provenance">
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-3 gap-y-1 text-sm">

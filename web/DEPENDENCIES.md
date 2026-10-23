@@ -13,8 +13,10 @@ Checked from each package's own `package.json` in `node_modules` on 2026-10-21 (
 | cytoscape | 3.34.4 | MIT | Graph canvas, loaded only on the graph route (scaffold, code-split here) |
 | @tanstack/react-query | 5.104.5 | MIT | Server state: caching, job polling with ETag, retry policy. Added in ws/ui-shell |
 | @radix-ui/react-dialog | 1.3.1 | MIT | Accessible dialog primitive (focus trap, Escape, aria) for the phone More sheet. Added in ws/ui-shell |
+| @radix-ui/react-tabs | 1.2.1 | MIT | Accessible tabs (arrow-key roving focus, aria-selected) for the overview layers. Added in ws/ui-overview |
+| shiki, @shikijs/langs, @shikijs/themes | 4.5.0 | MIT | Syntax highlighting of pinned source lines with the JavaScript regex engine (no WASM). Tokens are rendered as React text, never as HTML. Loaded lazily with the source panel; only 17 grammars and one theme are bundled. Added in ws/ui-graph |
 
-Full production tree (`npm ls --omit=dev --all`): 37 packages MIT, 1 package 0BSD (`tslib`, pulled in by Radix). No copyleft code ships to the browser.
+Full production tree (`npm ls --omit=dev --all`): 86 packages MIT, 1 package 0BSD (`tslib`, pulled in by Radix), 1 package ISC (`@ungap/structured-clone`, pulled in by Shiki through hast-util-to-html; the UI does not call the HTML path). No copyleft code ships to the browser.
 
 ## Build time only (not shipped)
 

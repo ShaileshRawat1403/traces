@@ -70,7 +70,9 @@ export interface paths {
         put?: never;
         /**
          * Register Repo
-         * @description Validate a public GitHub URL and register the repo. Does not fetch anything; indexing is a separate job.
+         * @description Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the
+         *     default branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.
+         *     Nothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.
          */
         post: operations["register_repo_api_v1_repos_post"];
         delete?: never;
@@ -103,7 +105,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Compare */
+        /**
+         * Compare
+         * @description Static claims present on only one of two indexed snapshots. Rename-aware snapshot_added records are returned when history stored them; otherwise the underlying claims are returned with their own kinds.
+         */
         get: operations["compare_api_v1_repos__repo_id__compare_get"];
         put?: never;
         post?: never;
@@ -122,7 +127,8 @@ export interface paths {
         };
         /**
          * Repo Head
-         * @description Latest discovered commit on the default branch vs. the displayed snapshot (cached ls-remote, rate limited).
+         * @description Latest discovered commit on the default branch vs. the displayed snapshot (the newest ready one). Anonymous
+         *     `git ls-remote`, cached for 60 s per repo and rate limited (429 rate_limited only when nothing is cached).
          */
         get: operations["repo_head_api_v1_repos__repo_id__head_get"];
         put?: never;
@@ -142,7 +148,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Index Job */
+        /**
+         * Create Index Job
+         * @description Start an index job for `sha` (default: the latest discovered HEAD, discovered now if unknown). Returns the job
+         *     (202); an index already queued or running for the same snapshot is returned instead of a duplicate. Poll
+         *     GET /jobs/{id} with If-None-Match. Phases: fetching, checking_out, indexing, adapting, validating, storing, history.
+         */
         post: operations["create_index_job_api_v1_repos__repo_id__index_jobs_post"];
         delete?: never;
         options?: never;
@@ -193,7 +204,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Chat Bundle */
+        /**
+         * Chat Bundle
+         * @description Prompt bundle for browser-side chat (always prepare_bundle, whatever mode says); the backend never sees provider keys.
+         */
         post: operations["chat_bundle_api_v1_repos__repo_id__snapshots__sha__chat_bundle_post"];
         delete?: never;
         options?: never;
@@ -249,7 +263,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Components */
+        /**
+         * Components
+         * @description Deterministic components stored at index time (rule id on each row) with claim counts by status.
+         */
         get: operations["components_api_v1_repos__repo_id__snapshots__sha__components_get"];
         put?: never;
         post?: never;
@@ -306,7 +323,7 @@ export interface paths {
         };
         /**
          * Graph
-         * @description Graph query: filters (layer, rel, status, q) and neighborhood (focus + depth). Rejected excluded unless include_rejected.
+         * @description Static relationships only. History patterns (co-change, hotspots) are not drawn here. Rejected edges are excluded unless include_rejected.
          */
         get: operations["graph_api_v1_repos__repo_id__snapshots__sha__graph_get"];
         put?: never;
@@ -324,7 +341,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** History Cochange */
+        /**
+         * History Cochange
+         * @description Changed-together records. Coupling is not causation and not a static dependency.
+         */
         get: operations["history_cochange_api_v1_repos__repo_id__snapshots__sha__history_cochange_get"];
         put?: never;
         post?: never;
@@ -341,7 +361,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** History Hotspots */
+        /**
+         * History Hotspots
+         * @description History-pattern metrics. A hotspot score is not a quality judgment and not a code dependency.
+         */
         get: operations["history_hotspots_api_v1_repos__repo_id__snapshots__sha__history_hotspots_get"];
         put?: never;
         post?: never;
@@ -392,7 +415,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** History Rationale */
+        /**
+         * History Rationale
+         * @description Quoted PR or commit text. A quote is evidence the text exists, not proof of intent.
+         */
         get: operations["history_rationale_api_v1_repos__repo_id__snapshots__sha__history_rationale_get"];
         put?: never;
         post?: never;
@@ -409,7 +435,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** History Timeline */
+        /**
+         * History Timeline
+         * @description Commit nodes, newest committer time first. A path or component filter switches to the file-change records for that scope.
+         */
         get: operations["history_timeline_api_v1_repos__repo_id__snapshots__sha__history_timeline_get"];
         put?: never;
         post?: never;
@@ -426,7 +455,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Overview */
+        /**
+         * Overview
+         * @description Grounded facts, documented interpretations and explicit unknowns. Nothing here is a business claim without a source.
+         */
         get: operations["overview_api_v1_repos__repo_id__snapshots__sha__overview_get"];
         put?: never;
         post?: never;
@@ -443,7 +475,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Routes */
+        /**
+         * Routes
+         * @description Route and operation records already stored. A method that was not on the record is UNKNOWN, not guessed from a scan.
+         */
         get: operations["routes_api_v1_repos__repo_id__snapshots__sha__routes_get"];
         put?: never;
         post?: never;
@@ -462,7 +497,7 @@ export interface paths {
         };
         /**
          * Source
-         * @description Pinned source view at the snapshot SHA (read from Git objects, never from a working tree).
+         * @description Pinned source at the snapshot SHA, read from the local checkout's Git objects. Paths cannot escape the tree.
          */
         get: operations["source_api_v1_repos__repo_id__snapshots__sha__source_get"];
         put?: never;
@@ -482,7 +517,7 @@ export interface paths {
         };
         /**
          * Trace
-         * @description Cross-layer trace as ordered hops: edge, gap and library_contract (gap and library_contract are inferred with a reason).
+         * @description Ordered static hops. A missing link is a gap (inferred, with a reason). library_contract hops are not verified calls.
          */
         get: operations["trace_api_v1_repos__repo_id__snapshots__sha__trace_get"];
         put?: never;
@@ -603,7 +638,7 @@ export interface components {
         ErrorBody: {
             /**
              * Code
-             * @description machine code, e.g. not_implemented, invalid_repo_url, not_found, rate_limited, too_large
+             * @description machine code, e.g. not_implemented, invalid_repo_url, invalid_sha, not_found, repo_not_public, repo_empty, sha_not_found, too_large, too_many_files, fetch_timeout, upstream_unavailable, rate_limited, fetch_failed
              */
             code: string;
             /** Detail */
@@ -942,6 +977,12 @@ export interface components {
             created_at: string;
             /** Default Branch */
             default_branch?: string | null;
+            /**
+             * External Ai Consent
+             * @description repo-level consent to send source snippets to an external AI provider; always false in v1 (no endpoint sets it), so explain bundles need per-request consent
+             * @default false
+             */
+            external_ai_consent: boolean;
             /** Host */
             host: string;
             /** Id */
@@ -961,6 +1002,11 @@ export interface components {
              * @constant
              */
             visibility: "public";
+            /**
+             * Visibility Checked At
+             * @description when an anonymous (credential-free) ls-remote last confirmed the repo is public
+             */
+            visibility_checked_at?: string | null;
         };
         /** RepoCreate */
         RepoCreate: {
@@ -1288,6 +1334,33 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description rate_limited (HEAD discovery called too often; Retry-After set) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description upstream_unavailable or fetch_failed (GitHub unreachable) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description fetch_timeout */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     get_repo_api_v1_repos__repo_id__get: {
@@ -1371,15 +1444,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     repo_head_api_v1_repos__repo_id__head_get: {
@@ -1420,8 +1484,26 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
+            /** @description rate_limited (HEAD discovery called too often; Retry-After set) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description upstream_unavailable or fetch_failed (GitHub unreachable) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description fetch_timeout */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1464,6 +1546,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description already_indexed (the snapshot is ready; send reindex=true) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Unprocessable Content */
             422: {
                 headers: {
@@ -1473,8 +1564,26 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
+            /** @description rate_limited (HEAD discovery called too often; Retry-After set) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description upstream_unavailable or fetch_failed (GitHub unreachable) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description fetch_timeout */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1601,15 +1710,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1752,15 +1852,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     explain_api_v1_repos__repo_id__snapshots__sha__explain_post: {
@@ -1799,15 +1890,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1904,15 +1986,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     history_cochange_api_v1_repos__repo_id__snapshots__sha__history_cochange_get: {
@@ -1950,15 +2023,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2009,15 +2073,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     history_lifecycle_api_v1_repos__repo_id__snapshots__sha__history_lifecycle_get: {
@@ -2054,15 +2109,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2111,15 +2157,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     history_rationale_api_v1_repos__repo_id__snapshots__sha__history_rationale_get: {
@@ -2156,15 +2193,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2218,15 +2246,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     overview_api_v1_repos__repo_id__snapshots__sha__overview_get: {
@@ -2268,15 +2287,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     routes_api_v1_repos__repo_id__snapshots__sha__routes_get: {
@@ -2311,15 +2321,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2372,15 +2373,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     trace_api_v1_repos__repo_id__snapshots__sha__trace_get: {
@@ -2419,15 +2411,6 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Not implemented in this build (error.code = not_implemented) */
-            501: {
                 headers: {
                     [name: string]: unknown;
                 };

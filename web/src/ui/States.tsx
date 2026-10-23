@@ -57,15 +57,15 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <header className="mb-4">
-      <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-      {children ? <div className="mt-1 text-ink-2">{children}</div> : null}
+    <header className="mb-5">
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      {children ? <div className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-ink-2">{children}</div> : null}
     </header>
   );
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-lg border border-line bg-surface p-4 ${className}`}>{children}</div>;
+  return <div className={`panel p-4 ${className}`}>{children}</div>;
 }
 
 export function Button({
@@ -76,7 +76,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" }) {
   const v =
     variant === "primary"
-      ? "bg-accent text-accent-ink border-accent hover:bg-accent/90 disabled:bg-line-strong disabled:border-line-strong"
+      ? "bg-accent text-accent-ink border-accent hover:bg-accent/90 disabled:border-line disabled:bg-line disabled:text-muted"
       : "bg-surface text-ink border-line-strong hover:bg-sunken";
   return (
     <button className={`tap inline-flex items-center justify-center rounded-md border px-3 text-sm font-medium disabled:cursor-not-allowed ${v} ${className}`} {...rest}>

@@ -7,6 +7,12 @@ import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States"
 
 const URL_RULE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/?$/;
 
+const NOTES = [
+  { title: "Pinned", body: "A snapshot is one commit. Later commits do not rewrite it." },
+  { title: "Labeled", body: "Verified, observed, inferred, and rejected stay distinct." },
+  { title: "Not executed", body: "The repository is read. Its own code is never run." },
+] as const;
+
 export function Home() {
   const repos = useRepos();
   const qc = useQueryClient();
@@ -34,8 +40,17 @@ export function Home() {
   const serverError = register.error instanceof ApiError ? register.error : null;
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-6 focus:outline-none sm:py-10">
-      <PageHeader title="Repositories">Point Traces at a public GitHub repository. Every view is pinned to a commit and backed by evidence.</PageHeader>
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-8 focus:outline-none sm:py-12">
+      <PageHeader title="Repositories">Public repositories, one commit at a time. Every view is backed by stored evidence. A gap stays a gap.</PageHeader>
+
+      <ul className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="How Traces treats a repository">
+        {NOTES.map((n) => (
+          <li key={n.title} className="rounded-lg border border-line bg-surface px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent">{n.title}</p>
+            <p className="mt-1 text-sm leading-snug text-ink-2">{n.body}</p>
+          </li>
+        ))}
+      </ul>
 
       <form onSubmit={submit} noValidate className="rounded-lg border border-line bg-surface p-4" aria-label="Add a repository">
         <label id={`${inputId}-label`} htmlFor={inputId} className="block font-medium">
@@ -94,13 +109,18 @@ export function Home() {
               <li key={r.id}>
                 <Link
                   to={`/r/${encodeURIComponent(r.id)}`}
-                  className="tap flex flex-col justify-center rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-line-strong hover:no-underline"
+                  className="tap flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-accent hover:no-underline"
                 >
-                  <span className="font-medium">
-                    {r.owner}/{r.name}
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {r.owner}/{r.name}
+                    </span>
+                    <span className="block text-sm text-muted">
+                      {r.latest_discovered_sha ? `${r.visibility} · latest seen @${r.latest_discovered_sha.slice(0, 7)}` : `${r.visibility} · open to see snapshots`}
+                    </span>
                   </span>
-                  <span className="text-sm text-muted">
-                    {r.visibility} · {r.latest_discovered_sha ? `latest seen @${r.latest_discovered_sha.slice(0, 7)}` : "HEAD not checked yet"}
+                  <span aria-hidden="true" className="text-accent">
+                    Open
                   </span>
                 </Link>
               </li>

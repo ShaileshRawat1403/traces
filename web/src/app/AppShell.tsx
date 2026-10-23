@@ -39,17 +39,17 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
-      <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur" role="banner">
+      <header className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur-md" role="banner">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4">
           <Link to="/" className="tap -ml-2 inline-flex items-center gap-2 rounded-md px-2 font-semibold text-ink no-underline hover:no-underline">
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" className="text-accent">
               <circle cx="4" cy="15" r="2.5" fill="currentColor" />
               <circle cx="16" cy="5" r="2.5" fill="currentColor" />
               <path d="M6 13.5 L14 6.5" stroke="currentColor" strokeWidth="1.6" />
             </svg>
             <span>Traces</span>
           </Link>
-          <span className="hidden text-sm text-muted sm:inline">Evidence-first repository intelligence</span>
+          <span className="hidden text-sm text-muted sm:inline">One commit. Labeled evidence.</span>
           <nav aria-label="Global" className="ml-auto">
             <Link to="/settings" className="tap inline-flex items-center rounded-md px-2 text-sm text-ink-2">
               Settings

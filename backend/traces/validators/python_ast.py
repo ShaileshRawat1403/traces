@@ -444,11 +444,11 @@ class Rules:
 
     def _versions(self):
         out = {}
-        lock = self.P.blobs.text("uv.lock").split("\n")
+        lock = self.P.blobs.text("uv.lock").split("\n") if self.P.blobs.exists("uv.lock") else []
         for i, l in enumerate(lock):
             if l == 'name = "fastapi"' and i + 1 < len(lock):
                 out["fastapi"] = (re.match(r'version = "(.*)"', lock[i + 1]).group(1), "uv.lock", i + 1)
-        pj = self.P.blobs.text("frontend/package.json").split("\n")
+        pj = self.P.blobs.text("frontend/package.json").split("\n") if self.P.blobs.exists("frontend/package.json") else []
         for i, l in enumerate(pj):
             mm = re.match(r'\s*"@hey-api/openapi-ts": "(.*)"', l)
             if mm:
