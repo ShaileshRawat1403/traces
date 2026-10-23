@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { useRepo } from "../../api/queries";
@@ -115,12 +115,13 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const qid = useId();
+  const messageRef = useRef<HTMLTextAreaElement>(null);
 
   const prepare = useMutation({
     mutationFn: (q: string) => api.chatBundle(repoId, sha, { question: q, mode: "prepare_bundle", focus_claim_ids: [] }),
     onSuccess: (r, q) => {
       const b = readBundle(r);
-      if (!b) return setNotice("The API answered without a prompt bundle, so there is nothing to send.");
+      if (!b) return setNotice("The API answered without a prompt bundle that can be sent safely, so nothing was sent.");
       if (!b.evidence.length) return setNotice("No evidence matched this question, so nothing would be grounded. Nothing was sent. Try Explain, or ask about a named file or symbol.");
       setRemoved(new Set());
       setPending({ question: q, bundle: b, manifest: r.outbound_manifest });
@@ -136,6 +137,7 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
         Chat is off for this repository because it is not public ({visibility}), and this build has no recorded consent for sending its text to an AI provider.
       </p>
     );
+  const repoConsent = repo.data.external_ai_consent === true;
 
   const badCfg = !cfg ? "No AI provider is set up." : checkBaseUrl(cfg.baseUrl) ?? (!cfg.model ? "No model is set." : null);
   const stored = loadKey();
@@ -213,6 +215,13 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
             Provider: {PROVIDERS[cfg!.kind].name}, {cfg!.model} at {hostOf(cfg!.baseUrl)}. Key {stored?.remembered ? "remembered on this device" : needsKey ? "kept for this session" : "not needed"}.
           </p>
         )}
+        {blocked ? null : (
+          <p className="text-xs text-muted" data-testid="repo-consent" data-consent={repoConsent ? "true" : "false"}>
+            {repoConsent
+              ? "This repository has recorded consent for sending evidence to an AI provider. You still approve each send."
+              : "This repository has no recorded consent for sending evidence to an AI provider, so you approve each send for that send only."}
+          </p>
+        )}
 
         <ol className="flex flex-col gap-3" aria-label="Conversation">
           {messages.map((m) => (
@@ -238,7 +247,7 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
           <label htmlFor={qid} className="text-sm font-medium">
             Message
           </label>
-          <textarea id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-line-strong p-2" />
+          <textarea ref={messageRef} id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-line-strong p-2" />
           <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" variant="primary" disabled={!question.trim() || !!blocked || prepare.isPending}>
               {prepare.isPending ? "Preparing" : "Review what will be sent"}
@@ -261,6 +270,7 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
         <ConsentDialog
           pending={pending}
           cfg={cfg}
+          repoConsent={repoConsent}
           removed={removed}
           onToggle={(id) =>
             setRemoved((s) => {
@@ -272,6 +282,7 @@ export function ChatPanel({ repoId, sha }: { repoId: string; sha: string }) {
           }
           onCancel={() => setPending(null)}
           onSend={() => void sendNow()}
+          returnFocus={messageRef}
         />
       ) : null}
     </div>

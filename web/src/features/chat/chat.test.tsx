@@ -55,6 +55,18 @@ describe("bundle", () => {
     expect(b.rebuildable).toBe(false);
     expect(outgoing(b, new Set([b.evidence[0]!.claim_id])).prompt).toBe(b.prompt);
   });
+
+  it("never sends rejected claims: strips them when the prompt can be rebuilt, refuses the bundle otherwise", () => {
+    const pb = BUNDLE.prompt_bundle as { instructions: string; question: string; evidence: Record<string, string>[] };
+    const evidence = pb.evidence.map((e, i) => (i === 0 ? { ...e, status: "rejected", label: "rejected" } : e));
+    const prompt = assemblePrompt({ instructions: pb.instructions, question: pb.question, evidence: evidence as never }, new Set());
+    const withRejected = { ...BUNDLE, prompt_bundle: { ...pb, evidence, prompt } };
+    const b = readBundle(withRejected)!;
+    expect(b.rejectedDropped).toBe(1);
+    expect(b.evidence.some((e) => e.status === "rejected")).toBe(false);
+    expect(b.prompt).not.toContain(evidence[0]!.claim_id);
+    expect(readBundle({ ...withRejected, prompt_bundle: { ...withRejected.prompt_bundle, prompt: `${prompt} ` } })).toBeNull();
+  });
 });
 
 describe("citations", () => {
@@ -163,7 +175,7 @@ describe("sent record", () => {
 });
 
 describe("ChatPanel", () => {
-  const repo: Repo = { id: "r1", host: "github.com", owner: "o", name: "n", url: "https://github.com/o/n", visibility: "public", created_at: "2026-01-01T00:00:00Z" };
+  const repo: Repo = { id: "r1", host: "github.com", owner: "o", name: "n", url: "https://github.com/o/n", visibility: "public", external_ai_consent: false, created_at: "2026-01-01T00:00:00Z" };
 
   function mount() {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -205,6 +217,7 @@ describe("ChatPanel", () => {
     await u.click(screen.getByRole("button", { name: "Review what will be sent" }));
     const dialog = await screen.findByTestId("consent-dialog");
     expect(within(dialog).getAllByTestId("consent-item")).toHaveLength(b.evidence.length);
+    expect(within(dialog).getByTestId("consent-scope").textContent).toContain("no recorded consent");
     expect(calls.some((c) => c.url.includes("llm.example.test"))).toBe(false);
     await u.click(within(dialog).getAllByRole("checkbox")[0]!);
     expect(within(dialog).getByTestId("consent-body").textContent).not.toContain(first!.claim_id);

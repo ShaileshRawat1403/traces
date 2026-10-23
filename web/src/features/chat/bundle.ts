@@ -19,10 +19,17 @@ export interface Bundle {
   prompt: string;
   /** True when assemblePrompt(all evidence) equals the server prompt, so removal is safe. */
   rebuildable: boolean;
+  /** Rejected claims the server included by mistake. They are stripped before anything is shown or sent. */
+  rejectedDropped: number;
 }
+
+/** Rejected claims are never used (charter, CONTRACTS.md). Status, not label, decides. */
+export const isRejected = (e: Pick<EvidenceItem, "status" | "label">) => e.status === "rejected" || e.label.toLowerCase() === "rejected";
 
 const str = (v: unknown): v is string => typeof v === "string";
 
+/** Parse the server bundle. Returns null when there is nothing safe to send: no prompt, or rejected claims that cannot be
+ * removed because the browser cannot rebuild the prompt exactly. */
 export function readBundle(r: ExplainResponse): Bundle | null {
   const pb = r.prompt_bundle as Record<string, unknown> | null | undefined;
   if (!pb || !str(pb.prompt)) return null;
@@ -38,8 +45,16 @@ export function readBundle(r: ExplainResponse): Bundle | null {
     question: str(pb.question) ? pb.question : "",
     prompt: pb.prompt,
     rebuildable: false,
+    rejectedDropped: 0,
   };
   b.rebuildable = evidence.length > 0 && assemblePrompt(b, new Set()) === b.prompt;
+  const rejected = evidence.filter(isRejected);
+  if (rejected.length) {
+    if (!b.rebuildable) return null;
+    b.evidence = evidence.filter((e) => !isRejected(e));
+    b.prompt = assemblePrompt(b, new Set());
+    b.rejectedDropped = rejected.length;
+  }
   return b;
 }
 

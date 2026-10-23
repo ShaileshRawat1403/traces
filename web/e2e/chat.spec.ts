@@ -119,6 +119,10 @@ test.describe("chat", () => {
     await page.goto("/settings");
     await expect(page.getByTestId("sent-record").getByTestId("sent-entry")).toHaveCount(1);
     await expect(page.getByTestId("sent-record")).toContainText(`${stub.url}/cors/v1/chat/completions`);
+    await page.getByTestId("sent-record").getByTestId("sent-entry").first().locator("summary").first().click();
+    await expectAccessible(page);
+    await page.getByTestId("sent-record").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${shotsDir("chat")}/${info.project.name}-sent-record.png`, fullPage: true });
     expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(KEY);
     await page.getByRole("button", { name: "Clear this record" }).click();
     await expect(page.getByTestId("sent-record")).toContainText("Nothing has been sent from this browser.");
@@ -153,6 +157,52 @@ test.describe("chat", () => {
     expect(api.filter((a) => a.includes(stub.url) || a.includes("nocors") || a.includes("completions"))).toEqual([]);
     await expectAccessible(page);
     await page.screenshot({ path: `${shotsDir("chat")}/${info.project.name}-cors.png`, fullPage: true });
+  });
+
+  test("live: real chat bundle from the API, sent to the stub provider after consent", async ({ page }, info) => {
+    test.skip(caps.chat_bundle === false, "chat bundle not implemented by this API");
+    const api = watchApi(page);
+    await configure(page, { kind: "openai", baseUrl: `${stub.url}/cors/v1`, model: "stub-model" }, KEY);
+    const before = stub.requests.filter((r) => r.method === "POST").length;
+    await page.goto(`${base(snap)}/ask?mode=chat`);
+    await expect(page.getByTestId("repo-consent")).toBeVisible();
+    await page.getByLabel("Message").fill("What does the app persist?");
+    await page.getByRole("button", { name: "Review what will be sent" }).click();
+    const dialog = page.getByTestId("consent-dialog");
+    await expect(dialog.or(page.getByTestId("chat-notice"))).toBeVisible();
+    test.skip(!(await dialog.isVisible()), "the live snapshot has no evidence for this question");
+    await expect(dialog.getByTestId("consent-scope")).toBeVisible();
+    await expect(dialog).not.toContainText(KEY);
+    await expect(dialog.getByText("rejected", { exact: true })).toHaveCount(0);
+    await expectAccessible(page);
+    await page.screenshot({ path: `${shotsDir("chat")}/${info.project.name}-live-consent.png`, fullPage: true });
+    expect(stub.requests.filter((r) => r.method === "POST")).toHaveLength(before);
+    await dialog.getByRole("button", { name: /^Send to 127\.0\.0\.1/ }).click();
+    await expect(page.getByTestId("grounding")).toHaveAttribute("data-grounded", "true");
+    await expect(page.getByTestId("cite-ok")).toHaveCount(1);
+    expect(api.join("\n")).not.toContain(KEY);
+    expect(api.filter((a) => a.includes("completions"))).toEqual([]);
+    await expectAccessible(page);
+    await page.screenshot({ path: `${shotsDir("chat")}/${info.project.name}-live-answer.png`, fullPage: true });
+  });
+
+  test("consent dialog: focus stays inside, Escape closes it, returns focus and sends nothing", async ({ page }) => {
+    await configure(page, { kind: "openai", baseUrl: `${stub.url}/cors/v1`, model: "stub-model" }, KEY);
+    await routeBundle(page);
+    const before = stub.requests.length;
+    await page.goto(`${base(snap)}/ask?mode=chat`);
+    await page.getByLabel("Message").fill("anything");
+    await page.getByRole("button", { name: "Review what will be sent" }).click();
+    const dialog = page.getByRole("dialog", { name: "Review what will be sent" });
+    await expect(dialog).toBeVisible();
+    for (let i = 0; i < 25; i++) {
+      await page.keyboard.press("Tab");
+      expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByLabel("Message")).toBeFocused();
+    expect(stub.requests.length).toBe(before);
   });
 
   test("cancel sends nothing", async ({ page }) => {

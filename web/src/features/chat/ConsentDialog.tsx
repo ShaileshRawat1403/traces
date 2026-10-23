@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import type { RefObject } from "react";
 import type { OutboundItem } from "../../api/client";
 import { StatusChip } from "../../ui/StatusChip";
 import { Button } from "../../ui/States";
@@ -17,17 +18,22 @@ export interface Pending {
 export function ConsentDialog({
   pending,
   cfg,
+  repoConsent,
   removed,
   onToggle,
   onCancel,
   onSend,
+  returnFocus,
 }: {
   pending: Pending | null;
   cfg: ProviderConfig;
+  repoConsent: boolean;
   removed: ReadonlySet<string>;
   onToggle: (claimId: string) => void;
   onCancel: () => void;
   onSend: () => void;
+  /** Where focus goes when the dialog closes. The opening button is disabled while the bundle loads, so Radix cannot return to it. */
+  returnFocus?: RefObject<HTMLElement | null>;
 }) {
   const b = pending?.bundle;
   const out = b ? outgoing(b, removed) : null;
@@ -43,6 +49,12 @@ export function ConsentDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/30" />
         <Dialog.Content
+          onCloseAutoFocus={(e) => {
+            if (returnFocus?.current) {
+              e.preventDefault();
+              returnFocus.current.focus();
+            }
+          }}
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-lg border-t border-line bg-canvas shadow-xl focus:outline-none md:inset-x-auto md:left-1/2 md:top-1/2 md:bottom-auto md:max-h-[88dvh] md:w-[min(760px,94vw)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg md:border"
           data-testid="consent-dialog"
         >
@@ -73,6 +85,15 @@ export function ConsentDialog({
                   </dd>
                 </dl>
               </section>
+
+              <p className="rounded-md border border-line bg-surface p-2 text-xs" data-testid="consent-scope">
+                {repoConsent
+                  ? "This repository has recorded consent for external AI providers. This approval still covers this one send only."
+                  : "This repository has no recorded consent for external AI providers. Pressing Send approves this one send only; nothing is remembered."}
+                {b.rejectedDropped
+                  ? ` ${b.rejectedDropped} rejected ${b.rejectedDropped === 1 ? "claim was" : "claims were"} removed from the bundle and will not be sent.`
+                  : ""}
+              </p>
 
               <section aria-label="Evidence items">
                 <h3 className="font-semibold">
