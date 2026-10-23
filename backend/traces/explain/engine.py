@@ -910,7 +910,8 @@ def assemble_prompt(instructions: str, evidence: list[dict[str, Any]], question:
 
 def bundle(question: str, cited: list[ClaimView]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Prompt bundle for the browser to send after consent, and the manifest of exactly what it contains. No keys, ever.
-    Every evidence field and the question pass through fence_text, and the manifest hashes the fenced text that is sent."""
+    Every evidence field and the question pass through fence_text. Each manifest row hashes the exact text sent for it:
+    the whole evidence line for a claim, the instructions block, and the question line (all UTF-8, no trailing newline)."""
     evidence = []
     manifest = [_item("instructions", INSTRUCTIONS)]
     for c in cited:
@@ -926,7 +927,8 @@ def bundle(question: str, cited: list[ClaimView]) -> tuple[dict[str, Any], list[
             item["category"] = "history_patterns"
             item["criteria"] = {k: json.loads(v) for k, v in c.criteria}
         evidence.append(item)
-        manifest.append(_item("claim_statement", stmt, c))
+        # O-11: the row hashes the exact line that is sent, "(label, where)" prefix included, not only the statement.
+        manifest.append(_item("claim_statement", evidence_line(item), c))
     q = fence_text(question)
     manifest.append(_item("question", q))
     return {

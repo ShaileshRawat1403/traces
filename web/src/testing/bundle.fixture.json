@@ -100,39 +100,39 @@
       "start_line": null
     },
     {
-      "chars": 61,
+      "chars": 162,
       "claim_id": "c_0000000000000000000000000000000000000000000000000000000000000001",
       "end_line": 10,
       "file": "web/src/Form.tsx",
       "kind": "claim_statement",
-      "sha256": "c0519f383f21fdec18221ea8352723b9145d2c99d4849860e9beaf1efaca8d5f",
+      "sha256": "38ddcf65c6603f277b2a74dc9718172a4f7300be5b6dd78763b722a7c20becf0",
       "start_line": 10
     },
     {
-      "chars": 77,
+      "chars": 178,
       "claim_id": "c_0000000000000000000000000000000000000000000000000000000000000002",
       "end_line": 12,
       "file": "web/src/Form.tsx",
       "kind": "claim_statement",
-      "sha256": "04a6b58fb55030055441f4a273e9b4f11b89b369be33a1bcfa4c21fd5673ca70",
+      "sha256": "c8f0f3f00aef8513369acb0282765861cdd5b26168e16a1e1d414769ea783fc6",
       "start_line": 12
     },
     {
-      "chars": 61,
+      "chars": 162,
       "claim_id": "c_0000000000000000000000000000000000000000000000000000000000000003",
       "end_line": 3,
       "file": "web/src/client.ts",
       "kind": "claim_statement",
-      "sha256": "d893d90ee4e7825c9b324c0e7613b827dda4d6170e2e8e080ba21379b8e4d671",
+      "sha256": "2c84b65f12b74106594a708ebe28e23ad12d61c9543a31e934aa81c30b547476",
       "start_line": 3
     },
     {
-      "chars": 171,
+      "chars": 272,
       "claim_id": "c_0000000000000000000000000000000000000000000000000000000000000009",
       "end_line": 30,
       "file": "web/src/Form.tsx",
       "kind": "claim_statement",
-      "sha256": "16ca2f81589fbe3cfa5a3f3179572a7f285b6e59ce53963d9988f4a99bc8b5be",
+      "sha256": "9aa22fa7d2266b8c6a056954b4c43dba5a5f2ad45e8907845c1e210da0f48d67",
       "start_line": 30
     },
     {
