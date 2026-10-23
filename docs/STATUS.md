@@ -1,6 +1,6 @@
 # Status (Traces v1)
 
-Updated 2026-10-21 IST, after integrating PRs #9, #15, #16, #17, #19 and #14 into `build/traces-v1`. Authority is the code and the tests, not earlier seat notes.
+Updated 2026-10-21 IST, after integrating PRs #9, #15, #16, #17, #19 and #14 into `build/traces-v1`. The "Not done" list was corrected on 2026-10-23 IST against head `35499bc` (e2e, CI gaps, D-006). Authority is the code and the tests, not earlier seat notes.
 
 ## Integrated
 
@@ -36,7 +36,10 @@ Earlier merges on the branch: history contract and core, history analysis, UI sh
 - Hook H3: the index job does not re-index milestone SHAs, so history's evidence-set diff usually has only the pinned SHA. Compare then falls back to an identity diff of static claims (D-024).
 - Private repositories. v1 never asks for credentials.
 - No LLM is called by the server. Optional chat is a browser-side bundle after consent. There is no provider adapter in the backend.
-- Playwright specs live in `web/e2e`. The CI `e2e` job stays opt-in (`workflow_dispatch`) and is still a placeholder. A browser pass was not part of the automated suite recorded below.
+- End-to-end browser tests run on a synthetic seed, not on the Task 002 snapshot. The CI `e2e` job runs on every push and PR (`bash scripts/e2e_ui.sh`, Playwright specs in `web/e2e`). It seeds a 4-file synthetic repo (`octo/synth`) through `scripts/e2e_seed.py`, not `fastapi/full-stack-fastapi-template@b1125d8`. Run [39716507167](https://github.com/ShaileshRawat1403/traces/actions/runs/39716507167) on `35499bc`: 54 passed, 2 skipped. The same script on a fresh clone at `35499bc` (2026-10-23 IST): 54 passed, 2 skipped. Lab is adding a real-snapshot seed on `ws/lab-acceptance`.
+- CI does not yet run `tests/history`, `tests/explain` or the web vitest suite as separate jobs. Lab's CI additions for those are pushed at `ws/lab-acceptance` `bd0a603` and are not merged.
+- D-006 (worker memory cap) is closed by D-022: an RSS watchdog stops the index worker at `TRACES_MAX_RSS_MB` (default 6144). `RLIMIT_AS` stays off.
+- Acceptance evidence is not complete. `docs/ACCEPTANCE.md` (discrepancy table), the demo script, `tests/e2e`, `tests/security` and `tests/perf` are Lab-owned and pending. The draft review package `docs/review/V1_REVIEW_PACKAGE.md` records the section 7 audit on `35499bc`.
 - Compare is not a full rename-aware architecture diff unless those records were stored by a history run that received two evidence sets.
 
 ## CI
