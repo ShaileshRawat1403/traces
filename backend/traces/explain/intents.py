@@ -44,6 +44,11 @@ DEFINITION = [
     re.compile(rf"^\s*(?:what\s+is|tell\s+me\s+about|explain|describe|show)\s+{ONE}\s*\??\s*$", re.I),
     re.compile(rf"^\s*{ONE}\s*\??\s*$", re.I),
 ]
+# A file named in a question: a path with a slash, or a name with an extension (crud.py, Alpha.tsx).
+FILE_TOKEN = re.compile(r"`?((?:[\w.@-]+/)*[\w@-][\w.@-]*\.[A-Za-z][\w]{0,9}|(?:[\w.@-]+/)+[\w.@-]+)`?")
+COCHANGE = re.compile(r"\b(co-?chang\w*|chang(?:e|es|ed|ing)\s+(?:together|along)|chang(?:e|es|ed)\s+with|coupl\w*\s+(?:with|to))\b", re.I)
+# "changed together with Alpha": a bare name after with/and, resolved later against stored paths (never guessed).
+COCHANGE_NAME = re.compile(r"\b(?:with|and|to)\s+`?([A-Za-z_][\w.-]*)`?", re.I)
 HISTORY = re.compile(r"\b(history|historical|co-?change\w*|changed together|change together|changes together|churn|hotspots?"
                      r"|coupl\w*|most changed|changed most|changes most)\b", re.I)
 ROUTES = re.compile(r"\b(routes?|endpoints?|urls?|api\s+paths?|pages?)\b", re.I)
@@ -57,6 +62,8 @@ PROJECT_DEPS = re.compile(r"\b(?:project|package|app|repo|repository)(?:'s)?\s+d
 NOT_SYMBOL = frozenset("the a an this that it its these those they them what which who it's app project repo repository code "
                        "service codebase library package page pages file files function functions".split())
 
+HISTORY_WORDS = frozenset("other others each together commits commit history time files file".split())
+
 SUGGESTIONS = (
     "What does <symbol> depend on?",
     "What calls <symbol>?",
@@ -64,13 +71,14 @@ SUGGESTIONS = (
     "Which routes are declared?",
     "How is data persisted?",
     "Which files changed together?",
+    "Which files changed together with <path/to/file.py>?",
     "What changed in commit <sha>?",
 )
 
 
 @dataclass(frozen=True)
 class Intent:
-    name: str  # runtime | trace | commit | dependencies | dependents | definition | history | routes | persistence | docs | unsupported
+    name: str  # runtime | trace | commit | cochange | dependencies | dependents | definition | history | routes | persistence | docs | unsupported
     entities: tuple[str, ...] = ()
     reason: str = ""
 
@@ -81,6 +89,22 @@ def _clean(s: str) -> str:
 
 def _symbol_ok(s: str) -> bool:
     return bool(s) and s.lower() not in NOT_SYMBOL
+
+
+def files_in(question: str) -> tuple[str, ...]:
+    """Files named in the question, in order, without duplicates. Version-like or sentence tokens are not files."""
+    out: list[str] = []
+    for m in FILE_TOKEN.finditer(question):
+        t = m.group(1).rstrip(".")
+        if re.fullmatch(r"[\d.]+", t) or "." not in t and "/" not in t:
+            continue
+        out.append(t)
+    return tuple(dict.fromkeys(out))
+
+
+def _without_files(q: str) -> str:
+    """The question with named files removed, so a path such as api/routes/x.py cannot trigger keyword intents."""
+    return FILE_TOKEN.sub(" ", q)
 
 
 def classify(question: str) -> Intent:
@@ -98,6 +122,13 @@ def classify(question: str) -> Intent:
     for p in COMMIT:
         if m := p.search(q):
             return Intent("commit", (m.group(1).lower(),))
+    # Co-change: the files it names are the entities. A bare name is kept for exact resolution against stored paths.
+    if COCHANGE.search(q):
+        files = files_in(q)
+        if not files:
+            names = [n for n in (_clean(x) for x in COCHANGE_NAME.findall(_without_files(q))) if _symbol_ok(n) and n.lower() not in HISTORY_WORDS]
+            files = tuple(dict.fromkeys(names))
+        return Intent("cochange", files)
     if re.search(r"\bcommit\b", q, re.I):
         return Intent("unsupported", reason="Questions about a commit need its hash (7 to 40 hex characters), for example 'What changed in commit 1a2b3c4?'.")
     if PROJECT_DEPS.search(q):
@@ -110,12 +141,13 @@ def classify(question: str) -> Intent:
                     return Intent(name, (sym,))
                 return Intent("unsupported", reason=f"'{sym}' is not a symbol name. Name a function, class or file, for example 'What does create_user depend on?'.")
     if HISTORY.search(q):
-        return Intent("history")
-    if ROUTES.search(q):
+        return Intent("history", files_in(q))
+    bare = _without_files(q)
+    if ROUTES.search(bare):
         return Intent("routes")
-    if PERSIST.search(q):
+    if PERSIST.search(bare):
         return Intent("persistence")
-    if DOCS.search(q):
+    if DOCS.search(bare):
         return Intent("docs")
     for p in DEFINITION:
         if m := p.search(q):

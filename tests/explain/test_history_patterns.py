@@ -66,8 +66,11 @@ def test_pattern_sentences_are_patterns_with_caveat_and_criteria_never_fact(q: s
     assert pattern_sentences
     for a in pattern_sentences:
         assert a["kind"] == "interpretation"
-        assert a["text"].startswith("History pattern (")
         assert PATTERN_CAVEAT in a["text"]
+        if len(a["claim_ids"]) > 1:  # a summary over several patterns (O-4): labelled as patterns, caveat required
+            assert a["text"].startswith("History patterns: ")
+            continue
+        assert a["text"].startswith("History pattern (")
         assert "Criteria: " in a["text"]
         assert not a["text"].startswith("History pattern (verified")
         low = a["text"].lower()

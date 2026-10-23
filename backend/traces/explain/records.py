@@ -55,6 +55,10 @@ class ClaimView:
     scope: str = ""
     # Full commit SHAs this record is about (commit:: endpoints and origin.commit), for commit questions.
     commits: tuple[str, ...] = ()
+    # Co-change support (shared commits), union of commits touching either side, and coupling degree, from metrics.
+    support: int | None = None
+    union: int | None = None
+    degree: float | None = None
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
@@ -132,6 +136,21 @@ def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     return tuple((k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False)) for k in CRITERIA_KEYS if k in src)
 
 
+def _num(d: Any, key: str) -> float | None:
+    v = d.get(key) if isinstance(d, dict) else None
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def endpoint_path(symbol: str | None) -> str | None:
+    """The repository path of a file:: endpoint, or the name of a component:: endpoint; None otherwise."""
+    if not symbol:
+        return None
+    for pre in ("file::", "component::"):
+        if symbol.startswith(pre):
+            return symbol[len(pre):] or None
+    return None
+
+
 def view(record: dict[str, Any]) -> ClaimView | None:
     """Project a record; returns None for records without a claim_id or status (never guesses a status)."""
     cid, status, label = record.get("claim_id"), record.get("status"), record.get("label")
@@ -167,5 +186,8 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         criteria=criteria_of(record),
         scope=str(record.get("evidence_scope") or ""),
         commits=_commits_of(record),
+        support=int(sup) if (sup := _num(record.get("metrics"), "support") or _num(raw, "support")) is not None else None,
+        union=int(uni) if (uni := _num(record.get("metrics"), "union_commits")) is not None else None,
+        degree=_num(record.get("metrics"), "degree"),
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )

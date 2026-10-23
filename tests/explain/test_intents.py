@@ -109,7 +109,7 @@ def test_commit_question_without_history_is_unknown_not_a_guess() -> None:
     ("trace from create_item to Item", "trace"),
     ("Which routes are declared?", "routes"),
     ("How is an item saved?", "persistence"),
-    ("Which files changed together?", "history"),
+    ("Which files changed together?", "cochange"),
     ("What does the README say?", "docs"),
     ("What are the project dependencies?", "docs"),
     ("Is create_item slow?", "runtime"),
