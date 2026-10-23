@@ -31,6 +31,7 @@ Non-goals:
 - No reuse of Lab C scripts as code. This is a clean rewrite with tests; Lab C's techniques and measured results are reused as requirements and regression baselines.
 - Issue and Discussion threads are deferred past v1.
 - Component-level alias suggestions are deferred past v1 (D-H14). v1 alias suggestions are file level only.
+- Running history Git under the extractor's sandbox (`workers/sandbox.sh`, a separate `unshare -rn` network namespace) is a v1.1 item (D-H16). v1 runs history Git in the index job process with the in-process hardening of section 11.
 
 ## 2. Package layout (owned by this seat)
 
@@ -100,7 +101,7 @@ Outputs, mirroring the adapter run layout:
 | `work/<run_id>/history/report.json` | counts by kind, class, status; filters and thresholds used; warnings; skipped stages with reasons; git version; timings |
 | `work/<run_id>/history/milestones.json` | selected milestone SHAs with the reasons each was selected |
 | `work/<run_id>/history/errors.json` | on failure only |
-| `work/<run_id>/history/netprobe.log` | isolation proof (section 16) |
+| `work/<run_id>/history/netprobe.log` | not written in v1: history Git does not run in its own network namespace, so there is no per-run probe (D-H16, section 16) |
 
 ## 4. Ownership and dependencies on other seats
 
@@ -737,13 +738,14 @@ The API seat owns the GitHub client, token, cache files and rate limiting. Histo
 
 - argv lists only, never a shell. The Git binary path is resolved once at start and recorded.
 - Allowed subcommands: `rev-parse --verify`, `cat-file`, `log`, `rev-list`, `ls-tree`, `diff-tree`, `for-each-ref` (read only). Anything else raises before execution.
-- Global options on every call: `--no-pager`, `--git-dir=<repo_path>` (bare) or `-C <repo_path>`, `-c core.hooksPath=/dev/null`, `-c core.quotePath=false`, `-c core.fsmonitor=false`, `-c core.attributesFile=/dev/null`, `-c diff.external=`, `-c log.showSignature=false`, `-c protocol.allow=never`, `-c mailmap.file=`, `-c mailmap.blob=<repo_sha>:.mailmap` (or empty when mailmap is off).
-- Diff-producing calls add `--no-ext-diff --no-textconv -z`. Output parsing is NUL-delimited only.
-- Environment is built from scratch: `PATH` limited to the Git binary's directory, `HOME` and `XDG_CONFIG_HOME` set to an empty private temp dir, `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_ATTR_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_NO_REPLACE_OBJECTS=1`, `GIT_NO_LAZY_FETCH=1`, `GIT_OPTIONAL_LOCKS=0`, `LC_ALL=C`. No credential helpers, no `SSH_*`, no proxy variables.
-- Refuses repos that have `info/grafts`, a `shallow` file (`E_SHALLOW`), or a promisor remote with missing objects (`E_MISSING_OBJECT` instead of a lazy fetch).
+- Global options on every call: `--no-pager`, `--git-dir=<absolute git dir>`, `--work-tree=<empty private temp dir>`, and `-c` for `core.hooksPath=/dev/null`, `core.quotePath=false`, `core.fsmonitor=false`, `core.attributesFile=/dev/null`, `core.pager=cat`, `diff.external=`, `log.showSignature=false`, `log.decorate=false`, `color.ui=false`, `protocol.allow=never`, `mailmap.file=`, `i18n.logOutputEncoding=UTF-8`, and `mailmap.blob=<blob id of .mailmap at repo_sha>` (empty when there is none). The git dir is found once with `-C <repo_path> rev-parse --absolute-git-dir` under the same `-c` options. `version` is also allowed, for the version check.
+- Diff-producing calls (`log`, `diff-tree`) add `--no-ext-diff --no-textconv`; ingest, lifecycle and milestone calls pass `-z` and parse NUL-delimited output. The one exception is the `log --follow` recount in `verify.py`, which reads only the numstat counts from line-delimited output and never parses paths from it.
+- Environment is built from scratch, with nothing inherited: `PATH` limited to the Git binary's directory, `HOME` and `XDG_CONFIG_HOME` set to an empty private temp dir, `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_ATTR_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_NO_REPLACE_OBJECTS=1`, `GIT_NO_LAZY_FETCH=1`, `GIT_OPTIONAL_LOCKS=0`, `GIT_PAGER=cat`, `GIT_LITERAL_PATHSPECS=1`, `LC_ALL=C`. So no credential helpers from global or system config, no `SSH_*`, no proxy variables, no tokens. The child's working directory is the empty temp dir and stdin is `/dev/null` unless the call passes input.
+- Refuses repos that have `info/grafts` or are shallow (`E_SHALLOW`). In a partial clone, a missing object gives `E_MISSING_OBJECT`; lazy fetch is off, so it never fetches.
 - SHA validation: input must match `^[0-9a-f]{40}$`, `rev-parse --verify <sha>^{commit}` must return the same SHA, and `cat-file -t` must be `commit`.
-- Per-call timeout and output byte cap from `limits`. stderr is captured, truncated and stripped of paths outside the repo before it reaches logs.
-- The index worker runs history under the same OS-level network isolation as Task 002 (`unshare -rn` or a container with no network).
+- Per-call timeout and output byte cap. stderr is truncated, token-like strings are redacted and the repo path and git dir are replaced with `<path>` before it reaches error details.
+- Inside `run()`, every Git child also gets resource limits set in `preexec_fn` between fork and exec: `RLIMIT_AS` of `budget.memory_mb` + 512 MiB, and `RLIMIT_CPU` of the remaining stage time + 1 s (both capped at the existing hard limit), plus `core.packedGitWindowSize=32m` and `core.packedGitLimit` of a quarter of that address space (at least 64 MiB) so pack mmaps stay inside it. A call that would start after the run deadline does not start.
+- Where it runs (v1, D-H16): history is called in process by the index job (hook H1 in `backend/traces/evidence/index.py`), and its Git children are plain child processes of the index job, with the job's user and network. They do **not** run in a separate `unshare` namespace or a container, and not under `workers/sandbox.sh`, which isolates only the extractor and adapter. Network refusal for history is the configuration above (`protocol.allow=never`, `GIT_NO_LAZY_FETCH=1`, no credentials, read-only subcommands only), not OS-level isolation. Running history Git under the extractor's sandbox is a v1.1 item.
 
 ## 12. Filters and thresholds
 
@@ -785,7 +787,7 @@ On any error below: write `errors.json` (`{code, detail, stage, at}`), write no 
 | `E_PATH` | an emitted path is absolute, contains `..`, or escapes the repo |
 | `E_COLLISION` | two different records share a claim id |
 | `E_SCHEMA` | an emitted record fails the 0.4 schema |
-| `E_ISOLATION` | the network probe shows network access inside the worker |
+| `E_ISOLATION` | reserved; not raised in v1, because history runs no network probe (D-H16) |
 | `E_CACHE` | a cache entry fails its digest and the recomputation disagrees with it |
 
 Not errors (report warnings, run continues): no `.mailmap`; no component map (component outputs skipped); no PR provider or no cached PR; a cached PR that fails its checks (that PR skipped); an unparseable manifest blob (that event skipped); rename detection limited (records flagged).
@@ -809,7 +811,7 @@ Not errors (report warnings, run continues): no `.mailmap`; no component map (co
 ## 16. No-network guarantee
 
 - The package imports no HTTP, socket or subprocess-network library. `gitcmd` is the only subprocess path and blocks transports (`protocol.allow=never`, `GIT_NO_LAZY_FETCH=1`).
-- The worker runs under OS-level isolation. Each run writes `netprobe.log` with the same probe set as Task 002 CT15 (interfaces, `curl` attempts, child-process attempts, namespace ids, outside control).
+- v1: history runs in the index job process and its Git children are plain child processes of it, not in a separate network namespace (section 11, D-H16). No `netprobe.log` is written for history. The guarantee in v1 is the in-process one above: no network library, transports refused, lazy fetch off, no credentials in the Git environment. `tests/history/test_runner.py::test_run_inside_network_namespace` shows `run()` gives the same digest inside `unshare -rn`, so the v1.1 move is expected not to change output; it is a test, not how production runs.
 - Tests enforce it (HT10).
 
 ## 17. Wording rules for user-facing explanations
@@ -844,7 +846,7 @@ pytest under `tests/history/`. Synthetic repos are built by test fixtures with G
 
 **HT9. Co-change defaults and wording.** Given fsft with default config. Then a `co_changed_with` record exists for `frontend/src/components/Admin/AddUser.tsx` and `frontend/src/components/Admin/EditUser.tsx`; its `parameters` show 5, 5, 0.30, 30 and the filters; every `co_changed_with` statement matches `changed together in \d+ of \d+ commits` and contains none of `causes`, `caused`, `because`, `depends on`, `drives`, `breaks`; class `history_pattern`; status never `verified`. Pass: all hold. Support, revs and degree are frozen as baselines on first run.
 
-**HT10. No network.** Given the worker under the isolation wrapper, plus a pytest fixture that makes socket creation raise. When a full fsft run executes, and when a synthetic partial clone with a missing blob is analyzed. Then the probe log shows no reachable network, the socket fixture is never triggered, and the partial clone gives `E_MISSING_OBJECT` with no fetch attempt. Pass: all hold.
+**HT10. No network.** Given a pytest fixture that makes socket creation raise. When a full pipeline run executes, and when a synthetic partial clone with a missing blob is analyzed. Then the socket fixture is never triggered, and the partial clone gives `E_MISSING_OBJECT` with no fetch attempt. Where unprivileged `unshare -rn` is available, `run()` inside it gives the same `records_digest` as outside. Pass: all hold. v1 has no per-run probe log for history (D-H16); a probe returns with the v1.1 sandbox item.
 
 **HT11. Mailmap.** Given a synthetic repo where one person commits under two emails, a `.mailmap` at the pinned SHA that joins them, and a later commit beyond the pinned SHA that changes the mailmap. Then authors are counted once; the later mailmap has no effect; with `mailmap: none` the two identities stay separate and the report says so. Pass: all hold.
 
@@ -888,6 +890,7 @@ Still open:
 2. **Decision log location.** Architect1 asked for the claim_id anchor difference (D-H6) to be recorded in DECISIONS.md. `build/traces-v1` has no `docs/DECISIONS.md` at the time of this draft, and it is not this seat's file, so the entry is requested in the PR body and recorded here in section 20 meanwhile.
 3. **Lab C code.** Clean rewrite. Lab C scripts stay outside the repo and are not vendored.
 4. **Discussions and issue threads.** Deferred past v1. Charter open question 10 stays open.
+5. **History Git sandbox (v1.1, D-H16).** Run history's Git children under the same sandbox as the extractor (`workers/sandbox.sh`, `unshare -rn`), and write a history `netprobe.log` again so `E_ISOLATION` can fire.
 
 ## 20. Decisions (Architect1, 2026-10-21 IST)
 
@@ -908,5 +911,6 @@ Binding. They supersede any conflicting text above.
 | D-H11 | No new check method in v1. `evidence_set_diff` keeps `git_recount` (family `text`); a dedicated method is deferred to schema 0.5. | 5, 9.8 |
 | D-H12 | Accepted: `run()` signature, `RunBudget`, `STAGE_ORDER`, stage statuses and reasons, and report layout are frozen. | 8.11, 13, 14 |
 | D-H13 | `interface.HistoryRunner.run` takes `config` and `budget`, `select_milestones` takes `config`; the constructor milestone cap is a ceiling (higher is `E_CONFIG`); git children get `RLIMIT_AS` and `RLIMIT_CPU` derived from `RunBudget`, with RSS-growth checks kept; defaults 600 s, 1024 MiB, 250,000 records, 30 s reserve; finalize validates every record. Finalize validation: option C chosen. The 10% of run time line was a tripwire, not a requirement. Before, on fsft with both validators in the worker: total about 17.2 to 17.9 s, finalize 11.7 s (jsonschema 8.5 s, stdlib validator 2.7 s, collision check 0.5 s). Option C: the worker validates every record with the stdlib validator only and keeps the collision check; tests/history cross-check every record with jsonschema as well, so CI covers both. After, re-measured over three fsft runs: total 8.5 to 9.2 s, finalize 3.1 s (about 35%), stages about 5.0 to 5.6 s, same 8,402 records and digest. `traces/evidence/schema_check.py` is loaded by module name until the API lane adds its mypy annotations; follow-up: switch to a normal import then. | 8.11 |
-| D-H14 | Alias suggestions are opt-in in `run()`: `HistoryConfig.aliases: bool = False`. Off, the `aliases` stage is skipped with `not_in_v1_default` (an input reason, so the run stays complete). On, it runs `alias_suggestions` with the run's component map and context. The flag is in the config digest and in alias record parameters (`aliases: true`); no other stage's parameters change, so default claim_ids and the fsft default digest stay as they were (8,402 records, 402d3d34eff4). On fsft, enabling it adds 54 records. Component-level aliases are deferred past v1. The `run()` signature is unchanged. | 8.8, 8.11, 12 |
+| D-H14 | Alias suggestions are opt-in in `run()`: `HistoryConfig.aliases: bool = False`. Off, the `aliases` stage is skipped with `not_in_v1_default` (an input reason, so the run stays complete). On, it runs `alias_suggestions` with the run's component map and context. The flag is in the config digest and in alias record parameters (`aliases: true`); no other stage's parameters change, so default claim_ids and the fsft default digest stay as they were (8,402 records, 402d3d34eff4 at the time; D-H15 later changed it to 2fb288167ebf, still 8,402 records). On fsft, enabling it adds 54 records. Component-level aliases are deferred past v1. The `run()` signature is unchanged. | 8.8, 8.11, 12 |
 | D-H15 | Lineage is not joined across a delete and re-add of the same path in v1 (9.2 unchanged). Instead, file-level churn, hotspot and co-change records whose path has such a gap carry `metrics.lineage_breaks` (co-change: `lineage_breaks_a`, `lineage_breaks_b` and their sum `lineage_breaks`), the flag `x-lineage_restart` (schema `x-` extension, no schema change), a plain sentence in `provenance_raw.caveat`, and that sentence appended to `statement`. A gap is a non-merge `D` of the path where the HEAD identity starts, earlier in the analysed range than that start. Records without a gap are byte-identical to before. `claim_id`, `parameters` and `status` do not change. The lifecycle report lists `lineage_breaks` per HEAD path. Component-level records are not flagged in v1. Source: Lab Express run O-6 (`docs/acceptance/EXPRESS.md`), where all 4 of 18 co-change misses on hagopj13/node-express-boilerplate@179ae84 involve the re-added `user.service.js` or `auth.service.js`; those 4 pairs are now flagged. fsft default digest: 402d3d34eff4 before, 2fb288167ebf after, 8,402 records with the same claim_ids; the 4 changed records are churn for `CONTRIBUTING.md`, `frontend/src/index.css`, `frontend/src/utils.ts` and the hotspot for `frontend/src/utils.ts`. With aliases on: 8,456 records, 8d7313302536 before, 832325576eaa after, same 4 records. | 9.2, 9.3, 9.4, HT26 |
+| D-H16 | v1 runs history Git without namespace isolation. `run()` is called in process by the index job, and its Git children are plain child processes of the job, with the hardening in section 11: fixed argv, read-only subcommands, `protocol.allow=never`, `GIT_NO_LAZY_FETCH=1`, hooks off, no external diff or textconv, an environment built from scratch (`GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL=/dev/null`, private empty `HOME`), timeouts, SHA validation, and `RLIMIT_AS`/`RLIMIT_CPU` in `preexec_fn`. They are not in a separate `unshare` namespace, no history `netprobe.log` is written, and `E_ISOLATION` is not raised. The earlier text saying history runs under `unshare -rn` was wrong and is corrected. v1.1 item: run history Git under the same sandbox as the extractor. No code change; fsft default digest stays 2fb288167ebf (8,402 records). | 1, 3, 11, 13, 16, HT10, 19 |
