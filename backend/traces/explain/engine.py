@@ -5,6 +5,7 @@ Every answer sentence is either grounded (kind "fact", citing verified or observ
 from templates over structured record fields, never from free generation, and never assert runtime behavior: the
 evidence is static (docs/CONTRACTS.md section 1). Rejected claims are never used.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,17 +25,37 @@ STOP = frozenset(
     "by as at can could would should there their its any all show me tell about explain find list get use used using "
     "code repo repository file files function functions".split()
 )
-RUNTIME_WORDS = re.compile(r"\b(runtime|run time|at run|in production|performance|latency|throughput|memory usage|crash|crashes|slow|fast|load test|when it runs|actually happens)\b", re.I)
+RUNTIME_WORDS = re.compile(
+    r"\b(runtime|run time|at run|in production|performance|latency|throughput|memory usage|crash|crashes|slow|fast|load test|when it runs|actually happens)\b",
+    re.I,
+)
 ROUTE_WORDS = re.compile(r"\b(routes?|endpoints?|urls?|paths?|pages?|api)\b", re.I)
-PERSIST_WORDS = re.compile(r"\b(persist\w*|database|db|saves?|saved|stor(e|es|ed|age)|writes?|commit\w*|session)\b", re.I)
-HISTORY_WORDS = re.compile(r"\b(history|historical|co-?change\w*|cochange\w*|changed together|change together|changes together|churn|hotspots?|coupl\w*|commits?|evolv\w*)\b", re.I)
-HISTORY_GENERIC = frozenset("history historical change changes changed together cochange co commit commits churn hotspot hotspots coupling coupled evolve evolved often most".split())
+PERSIST_WORDS = re.compile(
+    r"\b(persist\w*|database|db|saves?|saved|stor(e|es|ed|age)|writes?|commit\w*|session)\b", re.I
+)
+HISTORY_WORDS = re.compile(
+    r"\b(history|historical|co-?change\w*|cochange\w*|changed together|change together|changes together|churn|hotspots?|coupl\w*|commits?|evolv\w*)\b",
+    re.I,
+)
+HISTORY_GENERIC = frozenset(
+    "history historical change changes changed together cochange co commit commits churn hotspot hotspots coupling coupled evolve evolved often most".split()
+)
 DOC_WORDS = re.compile(r"\b(readme|purpose|business|what does .* do|manifest|dependencies|package)\b", re.I)
-ROUTE_GENERIC = frozenset("route routes endpoint endpoints api url urls path paths page pages declared declare defined define exposes expose exposed has have list available".split())
+ROUTE_GENERIC = frozenset(
+    "route routes endpoint endpoints api url urls path paths page pages declared declare defined define exposes expose exposed has have list available".split()
+)
 TRACE_PATTERN = re.compile(r"\bfrom\s+(\S+)\s+to\s+(\S+)", re.I)
 
 # Phrases a deterministic answer must never contain: they would present static evidence as runtime observation.
-FORBIDDEN_RUNTIME_PHRASES = ("at runtime it", "was executed", "is executed", "was observed running", "in production it", "actually runs", "always runs")
+FORBIDDEN_RUNTIME_PHRASES = (
+    "at runtime it",
+    "was executed",
+    "is executed",
+    "was observed running",
+    "in production it",
+    "actually runs",
+    "always runs",
+)
 
 RUNTIME_UNKNOWN = "Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown."
 STATIC_NOTE = "Static analysis only. No runtime behavior has been observed."
@@ -79,8 +100,11 @@ def _pattern_sentence(c: ClaimView) -> str:
         standing = "label not accepted: a history pattern is never verified"
     else:
         standing = c.label
-    body = c.statement.strip() or (f"{short_symbol(c.from_symbol)} and {short_symbol(c.to_symbol)} {c.qualifier}." if c.qualifier
-                                   else f"{c.kind.replace('_', ' ')} for {short_symbol(c.from_symbol)}.")
+    body = c.statement.strip() or (
+        f"{short_symbol(c.from_symbol)} and {short_symbol(c.to_symbol)} {c.qualifier}."
+        if c.qualifier
+        else f"{c.kind.replace('_', ' ')} for {short_symbol(c.from_symbol)}."
+    )
     if not body.endswith((".", "!", "?")):
         body += "."
     crit = "; ".join(f"{k}={v}" for k, v in c.criteria) or "not recorded"
@@ -114,10 +138,22 @@ def _order(c: ClaimView) -> tuple[int, int, str]:
     return (RANK.get(c.status, 9), 0 if c.claim_kind == "relationship" else 1, c.claim_id)
 
 
-def _trace(claims: list[ClaimView], src_name: str, src_terms: frozenset[str], dst_name: str, dst_terms: frozenset[str]) -> tuple[list[ClaimView], bool, str | None, str | None]:
+def _trace(
+    claims: list[ClaimView], src_name: str, src_terms: frozenset[str], dst_name: str, dst_terms: frozenset[str]
+) -> tuple[list[ClaimView], bool, str | None, str | None]:
     """Shortest path over non-rejected code relationship claims (never history patterns) between the symbols the two names resolve to exactly (BFS, deterministic)."""
-    rels = sorted((c for c in claims if c.claim_kind == "relationship" and c.from_symbol and c.to_symbol and not c.rejected
-                   and not c.history_pattern), key=_order)
+    rels = sorted(
+        (
+            c
+            for c in claims
+            if c.claim_kind == "relationship"
+            and c.from_symbol
+            and c.to_symbol
+            and not c.rejected
+            and not c.history_pattern
+        ),
+        key=_order,
+    )
     out: dict[str, list[ClaimView]] = {}
     for c in rels:
         out.setdefault(c.from_symbol or "", []).append(c)
@@ -166,10 +202,33 @@ def _resolve_symbol(name: str, symbols: Iterable[str]) -> list[str]:
     return hits
 
 
-DEP_ORDER = {k: i for i, k in enumerate(("depends_on", "uses_model", "uses_crud", "returns_model", "persistence_path", "http_call",
-                                         "routes_to", "binds_handler", "implements_operation", "calls", "instantiates", "extends",
-                                         "renders", "navigates", "references", "function_ref", "decorates", "imports", "import",
-                                         "library_contract"))}
+DEP_ORDER = {
+    k: i
+    for i, k in enumerate(
+        (
+            "depends_on",
+            "uses_model",
+            "uses_crud",
+            "returns_model",
+            "persistence_path",
+            "http_call",
+            "routes_to",
+            "binds_handler",
+            "implements_operation",
+            "calls",
+            "instantiates",
+            "extends",
+            "renders",
+            "navigates",
+            "references",
+            "function_ref",
+            "decorates",
+            "imports",
+            "import",
+            "library_contract",
+        )
+    )
+}
 NOT_DEPENDENCY = frozenset({"contains"})
 MAX_AMBIGUOUS = 3
 
@@ -183,10 +242,12 @@ def _resolve_paths(name: str, paths: Iterable[str]) -> list[str]:
     for fold in (False, True):
         f = (lambda x: x.lower()) if fold else (lambda x: x)
         q = f(n)
-        for test in (lambda p: f(p) == q,
-                     lambda p: f(p).endswith("/" + q),
-                     lambda p: f(p).rsplit("/", 1)[-1] == q,
-                     lambda p: f(p).rsplit("/", 1)[-1].rsplit(".", 1)[0] == q):
+        for test in (
+            lambda p: f(p) == q,
+            lambda p: f(p).endswith("/" + q),
+            lambda p: f(p).rsplit("/", 1)[-1] == q,
+            lambda p: f(p).rsplit("/", 1)[-1].rsplit(".", 1)[0] == q,
+        ):
             hits = [p for p in pool if test(p)]
             if hits:
                 return hits
@@ -204,7 +265,9 @@ def _suggest(reason: str) -> str:
     return f"{reason} Nothing was guessed. Try one of: " + "; ".join(SUGGESTIONS) + "."
 
 
-def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, focus_claim_ids: Iterable[str] = ()) -> tuple[list[dict[str, Any]], list[ClaimView], int]:
+def build_answer(
+    records: Iterable[dict[str, Any] | ClaimView], question: str, focus_claim_ids: Iterable[str] = ()
+) -> tuple[list[dict[str, Any]], list[ClaimView], int]:
     """Return (answer facts, cited claims, rejected-skipped count). Pure: same records and question give the same answer.
 
     Routing is by explicit intent (traces.explain.intents.classify), never by keyword overlap: pinned claims first (the
@@ -236,7 +299,9 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
         if c is None:
             answer.append(_fact(f"The pinned claim {fid} is not in this snapshot.", "unknown"))
         elif c.rejected:
-            answer.append(_fact(f"The pinned claim {fid} was rejected by an independent check, so it is not used.", "unknown"))
+            answer.append(
+                _fact(f"The pinned claim {fid} was rejected by an independent check, so it is not used.", "unknown")
+            )
         else:
             answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
 
@@ -246,39 +311,78 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
     def resolve(name: str, pool: Iterable[str]) -> list[str] | None:
         hits = _resolve_symbol(name, pool)
         if not hits:
-            answer.append(_fact(_suggest(f"No stored symbol is named {name!r}, so there is nothing to answer from."), "unknown"))
+            answer.append(
+                _fact(_suggest(f"No stored symbol is named {name!r}, so there is nothing to answer from."), "unknown")
+            )
             return None
         if len(hits) > MAX_AMBIGUOUS:
             shown = ", ".join(hits[:5])
-            answer.append(_fact(_suggest(f"{len(hits)} stored symbols are named {name!r} ({shown}{', ...' if len(hits) > 5 else ''}), so the question is "
-                                         "ambiguous. Ask again with the file, for example 'path/to/file.py::name'."), "unknown"))
+            answer.append(
+                _fact(
+                    _suggest(
+                        f"{len(hits)} stored symbols are named {name!r} ({shown}{', ...' if len(hits) > 5 else ''}), so the question is "
+                        "ambiguous. Ask again with the file, for example 'path/to/file.py::name'."
+                    ),
+                    "unknown",
+                )
+            )
             return None
         return hits
 
     def edges(direction: str, sym: str) -> None:
-        mine = [c for c in rels if (c.from_symbol if direction == "out" else c.to_symbol) == sym and c.kind not in NOT_DEPENDENCY]
-        resolved = sorted((c for c in mine if c.claim_kind == "relationship"), key=lambda c: (DEP_ORDER.get(c.kind, 99), *_order(c)))
+        mine = [
+            c
+            for c in rels
+            if (c.from_symbol if direction == "out" else c.to_symbol) == sym and c.kind not in NOT_DEPENDENCY
+        ]
+        resolved = sorted(
+            (c for c in mine if c.claim_kind == "relationship"), key=lambda c: (DEP_ORDER.get(c.kind, 99), *_order(c))
+        )
         unresolved = sorted((c for c in mine if c.claim_kind == "unresolved_reference"), key=_order)
         name = short_symbol(sym)
         where = sym.split("::")[0]
         if resolved:
             shown = resolved[:MAX_MATCHES]
-            kinds = ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(Counter(c.kind for c in resolved).items()))
+            kinds = ", ".join(
+                f"{n} {k.replace('_', ' ')}" for k, n in sorted(Counter(c.kind for c in resolved).items())
+            )
             what = "outgoing" if direction == "out" else "incoming"
-            answer.append(_fact(f"The evidence records {len(resolved)} {what} static relationship{'s' if len(resolved) != 1 else ''} for {name} in {where} ({kinds})"
-                                f"{f'; the first {len(shown)} are listed' if len(resolved) > len(shown) else ''}.",
-                                "fact" if all(c.grounded for c in shown) else "interpretation", [cite(c) for c in shown]))
+            answer.append(
+                _fact(
+                    f"The evidence records {len(resolved)} {what} static relationship{'s' if len(resolved) != 1 else ''} for {name} in {where} ({kinds})"
+                    f"{f'; the first {len(shown)} are listed' if len(resolved) > len(shown) else ''}.",
+                    "fact" if all(c.grounded for c in shown) else "interpretation",
+                    [cite(c) for c in shown],
+                )
+            )
             for c in shown:
                 answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
         if unresolved and direction == "out":
             shown_u = unresolved[:MAX_MATCHES]
-            answer.append(_fact(f"{name} also refers to {len(unresolved)} name{'s' if len(unresolved) != 1 else ''} that static analysis did not resolve to a "
-                                "definition; these are not established dependencies.", "interpretation", [cite(c) for c in shown_u]))
+            answer.append(
+                _fact(
+                    f"{name} also refers to {len(unresolved)} name{'s' if len(unresolved) != 1 else ''} that static analysis did not resolve to a "
+                    "definition; these are not established dependencies.",
+                    "interpretation",
+                    [cite(c) for c in shown_u],
+                )
+            )
         if not resolved and not unresolved:
-            hidden = sum(1 for c in claims if c.rejected and (c.from_symbol if direction == "out" else c.to_symbol) == sym)
-            note = f" {hidden} rejected relationship{'s' if hidden != 1 else ''} for it {'were' if hidden != 1 else 'was'} not used." if hidden else ""
-            answer.append(_fact(f"No {'outgoing' if direction == 'out' else 'incoming'} static relationship is recorded for {name} in {where}.{note} "
-                                "Absence in the evidence is not proof that none exists.", "unknown"))
+            hidden = sum(
+                1 for c in claims if c.rejected and (c.from_symbol if direction == "out" else c.to_symbol) == sym
+            )
+            note = (
+                f" {hidden} rejected relationship{'s' if hidden != 1 else ''} for it {'were' if hidden != 1 else 'was'} not used."
+                if hidden
+                else ""
+            )
+            answer.append(
+                _fact(
+                    f"No {'outgoing' if direction == 'out' else 'incoming'} static relationship is recorded for {name} in {where}.{note} "
+                    "Absence in the evidence is not proof that none exists.",
+                    "unknown",
+                )
+            )
 
     n = intent.name
     if n == "trace":
@@ -286,14 +390,32 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
         path, found, s, g = _trace(usable, src_name, _terms(src_name), dst_name, _terms(dst_name))
         if found and path:
             grounded = [c for c in path if c.grounded]
-            answer.append(_fact(f"A recorded path of {len(path)} steps links {short_symbol(s)} to {short_symbol(g)}.", "fact" if len(grounded) == len(path) else "interpretation", [cite(c) for c in path]))
+            answer.append(
+                _fact(
+                    f"A recorded path of {len(path)} steps links {short_symbol(s)} to {short_symbol(g)}.",
+                    "fact" if len(grounded) == len(path) else "interpretation",
+                    [cite(c) for c in path],
+                )
+            )
             for c in path:
                 answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
         elif s is None or g is None:
             missing = src_name if s is None else dst_name
-            answer.append(_fact(_suggest(f"No stored symbol with relationships is named {missing!r}, so no trace can start or end there."), "unknown"))
+            answer.append(
+                _fact(
+                    _suggest(
+                        f"No stored symbol with relationships is named {missing!r}, so no trace can start or end there."
+                    ),
+                    "unknown",
+                )
+            )
         else:
-            answer.append(_fact(f"No recorded path of relationships links {src_name} to {dst_name} within {MAX_TRACE_DEPTH} steps. The connection, if any, is unknown from this evidence.", "unknown"))
+            answer.append(
+                _fact(
+                    f"No recorded path of relationships links {src_name} to {dst_name} within {MAX_TRACE_DEPTH} steps. The connection, if any, is unknown from this evidence.",
+                    "unknown",
+                )
+            )
 
     elif n in ("dependencies", "dependents"):
         pool = [c.from_symbol for c in rels if c.from_symbol] + [c.to_symbol for c in rels if c.to_symbol]
@@ -303,43 +425,96 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
 
     elif n == "definition":
         decl = [c for c in code if c.claim_kind == "node" and c.from_symbol]
-        pool = [c.from_symbol for c in decl if c.from_symbol] + [c.from_symbol for c in rels if c.from_symbol] + [c.to_symbol for c in rels if c.to_symbol]
+        pool = (
+            [c.from_symbol for c in decl if c.from_symbol]
+            + [c.from_symbol for c in rels if c.from_symbol]
+            + [c.to_symbol for c in rels if c.to_symbol]
+        )
         hits = resolve(intent.entities[0], pool)
         for sym in hits or []:
             nodes = sorted((c for c in decl if c.from_symbol == sym), key=_order)
             for c in nodes[:2]:
                 answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
-            out_n = sum(1 for c in rels if c.from_symbol == sym and c.kind not in NOT_DEPENDENCY and c.claim_kind == "relationship")
-            in_n = sum(1 for c in rels if c.to_symbol == sym and c.kind not in NOT_DEPENDENCY and c.claim_kind == "relationship")
-            sample = sorted((c for c in rels if c.claim_kind == "relationship" and c.kind not in NOT_DEPENDENCY and sym in (c.from_symbol, c.to_symbol)),
-                            key=lambda c: (DEP_ORDER.get(c.kind, 99), *_order(c)))[:3]
+            out_n = sum(
+                1
+                for c in rels
+                if c.from_symbol == sym and c.kind not in NOT_DEPENDENCY and c.claim_kind == "relationship"
+            )
+            in_n = sum(
+                1
+                for c in rels
+                if c.to_symbol == sym and c.kind not in NOT_DEPENDENCY and c.claim_kind == "relationship"
+            )
+            sample = sorted(
+                (
+                    c
+                    for c in rels
+                    if c.claim_kind == "relationship"
+                    and c.kind not in NOT_DEPENDENCY
+                    and sym in (c.from_symbol, c.to_symbol)
+                ),
+                key=lambda c: (DEP_ORDER.get(c.kind, 99), *_order(c)),
+            )[:3]
             if sample:
-                answer.append(_fact(f"{short_symbol(sym)} has {out_n} outgoing and {in_n} incoming static relationships recorded; for example:",
-                                    "fact" if all(c.grounded for c in sample) else "interpretation", [cite(c) for c in sample]))
+                answer.append(
+                    _fact(
+                        f"{short_symbol(sym)} has {out_n} outgoing and {in_n} incoming static relationships recorded; for example:",
+                        "fact" if all(c.grounded for c in sample) else "interpretation",
+                        [cite(c) for c in sample],
+                    )
+                )
                 for c in sample:
                     answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
             if not nodes and not sample:
-                answer.append(_fact(f"{short_symbol(sym)} appears in the evidence only as an unresolved name; nothing more is recorded.", "unknown"))
+                answer.append(
+                    _fact(
+                        f"{short_symbol(sym)} appears in the evidence only as an unresolved name; nothing more is recorded.",
+                        "unknown",
+                    )
+                )
 
     elif n == "commit":
         prefix = intent.entities[0]
-        about = sorted((c for c in usable if any(sha.startswith(prefix) for sha in c.commits)),
-                       key=lambda c: (0 if c.claim_kind == "node" else 1, c.kind, c.claim_id))
+        about = sorted(
+            (c for c in usable if any(sha.startswith(prefix) for sha in c.commits)),
+            key=lambda c: (0 if c.claim_kind == "node" else 1, c.kind, c.claim_id),
+        )
         shas = sorted({sha for c in about for sha in c.commits if sha.startswith(prefix)})
         if len(shas) > 1:
-            answer.append(_fact(_suggest(f"{len(shas)} commits start with {prefix}, so the question is ambiguous. Use more characters of the hash."), "unknown"))
+            answer.append(
+                _fact(
+                    _suggest(
+                        f"{len(shas)} commits start with {prefix}, so the question is ambiguous. Use more characters of the hash."
+                    ),
+                    "unknown",
+                )
+            )
         elif about:
-            kinds = ", ".join(f"{k} {kind.replace('_', ' ')}" for kind, k in sorted(Counter(c.kind for c in about).items()))
+            kinds = ", ".join(
+                f"{k} {kind.replace('_', ' ')}" for kind, k in sorted(Counter(c.kind for c in about).items())
+            )
             shown = about[:MAX_MATCHES]
-            answer.append(_fact(f"The history records {len(about)} item{'s' if len(about) != 1 else ''} about commit {shas[0][:12]} ({kinds})"
-                                f"{f'; the first {len(shown)} are listed' if len(about) > len(shown) else ''}.",
-                                "fact" if all(c.grounded for c in shown) else "interpretation", [cite(c) for c in shown]))
+            answer.append(
+                _fact(
+                    f"The history records {len(about)} item{'s' if len(about) != 1 else ''} about commit {shas[0][:12]} ({kinds})"
+                    f"{f'; the first {len(shown)} are listed' if len(about) > len(shown) else ''}.",
+                    "fact" if all(c.grounded for c in shown) else "interpretation",
+                    [cite(c) for c in shown],
+                )
+            )
             for c in shown:
-                answer.append(_fact(_rel_sentence(c) if c.history_pattern else (c.statement or _rel_sentence(c)), tag(c), [cite(c)]))
+                answer.append(
+                    _fact(
+                        _rel_sentence(c) if c.history_pattern else (c.statement or _rel_sentence(c)), tag(c), [cite(c)]
+                    )
+                )
         else:
             has_history = any(c.scope == "history" for c in usable)
-            why = "No history record mentions a commit starting with " + prefix + "." if has_history else \
-                "This snapshot has no history records, so commits cannot be described here."
+            why = (
+                "No history record mentions a commit starting with " + prefix + "."
+                if has_history
+                else "This snapshot has no history records, so commits cannot be described here."
+            )
             answer.append(_fact(_suggest(why), "unknown"))
 
     elif n == "routes":
@@ -351,7 +526,13 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
             narrowed = [c for c in routes if _score(c, specific) >= 10]
             routes = narrowed or routes
         if routes:
-            answer.append(_fact(f"The route inventory records {len(routes)} declared routes{' matching the question' if len(routes) < total else ''}.", "fact" if all(c.grounded for c in routes) else "interpretation", [cite(c) for c in routes]))
+            answer.append(
+                _fact(
+                    f"The route inventory records {len(routes)} declared routes{' matching the question' if len(routes) < total else ''}.",
+                    "fact" if all(c.grounded for c in routes) else "interpretation",
+                    [cite(c) for c in routes],
+                )
+            )
             for c in routes[:MAX_MATCHES]:
                 answer.append(_fact(_rel_sentence(c), tag(c), [cite(c)]))
         else:
@@ -371,21 +552,42 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
         named = intent.entities
         if not pats:
             what = "co-change history patterns" if n == "cochange" else "history patterns"
-            answer.append(_fact(f"No {what} are recorded for this snapshot, so how files changed together over time is unknown here.", "unknown"))
+            answer.append(
+                _fact(
+                    f"No {what} are recorded for this snapshot, so how files changed together over time is unknown here.",
+                    "unknown",
+                )
+            )
         elif named:
             # Resolve every named file against the paths the history (and the code evidence) knows, exactly.
-            known = {p for c in pats for p in (endpoint_path(c.from_symbol), endpoint_path(c.to_symbol)) if p} | {c.file for c in usable if c.file}
+            known = {p for c in pats for p in (endpoint_path(c.from_symbol), endpoint_path(c.to_symbol)) if p} | {
+                c.file for c in usable if c.file
+            }
             chosen: list[str] = []
             for name in named:
                 hits = _resolve_paths(name, known)
                 if not hits:
-                    answer.append(_fact(_suggest(f"No stored file is named {name!r}, so nothing can be said about what changes with it."), "unknown"))
+                    answer.append(
+                        _fact(
+                            _suggest(
+                                f"No stored file is named {name!r}, so nothing can be said about what changes with it."
+                            ),
+                            "unknown",
+                        )
+                    )
                     chosen = []
                     break
                 if len(hits) > 1:
                     listed = ", ".join(hits[:5])
-                    answer.append(_fact(_suggest(f"{len(hits)} stored files match {name!r} ({listed}{', ...' if len(hits) > 5 else ''}), so the question is ambiguous. "
-                                                 "Ask again with the full path."), "unknown"))
+                    answer.append(
+                        _fact(
+                            _suggest(
+                                f"{len(hits)} stored files match {name!r} ({listed}{', ...' if len(hits) > 5 else ''}), so the question is ambiguous. "
+                                "Ask again with the full path."
+                            ),
+                            "unknown",
+                        )
+                    )
                     chosen = []
                     break
                 chosen.append(hits[0])
@@ -396,20 +598,35 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
                     return {p for p in (endpoint_path(c.from_symbol), endpoint_path(c.to_symbol)) if p}
 
                 # One file: patterns that include it. Two or more: only patterns between the named files.
-                hit = [c for c in pats if (want & ends(c) if len(want) == 1 else len(want & ends(c)) == 2 and ends(c) <= want)]
+                hit = [
+                    c
+                    for c in pats
+                    if (want & ends(c) if len(want) == 1 else len(want & ends(c)) == 2 and ends(c) <= want)
+                ]
                 hit.sort(key=_support_key)
                 label = " and ".join(chosen)
                 if hit:
                     shown = hit[:MAX_MATCHES]
                     if len(hit) > 1:
-                        answer.append(_fact(f"History patterns: {len(hit)} recorded co-change patterns "
-                                            f"{'include' if len(want) == 1 else 'link'} {label}, ranked by shared commits"
-                                            f"{f'; the top {len(shown)} are listed' if len(hit) > len(shown) else ''}.", "interpretation", [cite(c) for c in shown]))
+                        answer.append(
+                            _fact(
+                                f"History patterns: {len(hit)} recorded co-change patterns "
+                                f"{'include' if len(want) == 1 else 'link'} {label}, ranked by shared commits"
+                                f"{f'; the top {len(shown)} are listed' if len(hit) > len(shown) else ''}.",
+                                "interpretation",
+                                [cite(c) for c in shown],
+                            )
+                        )
                     for c in shown:
                         answer.append(_fact(_rel_sentence(c), "interpretation", [cite(c)]))
                 else:
-                    answer.append(_fact(f"No recorded {'co-change' if n == 'cochange' else 'history'} pattern {'includes' if len(want) == 1 else 'links'} {label}. "
-                                        "Files below the pattern thresholds are not recorded, so this is unknown, not proof that they never change together.", "unknown"))
+                    answer.append(
+                        _fact(
+                            f"No recorded {'co-change' if n == 'cochange' else 'history'} pattern {'includes' if len(want) == 1 else 'links'} {label}. "
+                            "Files below the pattern thresholds are not recorded, so this is unknown, not proof that they never change together.",
+                            "unknown",
+                        )
+                    )
         else:
             pats.sort(key=lambda c: (0 if c.kind == "co_changed_with" else 1, *_support_key(c)))
             for c in pats[:MAX_MATCHES]:
@@ -420,10 +637,17 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
         for c in docs[:MAX_MATCHES]:
             answer.append(_fact(c.statement or _rel_sentence(c), tag(c), [cite(c)]))
         if not docs:
-            answer.append(_fact("This snapshot has no README or manifest records, so the project's stated purpose and dependencies are unknown here.", "unknown"))
+            answer.append(
+                _fact(
+                    "This snapshot has no README or manifest records, so the project's stated purpose and dependencies are unknown here.",
+                    "unknown",
+                )
+            )
 
     elif not focus:
-        answer.append(_fact(_suggest(intent.reason or "This question is not one the no-key explainer supports."), "unknown"))
+        answer.append(
+            _fact(_suggest(intent.reason or "This question is not one the no-key explainer supports."), "unknown")
+        )
 
     # Final guard over every sentence, whichever branch built it (summaries included): a sentence that cites a history
     # pattern or history inference is never a fact and always carries the caveat.
@@ -440,14 +664,24 @@ def build_answer(records: Iterable[dict[str, Any] | ClaimView], question: str, f
 
 
 def citation(c: ClaimView, sha: str | None) -> dict[str, Any]:
-    return {"claim_id": c.claim_id, "status": c.status, "label": c.label, "file": c.file, "start_line": c.start_line, "end_line": c.end_line, "commit": sha}
+    return {
+        "claim_id": c.claim_id,
+        "status": c.status,
+        "label": c.label,
+        "file": c.file,
+        "start_line": c.start_line,
+        "end_line": c.end_line,
+        "commit": sha,
+    }
 
 
 def categories(cited: list[ClaimView]) -> dict[str, list[str]]:
     return {
         "code_structure": [c.claim_id for c in cited if c.code_structure],
         # Commit history: patterns (never fact) and Git object facts about commits. The contract has no separate history facts key.
-        "history_patterns": [c.claim_id for c in cited if c.history_pattern or (c.scope == "history" and not c.rejected)],
+        "history_patterns": [
+            c.claim_id for c in cited if c.history_pattern or (c.scope == "history" and not c.rejected)
+        ],
         "documented_decisions": [c.claim_id for c in cited if c.scope == "documented" and not c.history_pattern],
         "inference": [c.claim_id for c in cited if c.inferred],
         "runtime_observations": [],
@@ -505,7 +739,13 @@ def bundle(question: str, cited: list[ClaimView]) -> tuple[dict[str, Any], list[
     manifest = [_item("instructions", INSTRUCTIONS)]
     for c in cited:
         stmt = fence_text(_rel_sentence(c) if c.history_pattern else (c.statement or _rel_sentence(c)))
-        item: dict[str, Any] = {"claim_id": c.claim_id, "status": c.status, "label": c.label, "where": fence_text(c.where), "statement": stmt}
+        item: dict[str, Any] = {
+            "claim_id": c.claim_id,
+            "status": c.status,
+            "label": c.label,
+            "where": fence_text(c.where),
+            "statement": stmt,
+        }
         if c.history_pattern:
             item["category"] = "history_patterns"
             item["criteria"] = {k: json.loads(v) for k, v in c.criteria}
@@ -513,12 +753,24 @@ def bundle(question: str, cited: list[ClaimView]) -> tuple[dict[str, Any], list[
         manifest.append(_item("claim_statement", stmt, c))
     q = fence_text(question)
     manifest.append(_item("question", q))
-    return {"format": FORMAT_VERSION, "instructions": INSTRUCTIONS, "evidence": evidence, "question": q,
-            "prompt": assemble_prompt(INSTRUCTIONS, evidence, q)}, manifest
+    return {
+        "format": FORMAT_VERSION,
+        "instructions": INSTRUCTIONS,
+        "evidence": evidence,
+        "question": q,
+        "prompt": assemble_prompt(INSTRUCTIONS, evidence, q),
+    }, manifest
 
 
-def explain_records(records: Iterable[dict[str, Any] | ClaimView], *, snapshot_id: str, sha: str | None, question: str,
-                    focus_claim_ids: Iterable[str] = (), mode: str = "no_llm") -> dict[str, Any]:
+def explain_records(
+    records: Iterable[dict[str, Any] | ClaimView],
+    *,
+    snapshot_id: str,
+    sha: str | None,
+    question: str,
+    focus_claim_ids: Iterable[str] = (),
+    mode: str = "no_llm",
+) -> dict[str, Any]:
     """ExplainResponse-shaped dict (docs/contracts/openapi.json) from records. mode is no_llm or prepare_bundle."""
     if mode not in ("no_llm", "prepare_bundle"):
         raise ValueError(f"unknown explain mode {mode!r}")

@@ -1,6 +1,7 @@
 """History patterns in explain and the chat bundle: co-change is a pattern, never a cause or code structure.
 
 Inputs are generic synthetic records shaped like docs/contracts/history.md section 6 (no fixture names)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -13,8 +14,15 @@ from traces.explain.engine import PATTERN_CAVEAT, explain_records
 from .test_explain import FORM, HANDLER, MODEL, RECORDS, SHA, SID, rec
 
 A, B = "file::web/src/Alpha.tsx", "file::web/src/Beta.tsx"
-CRITERIA = {"level": "file", "min_revs": 5, "min_shared_revs": 5, "min_coupling": 0.3, "max_changeset_size": 30,
-            "commits": "non-merge commits only", "filters": {"bots": "default", "generated": "default"}}
+CRITERIA = {
+    "level": "file",
+    "min_revs": 5,
+    "min_shared_revs": 5,
+    "min_coupling": 0.3,
+    "max_changeset_size": 30,
+    "commits": "non-merge commits only",
+    "filters": {"bots": "default", "generated": "default"},
+}
 FORBIDDEN = ("causes", "caused", "because", "depends on", "drives", "breaks")
 
 
@@ -28,25 +36,55 @@ def history(kind: str, status: str, frm: str, to: str | None, cls: str, **extra:
     return r
 
 
-COCHANGE = history("co_changed_with", "observed", A, B, "history_pattern",
-                   statement="Alpha.tsx and Beta.tsx changed together in 7 of 9 commits that touched either file.",
-                   qualifier="changed together in 7 of 9 commits", granularity="file",
-                   parameters={"digest": "0" * 64, "values": CRITERIA},
-                   metrics={"support": 7, "revs_a": 8, "revs_b": 8, "union_commits": 9, "degree": 0.875})
-HOTSPOT = history("file_history_metrics", "observed", A, None, "history_pattern", claim_kind="node",
-                  statement="Alpha.tsx: 8 revisions, 3 authors.", parameters={"values": {"metric_set": "default", "filters": {}}})
+COCHANGE = history(
+    "co_changed_with",
+    "observed",
+    A,
+    B,
+    "history_pattern",
+    statement="Alpha.tsx and Beta.tsx changed together in 7 of 9 commits that touched either file.",
+    qualifier="changed together in 7 of 9 commits",
+    granularity="file",
+    parameters={"digest": "0" * 64, "values": CRITERIA},
+    metrics={"support": 7, "revs_a": 8, "revs_b": 8, "union_commits": 9, "degree": 0.875},
+)
+HOTSPOT = history(
+    "file_history_metrics",
+    "observed",
+    A,
+    None,
+    "history_pattern",
+    claim_kind="node",
+    statement="Alpha.tsx: 8 revisions, 3 authors.",
+    parameters={"values": {"metric_set": "default", "filters": {}}},
+)
 ALIAS = history("alias_of", "unvalidated", A, B, "history_inferred", statement="Beta.tsx may be an alias of Alpha.tsx.")
 # A pattern record with the wrong label for its status, and one with "verified" pushed onto it by mistake.
-BAD = history("co_changed_with", "verified", B, A, "history_pattern", statement="Beta.tsx and Alpha.tsx changed together in 3 of 4 commits.")
+BAD = history(
+    "co_changed_with",
+    "verified",
+    B,
+    A,
+    "history_pattern",
+    statement="Beta.tsx and Alpha.tsx changed together in 3 of 4 commits.",
+)
 HIST = [COCHANGE, HOTSPOT, ALIAS, BAD]
 PATTERN_IDS = {r["claim_id"] for r in HIST}
 
-QUESTIONS = ["which files changed together with Alpha?", "co-change history", "what changes with Alpha.tsx and Beta.tsx",
-             "Alpha Beta", "hotspots", "trace from Alpha to Beta"]
+QUESTIONS = [
+    "which files changed together with Alpha?",
+    "co-change history",
+    "what changes with Alpha.tsx and Beta.tsx",
+    "Alpha Beta",
+    "hotspots",
+    "trace from Alpha to Beta",
+]
 
 
 def run(question: str, mode: str = "no_llm", focus: tuple[str, ...] = ()) -> dict[str, Any]:
-    out = explain_records([*RECORDS, *HIST], snapshot_id=SID, sha=SHA, question=question, focus_claim_ids=focus, mode=mode)
+    out = explain_records(
+        [*RECORDS, *HIST], snapshot_id=SID, sha=SHA, question=question, focus_claim_ids=focus, mode=mode
+    )
     ExplainResponse.model_validate(out)
     return out
 
@@ -76,8 +114,14 @@ def test_pattern_sentences_are_patterns_with_caveat_and_criteria_never_fact(q: s
         low = a["text"].lower()
         assert not any(w in low for w in FORBIDDEN), a["text"]
     cc = next(a for a in pattern_sentences if a["claim_ids"] == [COCHANGE["claim_id"]])
-    for k in ("min_revs=5", "min_shared_revs=5", "min_coupling=0.3", "max_changeset_size=30", "level=\"file\"",
-              'filters={"bots":"default","generated":"default"}'):
+    for k in (
+        "min_revs=5",
+        "min_shared_revs=5",
+        "min_coupling=0.3",
+        "max_changeset_size=30",
+        'level="file"',
+        'filters={"bots":"default","generated":"default"}',
+    ):
         assert k in cc["text"], k
     assert "count was checked against Git" in cc["text"]
     bad = next(a for a in pattern_sentences if a["claim_ids"] == [BAD["claim_id"]])
@@ -124,7 +168,10 @@ def test_chat_bundle_marks_patterns_with_caveat_and_criteria() -> None:
     assert e["criteria"] == CRITERIA
     assert (e["status"], e["label"]) == ("observed", "observed")
     assert e["statement"].startswith("History pattern (") and PATTERN_CAVEAT in e["statement"]
-    assert "History pattern" in pb["instructions"] and "never present them as a code dependency or a cause" in pb["instructions"]
+    assert (
+        "History pattern" in pb["instructions"]
+        and "never present them as a code dependency or a cause" in pb["instructions"]
+    )
     assert pb["prompt"].count("<evidence>") == 1
     for i in pb["evidence"]:
         if i["claim_id"] not in PATTERN_IDS:

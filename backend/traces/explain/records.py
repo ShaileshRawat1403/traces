@@ -1,4 +1,5 @@
 """Read-only views over traces-evidence/0.4 records for the explain engine. Pure functions, no store access."""
+
 from __future__ import annotations
 
 import json
@@ -11,12 +12,35 @@ INFERRED = ("unvalidated", "missing_location")
 # History records that describe patterns or inferences over commit history (docs/contracts/history.md 6). They are never
 # code structure, never verified and never a "fact" sentence: co-change is a pattern, not a dependency or a cause.
 HISTORY_PATTERN_CLASSES = ("history_pattern", "history_inferred")
-HISTORY_PATTERN_KINDS = ("co_changed_with", "history_impact_candidate", "file_history_metrics", "component_history_metrics",
-                         "deleted_soon_after_add", "prefix_moved")
+HISTORY_PATTERN_KINDS = (
+    "co_changed_with",
+    "history_impact_candidate",
+    "file_history_metrics",
+    "component_history_metrics",
+    "deleted_soon_after_add",
+    "prefix_moved",
+)
 # Criteria keys echoed with a history pattern, in this order, when the record's parameters carry them.
-CRITERIA_KEYS = ("level", "min_revs", "min_shared_revs", "min_coupling", "max_changeset_size", "commits", "metric_set",
-                 "rename_normalization", "bot_filter", "generated_filter", "filters")
-EXPECTED_LABEL = {"verified": "verified", "observed": "observed", "unvalidated": "inferred", "missing_location": "inferred", "rejected": "rejected"}
+CRITERIA_KEYS = (
+    "level",
+    "min_revs",
+    "min_shared_revs",
+    "min_coupling",
+    "max_changeset_size",
+    "commits",
+    "metric_set",
+    "rename_normalization",
+    "bot_filter",
+    "generated_filter",
+    "filters",
+)
+EXPECTED_LABEL = {
+    "verified": "verified",
+    "observed": "observed",
+    "unvalidated": "inferred",
+    "missing_location": "inferred",
+    "rejected": "rejected",
+}
 
 
 def short_symbol(symbol: str | None) -> str:
@@ -28,7 +52,7 @@ def short_symbol(symbol: str | None) -> str:
     if "/" in name and len(parts) >= 2 and name == parts[0]:
         return name.rsplit("/", 1)[-1]
     if name.startswith("route:"):
-        name = name[len("route:"):]
+        name = name[len("route:") :]
     return name
 
 
@@ -115,7 +139,7 @@ def _commits_of(record: dict[str, Any]) -> tuple[str, ...]:
     for end in (record.get("from") or {}, record.get("to") or {}):
         sym = end.get("symbol") if isinstance(end, dict) else None
         if isinstance(sym, str) and sym.startswith("commit::"):
-            out.append(sym[len("commit::"):].lower())
+            out.append(sym[len("commit::") :].lower())
     origin = record.get("origin")
     if isinstance(origin, dict) and isinstance(origin.get("commit"), str):
         out.append(origin["commit"].lower())
@@ -133,7 +157,11 @@ def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
         src = record.get("criteria") if isinstance(record.get("criteria"), dict) else src
     if not isinstance(src, dict):
         return ()
-    return tuple((k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False)) for k in CRITERIA_KEYS if k in src)
+    return tuple(
+        (k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+        for k in CRITERIA_KEYS
+        if k in src
+    )
 
 
 def _num(d: Any, key: str) -> float | None:
@@ -147,7 +175,7 @@ def endpoint_path(symbol: str | None) -> str | None:
         return None
     for pre in ("file::", "component::"):
         if symbol.startswith(pre):
-            return symbol[len(pre):] or None
+            return symbol[len(pre) :] or None
     return None
 
 
@@ -186,7 +214,9 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         criteria=criteria_of(record),
         scope=str(record.get("evidence_scope") or ""),
         commits=_commits_of(record),
-        support=int(sup) if (sup := _num(record.get("metrics"), "support") or _num(raw, "support")) is not None else None,
+        support=int(sup)
+        if (sup := _num(record.get("metrics"), "support") or _num(raw, "support")) is not None
+        else None,
         union=int(uni) if (uni := _num(record.get("metrics"), "union_commits")) is not None else None,
         degree=_num(record.get("metrics"), "degree"),
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),

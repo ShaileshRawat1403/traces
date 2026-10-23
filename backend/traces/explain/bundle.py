@@ -1,6 +1,7 @@
 """Explain hook points (Traces UI seat). Deterministic, no LLM, no provider keys: see engine.py and docs/CONTRACTS.md 4.12.
 
 The API (api/app.py, Traces seat) is expected to call these with the snapshot it has already resolved."""
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -46,13 +47,23 @@ def explain(snapshot_id: str, question: str, focus_claim_ids: list[str], store: 
     """ExplainResponse (mode no_llm): template-built answer from the snapshot's records, every sentence tagged."""
     st = _store(store)
     sha = _sha(st, snapshot_id)
-    return explain_records(_records(st, snapshot_id), snapshot_id=snapshot_id, sha=sha, question=question, focus_claim_ids=focus_claim_ids)
+    return explain_records(
+        _records(st, snapshot_id), snapshot_id=snapshot_id, sha=sha, question=question, focus_claim_ids=focus_claim_ids
+    )
 
 
-def prompt_bundle(snapshot_id: str, question: str, focus_claim_ids: list[str], store: Store | None = None) -> dict[str, Any]:
+def prompt_bundle(
+    snapshot_id: str, question: str, focus_claim_ids: list[str], store: Store | None = None
+) -> dict[str, Any]:
     """ExplainResponse (mode prepare_bundle): the same answer plus prompt_bundle and outbound_manifest.
     Never accepts or returns provider credentials; the browser sends the bundle after user consent."""
     st = _store(store)
     sha = _sha(st, snapshot_id)
-    return explain_records(_records(st, snapshot_id), snapshot_id=snapshot_id, sha=sha, question=question,
-                           focus_claim_ids=focus_claim_ids, mode="prepare_bundle")
+    return explain_records(
+        _records(st, snapshot_id),
+        snapshot_id=snapshot_id,
+        sha=sha,
+        question=question,
+        focus_claim_ids=focus_claim_ids,
+        mode="prepare_bundle",
+    )

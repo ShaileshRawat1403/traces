@@ -2,6 +2,7 @@
 
 Lab's failing questions are used verbatim. The records are synthetic and generic: a route handler with a dependency, a
 decoy symbol whose name contains the asked name, decoy SDK imports, a persistence path, and Git facts for one commit."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -29,8 +30,15 @@ SECOND_Q = "What changed in commit 9d703df25491?"  # verbatim from ACCEPTANCE.md
 
 
 def git_fact(kind: str, sha: str, path: str, statement: str) -> dict[str, Any]:
-    r = rec(kind, "observed", f"commit::{sha}", f"file::{path}", evidence_scope="history", statement=statement,
-            origin={"kind": "git_object", "commit": sha, "paths": [path]})
+    r = rec(
+        kind,
+        "observed",
+        f"commit::{sha}",
+        f"file::{path}",
+        evidence_scope="history",
+        statement=statement,
+        origin={"kind": "git_object", "commit": sha, "paths": [path]},
+    )
     r["class"] = "git_object_fact"
     r["from"] = {"entity": "commit", "symbol": f"commit::{sha}"}
     r["to"] = {"entity": "file", "symbol": f"file::{path}", "file": path}
@@ -50,15 +58,27 @@ RECS = [
     rec("imports", "verified", SDK, "web/src/client/core/request.ts::request", line=1),
     rec("calls", "verified", SDK_CALLER, "web/src/client/core/request.ts::request", line=40),
     rec("calls", "rejected", HANDLER, "api/crud.py::api/crud.py", line=70),
-    git_fact("commit_renames", COMMIT, "frontend/src/main.tsx", "Commit 9d703df25491 renamed new-frontend/src/main.tsx to frontend/src/main.tsx."),
-    git_fact("commit_modifies", COMMIT, "frontend/package.json", "Commit 9d703df25491 modified frontend/package.json (+2 -2)."),
+    git_fact(
+        "commit_renames",
+        COMMIT,
+        "frontend/src/main.tsx",
+        "Commit 9d703df25491 renamed new-frontend/src/main.tsx to frontend/src/main.tsx.",
+    ),
+    git_fact(
+        "commit_modifies",
+        COMMIT,
+        "frontend/package.json",
+        "Commit 9d703df25491 modified frontend/package.json (+2 -2).",
+    ),
     git_fact("commit_modifies", OTHER_COMMIT, "api/deps.py", "Commit 1111111 modified api/deps.py (+1 -0)."),
 ]
 IDS = {r["claim_id"]: r for r in RECS}
 
 
 def run(q: str, focus: list[str] | None = None, records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    out = explain_records(RECS if records is None else records, snapshot_id=SID, sha=SHA, question=q, focus_claim_ids=focus or [])
+    out = explain_records(
+        RECS if records is None else records, snapshot_id=SID, sha=SHA, question=q, focus_claim_ids=focus or []
+    )
     ExplainResponse.model_validate(out)
     return out
 
@@ -68,7 +88,12 @@ def cited_ids(out: dict[str, Any]) -> set[str]:
 
 
 def symbols(out: dict[str, Any]) -> set[str]:
-    return {s for i in cited_ids(out) for s in ((IDS[i].get("from") or {}).get("symbol"), (IDS[i].get("to") or {}).get("symbol")) if s}
+    return {
+        s
+        for i in cited_ids(out)
+        for s in ((IDS[i].get("from") or {}).get("symbol"), (IDS[i].get("to") or {}).get("symbol"))
+        if s
+    }
 
 
 def test_lab_dependency_question_lists_the_handlers_own_dependencies() -> None:
@@ -99,37 +124,43 @@ def test_commit_question_without_history_is_unknown_not_a_guess() -> None:
     assert out["citations"] == []
 
 
-@pytest.mark.parametrize("q, intent", [
-    (FIRST_Q, "dependencies"),
-    (SECOND_Q, "commit"),
-    ("What calls get_db?", "dependents"),
-    ("Where is create_item used?", "dependents"),
-    ("Where is create_item defined?", "definition"),
-    ("create_item", "definition"),
-    ("trace from create_item to Item", "trace"),
-    ("Which routes are declared?", "routes"),
-    ("How is an item saved?", "persistence"),
-    ("Which files changed together?", "cochange"),
-    ("What does the README say?", "docs"),
-    ("What are the project dependencies?", "docs"),
-    ("Is create_item slow?", "runtime"),
-    ("What does create_item do at runtime?", "runtime"),
-    ("How fast is the items endpoint in production?", "runtime"),
-])
+@pytest.mark.parametrize(
+    "q, intent",
+    [
+        (FIRST_Q, "dependencies"),
+        (SECOND_Q, "commit"),
+        ("What calls get_db?", "dependents"),
+        ("Where is create_item used?", "dependents"),
+        ("Where is create_item defined?", "definition"),
+        ("create_item", "definition"),
+        ("trace from create_item to Item", "trace"),
+        ("Which routes are declared?", "routes"),
+        ("How is an item saved?", "persistence"),
+        ("Which files changed together?", "cochange"),
+        ("What does the README say?", "docs"),
+        ("What are the project dependencies?", "docs"),
+        ("Is create_item slow?", "runtime"),
+        ("What does create_item do at runtime?", "runtime"),
+        ("How fast is the items endpoint in production?", "runtime"),
+    ],
+)
 def test_classifier(q: str, intent: str) -> None:
     assert classify(q).name == intent
 
 
-@pytest.mark.parametrize("q", [
-    "What does create depend on?",           # near miss: a prefix of create_item, no symbol of that name
-    "What does create_itm depend on?",       # near miss: a typo
-    "What does it depend on?",               # no symbol named
-    "What changed in the last commit?",      # a commit without a hash
-    "What changed in commit 0000000?",       # a hash that is not in the history
-    "tell me something interesting",         # no intent
-    "items",                                 # a bare word, not a symbol
-    "Is this code good?",                    # judgment, unsupported
-])
+@pytest.mark.parametrize(
+    "q",
+    [
+        "What does create depend on?",  # near miss: a prefix of create_item, no symbol of that name
+        "What does create_itm depend on?",  # near miss: a typo
+        "What does it depend on?",  # no symbol named
+        "What changed in the last commit?",  # a commit without a hash
+        "What changed in commit 0000000?",  # a hash that is not in the history
+        "tell me something interesting",  # no intent
+        "items",  # a bare word, not a symbol
+        "Is this code good?",  # judgment, unsupported
+    ],
+)
 def test_near_misses_are_unknown_with_reason_and_suggestions(q: str) -> None:
     out = run(q)
     assert out["answer"] and all(a["kind"] == "unknown" for a in out["answer"]), out["answer"]
@@ -143,7 +174,10 @@ def test_prefix_never_resolves_to_a_longer_name() -> None:
     assert all(a["kind"] == "unknown" for a in out["answer"])
 
 
-@pytest.mark.parametrize("q", ["Is create_item slow?", "What happens at runtime when create_item is called?", "Does get_db crash under load?"])
+@pytest.mark.parametrize(
+    "q",
+    ["Is create_item slow?", "What happens at runtime when create_item is called?", "Does get_db crash under load?"],
+)
 def test_runtime_questions_are_only_unknown(q: str) -> None:
     out = run(q)
     assert out["answer"] == [{"text": RUNTIME_UNKNOWN, "kind": "unknown", "claim_ids": []}]

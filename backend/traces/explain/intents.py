@@ -4,6 +4,7 @@ A question is mapped to exactly one explicit intent by ordered patterns, with th
 names, a commit prefix). There is no keyword-overlap fallback: a question that matches no intent, or whose entities
 cannot be read, is routed to "unsupported" and answered as unknown with suggested phrasings. Pure functions only.
 """
+
 from __future__ import annotations
 
 import re
@@ -12,7 +13,9 @@ from dataclasses import dataclass
 # Runtime questions are always unknown: the evidence is static.
 RUNTIME = re.compile(
     r"\b(runtime|run[- ]time|at run|in production|performance|perform|latency|throughput|memory usage|crash(es|ed)?|slow(er|est)?"
-    r"|fast(er|est)?|load test|when it runs|actually happens|benchmark\w*|how long does|timeouts?)\b", re.I)
+    r"|fast(er|est)?|load test|when it runs|actually happens|benchmark\w*|how long does|timeouts?)\b",
+    re.I,
+)
 
 # A symbol-like token: an identifier, optionally qualified with ::, . or a path.
 SYM = r"`?([A-Za-z_][\w$]*(?:(?:::|\.|/)[\w$.-]+)*)`?"
@@ -46,21 +49,36 @@ DEFINITION = [
 ]
 # A file named in a question: a path with a slash, or a name with an extension (crud.py, Alpha.tsx).
 FILE_TOKEN = re.compile(r"`?((?:[\w.@-]+/)*[\w@-][\w.@-]*\.[A-Za-z][\w]{0,9}|(?:[\w.@-]+/)+[\w.@-]+)`?")
-COCHANGE = re.compile(r"\b(co-?chang\w*|chang(?:e|es|ed|ing)\s+(?:together|along)|chang(?:e|es|ed)\s+with|coupl\w*\s+(?:with|to))\b", re.I)
+COCHANGE = re.compile(
+    r"\b(co-?chang\w*|chang(?:e|es|ed|ing)\s+(?:together|along)|chang(?:e|es|ed)\s+with|coupl\w*\s+(?:with|to))\b", re.I
+)
 # "changed together with Alpha": a bare name after with/and, resolved later against stored paths (never guessed).
 COCHANGE_NAME = re.compile(r"\b(?:with|and|to)\s+`?([A-Za-z_][\w.-]*)`?", re.I)
-HISTORY = re.compile(r"\b(history|historical|co-?change\w*|changed together|change together|changes together|churn|hotspots?"
-                     r"|coupl\w*|most changed|changed most|changes most)\b", re.I)
+HISTORY = re.compile(
+    r"\b(history|historical|co-?change\w*|changed together|change together|changes together|churn|hotspots?"
+    r"|coupl\w*|most changed|changed most|changes most)\b",
+    re.I,
+)
 ROUTES = re.compile(r"\b(routes?|endpoints?|urls?|api\s+paths?|pages?)\b", re.I)
-PERSIST = re.compile(r"\b(persist\w*|database|db|saves?|saved|saving|stor(e|es|ed|age|ing)|writes?\s+to|written\s+to)\b", re.I)
-DOCS = re.compile(r"\b(readme|purpose|business|manifest|package\.json|pyproject|third[- ]party|what\s+(?:does|is)\s+(?:this|the)\s+"
-                  r"(?:app|project|repo|repository|service|codebase|library|package)(?:\s+(?:do|for|about))?)\b", re.I)
-PROJECT_DEPS = re.compile(r"\b(?:project|package|app|repo|repository)(?:'s)?\s+dependencies\b|\bdependencies\s+(?:of|does)\s+(?:this|the)\s+"
-                          r"(?:project|package|app|repo|repository)\b|^\s*(?:what|which)\s+(?:are\s+the\s+)?dependencies\b", re.I)
+PERSIST = re.compile(
+    r"\b(persist\w*|database|db|saves?|saved|saving|stor(e|es|ed|age|ing)|writes?\s+to|written\s+to)\b", re.I
+)
+DOCS = re.compile(
+    r"\b(readme|purpose|business|manifest|package\.json|pyproject|third[- ]party|what\s+(?:does|is)\s+(?:this|the)\s+"
+    r"(?:app|project|repo|repository|service|codebase|library|package)(?:\s+(?:do|for|about))?)\b",
+    re.I,
+)
+PROJECT_DEPS = re.compile(
+    r"\b(?:project|package|app|repo|repository)(?:'s)?\s+dependencies\b|\bdependencies\s+(?:of|does)\s+(?:this|the)\s+"
+    r"(?:project|package|app|repo|repository)\b|^\s*(?:what|which)\s+(?:are\s+the\s+)?dependencies\b",
+    re.I,
+)
 
 # Words that are never a symbol even when they sit where one is expected.
-NOT_SYMBOL = frozenset("the a an this that it its these those they them what which who it's app project repo repository code "
-                       "service codebase library package page pages file files function functions".split())
+NOT_SYMBOL = frozenset(
+    "the a an this that it its these those they them what which who it's app project repo repository code "
+    "service codebase library package page pages file files function functions".split()
+)
 
 HISTORY_WORDS = frozenset("other others each together commits commit history time files file".split())
 
@@ -118,7 +136,10 @@ def classify(question: str) -> Intent:
             a, b = _clean(m.group(1)), _clean(m.group(2))
             if _symbol_ok(a) and _symbol_ok(b):
                 return Intent("trace", (a, b))
-            return Intent("unsupported", reason="A trace needs two symbol names, for example 'Trace from LoginForm to login_access_token'.")
+            return Intent(
+                "unsupported",
+                reason="A trace needs two symbol names, for example 'Trace from LoginForm to login_access_token'.",
+            )
     for p in COMMIT:
         if m := p.search(q):
             return Intent("commit", (m.group(1).lower(),))
@@ -126,11 +147,18 @@ def classify(question: str) -> Intent:
     if COCHANGE.search(q):
         files = files_in(q)
         if not files:
-            names = [n for n in (_clean(x) for x in COCHANGE_NAME.findall(_without_files(q))) if _symbol_ok(n) and n.lower() not in HISTORY_WORDS]
+            names = [
+                n
+                for n in (_clean(x) for x in COCHANGE_NAME.findall(_without_files(q)))
+                if _symbol_ok(n) and n.lower() not in HISTORY_WORDS
+            ]
             files = tuple(dict.fromkeys(names))
         return Intent("cochange", files)
     if re.search(r"\bcommit\b", q, re.I):
-        return Intent("unsupported", reason="Questions about a commit need its hash (7 to 40 hex characters), for example 'What changed in commit 1a2b3c4?'.")
+        return Intent(
+            "unsupported",
+            reason="Questions about a commit need its hash (7 to 40 hex characters), for example 'What changed in commit 1a2b3c4?'.",
+        )
     if PROJECT_DEPS.search(q):
         return Intent("docs")
     for name, pats in (("dependencies", DEPENDENCIES), ("dependents", DEPENDENTS)):
@@ -139,7 +167,10 @@ def classify(question: str) -> Intent:
                 sym = _clean(m.group("sym"))
                 if _symbol_ok(sym):
                     return Intent(name, (sym,))
-                return Intent("unsupported", reason=f"'{sym}' is not a symbol name. Name a function, class or file, for example 'What does create_user depend on?'.")
+                return Intent(
+                    "unsupported",
+                    reason=f"'{sym}' is not a symbol name. Name a function, class or file, for example 'What does create_user depend on?'.",
+                )
     if HISTORY.search(q):
         return Intent("history", files_in(q))
     bare = _without_files(q)
@@ -154,4 +185,7 @@ def classify(question: str) -> Intent:
             sym = _clean(m.group("sym"))
             if _symbol_ok(sym) and (len(q.split()) > 1 or re.search(r"[_:./]|[a-z][A-Z]", sym)):
                 return Intent("definition", (sym,))
-    return Intent("unsupported", reason="This question does not match a kind of question the no-key explainer can answer from stored evidence.")
+    return Intent(
+        "unsupported",
+        reason="This question does not match a kind of question the no-key explainer can answer from stored evidence.",
+    )

@@ -3,6 +3,7 @@ every sentence that cites a history pattern carries the caveat, summaries includ
 
 Lab's questions are used verbatim. Records are generic synthetic co-change records shaped like docs/contracts/history.md
 section 6; the two Lab paths appear only so the verbatim questions have something to resolve."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,11 +27,18 @@ PAIR = "file::backend/tests/api/routes/test_users.py"
 
 def pair(a: str, b: str, support: int, union: int, status: str = "observed") -> dict[str, Any]:
     pa, pb = a.removeprefix("file::"), b.removeprefix("file::")
-    return history("co_changed_with", status, a, b, "history_pattern",
-                   statement=f"{pa} and {pb} changed together in {support} of {union} commits that touched either file.",
-                   qualifier=f"changed together in {support} of {union} commits", granularity="file",
-                   parameters={"values": CRITERIA},
-                   metrics={"support": support, "union_commits": union, "degree": round(support / union, 4)})
+    return history(
+        "co_changed_with",
+        status,
+        a,
+        b,
+        "history_pattern",
+        statement=f"{pa} and {pb} changed together in {support} of {union} commits that touched either file.",
+        qualifier=f"changed together in {support} of {union} commits",
+        granularity="file",
+        parameters={"values": CRITERIA},
+        metrics={"support": support, "union_commits": union, "degree": round(support / union, 4)},
+    )
 
 
 # Eight unrelated pairs with high support: the F-8 failure cited these for a crud.py question.
@@ -40,17 +48,33 @@ HIGH = pair(HUB, "file::backend/app/models.py", 7, 20)
 TIE = pair(HUB, "file::backend/app/core/db.py", 5, 10)  # same support as TARGET, higher ratio: ranks above it
 SMALL = pair("file::src/alpha.py", "file::src/beta.py", 4, 6)
 # Two files share a basename, so "util.py" alone is ambiguous.
-AMB = [pair("file::lib/one/util.py", "file::lib/one/x.py", 6, 8), pair("file::lib/two/util.py", "file::lib/two/y.py", 6, 8)]
-ROUTES = [rec("route", "verified", f"backend/app/api/routes/users.py::route:GET /users/{i}", claim_kind="node",
-              provenance_raw={"route_local_path": f"/users/{i}"}) for i in range(23)]
+AMB = [
+    pair("file::lib/one/util.py", "file::lib/one/x.py", 6, 8),
+    pair("file::lib/two/util.py", "file::lib/two/y.py", 6, 8),
+]
+ROUTES = [
+    rec(
+        "route",
+        "verified",
+        f"backend/app/api/routes/users.py::route:GET /users/{i}",
+        claim_kind="node",
+        provenance_raw={"route_local_path": f"/users/{i}"},
+    )
+    for i in range(23)
+]
 HISTORY = [*UNRELATED, TARGET, HIGH, TIE, SMALL, *AMB]
 PATTERN_IDS = {r["claim_id"] for r in HISTORY}
 ROUTE_IDS = {r["claim_id"] for r in ROUTES}
 
 
 def run(question: str, records: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    out = explain_records([*ROUTES, *HISTORY] if records is None else records, snapshot_id=SID, sha=SHA, question=question,
-                          focus_claim_ids=[])
+    out = explain_records(
+        [*ROUTES, *HISTORY] if records is None else records,
+        snapshot_id=SID,
+        sha=SHA,
+        question=question,
+        focus_claim_ids=[],
+    )
     ExplainResponse.model_validate(out)
     return out
 
@@ -64,11 +88,14 @@ def per_pattern(out: dict[str, Any], ids: set[str] = PATTERN_IDS) -> list[str]:
     return [a["claim_ids"][0] for a in out["answer"] if len(a["claim_ids"]) == 1 and a["claim_ids"][0] in ids]
 
 
-@pytest.mark.parametrize("q,files", [
-    (LAB_ONE, ("backend/app/crud.py",)),
-    (LAB_TWO, ("backend/app/crud.py", "backend/tests/api/routes/test_users.py")),
-    (LAB_SMALL, ("alpha.py", "beta.py")),
-])
+@pytest.mark.parametrize(
+    "q,files",
+    [
+        (LAB_ONE, ("backend/app/crud.py",)),
+        (LAB_TWO, ("backend/app/crud.py", "backend/tests/api/routes/test_users.py")),
+        (LAB_SMALL, ("alpha.py", "beta.py")),
+    ],
+)
 def test_cochange_intent_extracts_named_files(q: str, files: tuple[str, ...]) -> None:
     it = classify(q)
     assert (it.name, it.entities) == ("cochange", files)
@@ -104,14 +131,20 @@ def test_ranking_is_deterministic_and_capped() -> None:
     assert keys == sorted(keys)
     assert ids == per_pattern(run("Which files changed together with h/hub.py?", list(reversed(hub))), hub_ids)
     summary = out["answer"][0]
-    assert f"{MAX_MATCHES + 5} recorded co-change patterns" in summary["text"] and f"the top {MAX_MATCHES}" in summary["text"]
+    assert (
+        f"{MAX_MATCHES + 5} recorded co-change patterns" in summary["text"]
+        and f"the top {MAX_MATCHES}" in summary["text"]
+    )
 
 
-@pytest.mark.parametrize("q,why", [
-    ("Which files changed together with nowhere/missing.py?", "No stored file is named"),
-    ("Which files changed together with util.py?", "ambiguous"),
-    ("What changes with backend/app/models.py and src/alpha.py?", "No recorded co-change pattern links"),
-])
+@pytest.mark.parametrize(
+    "q,why",
+    [
+        ("Which files changed together with nowhere/missing.py?", "No stored file is named"),
+        ("Which files changed together with util.py?", "ambiguous"),
+        ("What changes with backend/app/models.py and src/alpha.py?", "No recorded co-change pattern links"),
+    ],
+)
 def test_no_match_or_ambiguity_is_unknown_never_a_fallback(q: str, why: str) -> None:
     out = run(q)
     assert all(a["kind"] == "unknown" for a in out["answer"]), out["answer"]
@@ -126,8 +159,18 @@ def test_no_cochange_records_is_unknown_not_route_facts() -> None:
         assert not ROUTE_IDS & set(cited(out))
 
 
-@pytest.mark.parametrize("q", [LAB_ONE, LAB_TWO, LAB_SMALL, "Which files changed together?", "co-change history", "hotspots",
-                               "Which files changed together with h/hub.py?"])
+@pytest.mark.parametrize(
+    "q",
+    [
+        LAB_ONE,
+        LAB_TWO,
+        LAB_SMALL,
+        "Which files changed together?",
+        "co-change history",
+        "hotspots",
+        "Which files changed together with h/hub.py?",
+    ],
+)
 def test_every_sentence_citing_a_pattern_has_the_caveat_including_summaries(q: str) -> None:
     out = run(q)
     citing = [a for a in out["answer"] if PATTERN_IDS & set(a["claim_ids"])]
@@ -141,8 +184,12 @@ def test_every_sentence_citing_a_pattern_has_the_caveat_including_summaries(q: s
 
 def test_guard_adds_the_caveat_to_a_summary_that_lacks_it() -> None:
     # A history_inferred record cited through a focus pin: whatever sentence cites it must carry the caveat.
-    inferred = history("history_impact_candidate", "unvalidated", HUB, PAIR, "history_inferred", statement="may be affected")
-    out = explain_records([*HISTORY, inferred], snapshot_id=SID, sha=SHA, question="", focus_claim_ids=[inferred["claim_id"]])
+    inferred = history(
+        "history_impact_candidate", "unvalidated", HUB, PAIR, "history_inferred", statement="may be affected"
+    )
+    out = explain_records(
+        [*HISTORY, inferred], snapshot_id=SID, sha=SHA, question="", focus_claim_ids=[inferred["claim_id"]]
+    )
     for a in out["answer"]:
         if inferred["claim_id"] in a["claim_ids"]:
             assert PATTERN_CAVEAT in a["text"] and a["kind"] == "interpretation"
