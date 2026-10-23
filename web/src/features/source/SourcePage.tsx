@@ -6,6 +6,7 @@ import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States"
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { SourceLinesView } from "./SourceLines";
 import { tokenize } from "./highlight";
+import { useDrawerClaim } from "../inventory/useDrawer";
 
 const CLAIMS_SHOWN = 30;
 /** The API serves at most 400 lines per request (MAX_SOURCE_LINES), so the file is read in windows of that size. */
@@ -23,7 +24,7 @@ export function SourcePage() {
   const path = sp.get("path") ?? "";
   const start = Number(sp.get("start")) || undefined;
   const end = Number(sp.get("end")) || undefined;
-  const claim = sp.get("claim");
+  const [claim, setClaim, opener] = useDrawerClaim();
   const win = windowFor(Number(sp.get("from")) || undefined, start);
   const [draft, setDraft] = useState(path);
   const pid = useId();
@@ -81,7 +82,7 @@ export function SourcePage() {
               <ul className="mt-2 flex flex-wrap gap-2">
                 {q.data.claim_ids.slice(0, CLAIMS_SHOWN).map((id) => (
                   <li key={id}>
-                    <Button onClick={() => setParam("claim", id)} aria-label={`Open evidence for claim ${id.slice(0, 10)}`}>
+                    <Button onClick={() => setClaim(id)} aria-label={`Open evidence for claim ${id.slice(0, 10)}`}>
                       <span className="font-mono text-xs">{id.slice(0, 10)}</span>
                     </Button>
                   </li>
@@ -92,7 +93,7 @@ export function SourcePage() {
           </section>
         </div>
       )}
-      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setParam("claim", null)} />
+      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setClaim(null)} returnFocus={opener} />
     </>
   );
 }

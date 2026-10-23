@@ -103,7 +103,7 @@ export function RoutesPage() {
   const base = snapshotBase(repoId, sha);
   const q = useQuery({ queryKey: keys.view("routes", repoId, sha), queryFn: () => api.routes(repoId, sha) });
   const hidden = useClaims(repoId, sha, { kind: "route", limit: 1 });
-  const [claim, setClaim] = useDrawerClaim();
+  const [claim, setClaim, opener] = useDrawerClaim();
   return (
     <>
       <PageHeader title="Routes">
@@ -116,7 +116,7 @@ export function RoutesPage() {
       ) : (
         <RoutesView items={q.data} base={base} onEvidence={setClaim} hidden={hidden.data?.hidden_counts} />
       )}
-      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setClaim(null)} />
+      <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setClaim(null)} returnFocus={opener} />
     </>
   );
 }
