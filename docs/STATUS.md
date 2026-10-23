@@ -1,6 +1,6 @@
 # Status (Traces v1)
 
-State of `build/traces-v1` at **`0f32d4d`** (merge of PR #38), written 2026-10-23 IST. Every seat PR through #38 is merged. Authority is the code and CI, not seat notes. Acceptance evidence is in [ACCEPTANCE.md](ACCEPTANCE.md) (Lab). The review package is [review/V1_REVIEW_PACKAGE.md](review/V1_REVIEW_PACKAGE.md), with [ARCHITECTURE](review/ARCHITECTURE.md) and [ROLLBACK](review/ROLLBACK.md).
+State of `build/traces-v1` at **`033e1f8`** (merge of PR #41), written 2026-10-23 IST. Every seat PR through #41 is merged. Lab's final acceptance pass ran at `0f32d4d`; `033e1f8` adds only #39 (history contract, D-H16), #40 (Lab final ACCEPTANCE.md) and #41 (O-13 explain fix). Authority is the code and CI, not seat notes. Acceptance evidence is in [ACCEPTANCE.md](ACCEPTANCE.md) (Lab). The review package is [review/V1_REVIEW_PACKAGE.md](review/V1_REVIEW_PACKAGE.md), with [ARCHITECTURE](review/ARCHITECTURE.md) and [ROLLBACK](review/ROLLBACK.md).
 
 ## What each module does
 
@@ -15,20 +15,20 @@ State of `build/traces-v1` at **`0f32d4d`** (merge of PR #38), written 2026-10-2
 | `evidence/store.py`, migrations | Traces | SQLite, WAL, per-thread connections. Migrations 0001-0003 (0003: snapshot isolation, consent fields). Startup removes empty failed `sha_not_found` snapshot rows (O-9, D-031) |
 | `evidence/report.py` | Traces | `chain.json` and `coverage.json` for baseline runs (F7) |
 | `evidence/views.py`, `evidence/components.py` | Traces | Overview (README heading and frameworks as interpretation), components with layer `reason` and a `library` layer (D-029), routes with `label` and Express `USE` mounts, graph and trace (rejected hidden with `hidden_counts`; `truncated_counts`; `injected` flag; trace gaps with `unresolved_calls` and `incomplete_reasons`, D-031), source by `git cat-file` |
-| `backend/traces/history` | Traces History | Timeline, lifecycle, churn, hotspots, co-change, milestones, rationale; aliases opt-in (D-H14); lineage-restart caveat (D-H15). Hardened `gitcmd` (`protocol.allow=never`, RLIMITs). fsft default digest `2fb288167ebf`, 8,402 records |
-| `backend/traces/explain` | Traces UI | No-key, deterministic: intent routing (`intents.py`), cited answer or `unknown`. Co-change answered only as a history pattern with the caveat (#24). `chat/bundle` returns a prompt and an outbound manifest; each row hashes the exact line sent (O-11) |
+| `backend/traces/history` | Traces History | Timeline, lifecycle, churn, hotspots, co-change, milestones, rationale; aliases opt-in (D-H14); lineage-restart caveat (D-H15). Runs in the index job with hardened `gitcmd` (`protocol.allow=never`, no lazy fetch, RLIMITs), not in its own namespace (D-H16). fsft default digest `2fb288167ebf`, 8,402 records |
+| `backend/traces/explain` | Traces UI | No-key, deterministic: intent routing (`intents.py`), cited answer or `unknown`. Co-change answered only as a history pattern with the caveat (#24). A runtime persistence question gives the runtime unknown, then the verified static persistence path (O-13, #41). `chat/bundle` returns a prompt and an outbound manifest; each row hashes the exact line sent (O-11) |
 | `backend/traces/api` | Traces | FastAPI, OpenAPI contract in `docs/contracts/openapi.json`. `PUT /repos/{id}/ai-consent` (D-027). 422 bodies never echo input (F-3). `/meta` reports probed isolation |
 | `web/` | Traces UI | React, React Router, TanStack Query, Cytoscape.js, Shiki, Radix. Home, job, overview, components, routes, graph and evidence drawer, trace, history, ask, claims, source, settings, BYOK chat |
 
 ## Tests and CI
 
-CI run on `0f32d4d`: push [39930532720](https://github.com/ShaileshRawat1403/traces/actions/runs/39930532720) and pull_request [39930539272](https://github.com/ShaileshRawat1403/traces/actions/runs/39930539272), both **success, 11 of 11 jobs**. Counts from the push run's job logs:
+CI run on `033e1f8`: push [39938654127](https://github.com/ShaileshRawat1403/traces/actions/runs/39938654127) and pull_request [39938661185](https://github.com/ShaileshRawat1403/traces/actions/runs/39938661185), both **success, 11 of 11 jobs**. Lab's final pass used the run on `0f32d4d` ([39930532720](https://github.com/ShaileshRawat1403/traces/actions/runs/39930532720)). Counts from the `033e1f8` job logs:
 
 | CI job | Command | Result |
 | --- | --- | --- |
 | lint | `ruff check backend tests` | pass |
 | types | `mypy`, web `tsc` | pass |
-| unit | `pytest tests/unit`, `pytest tests/explain` | 87 passed, 3 skipped (live GitHub); explain 96 passed |
+| unit | `pytest tests/unit`, `pytest tests/explain` | 87 passed, 3 skipped (live GitHub); explain 99 passed |
 | api | `pytest tests/api` | 95 passed |
 | web-build | vitest, `check:api`, `vite build` | vitest 16 files, 125 tests passed; API types current; build pass |
 | target | pinned fsft@b1125d8 cache, hardened git | pass |
@@ -89,8 +89,11 @@ A live LLM provider is not tested in v1 (no paid key, no local model).
 | #36 | `84d2eda` | `ws/ui-explain-fixes-2` | F-11, F-8 JS, O-12 |
 | #37 | `320d4c9` | `ws/ui-manifest-hash` | Manifest rows hash the exact line (O-11) |
 | #38 | `0f32d4d` | `ws/ui-trace-f9` | Trace UI for unresolved-call gaps (F-9) |
+| #39 | `1313c41` | `ws/history-sandbox-doc` | History contract states real Git sandboxing (D-H16) |
+| #40 | `99ae987` | `ws/lab-acceptance` | Lab final acceptance pass (`4289d1e`): ACCEPTANCE.md, demo walk 16 of 16, O-4 guard |
+| #41 | `033e1f8` | `ws/ui-o13` | Runtime persistence questions cite the static persistence path (O-13) |
 
-Open and not merged: #4 (integration tracking PR, do not merge), #21 (this review package, draft).
+Open and not merged: #4 (integration tracking PR, do not merge), #21 (this review package, ready for review; Shailesh merges it into `build/traces-v1`).
 
 ## Not done in v1
 
@@ -110,6 +113,8 @@ Open and not merged: #4 (integration tracking PR, do not merge), #21 (this revie
 - Express mounts (O-7): routers mounted through a computed `forEach` keep their local path without the prefix. Literal mounts are composed; middleware mounts show as method `USE` with flag `mount`.
 - Persistence (O-8): only the FastAPI/SQLModel session path is recognised. Mongoose and other ODMs are not detected; trace and explain say no persistence path is recorded.
 - README heading and frameworks on the overview are uncited interpretations, not verified claims.
-- Graph and trace p95 is about 630 ms on fsft (O-5, [acceptance/PERF.md](acceptance/PERF.md), local).
+- Graph p95 about 674 ms and trace `create_item` p95 about 938 ms on fsft (L-1, O-5, [acceptance/PERF.md](acceptance/PERF.md), local, at `0f32d4d`).
 - The BYOK provider key is stored in the browser (sessionStorage, or localStorage with "Remember on this device"), by design.
-- History git commands run in the job thread with network transports refused and RLIMITs, not inside `unshare -rn`. `docs/contracts/history.md` says the worker runs history under `unshare -rn`.
+- History Git runs in the index job with network transports refused and RLIMITs, not inside its own `unshare -rn` namespace (D-H16, `docs/contracts/history.md` section 11).
+- Graph truncates at `limit` and reports cut edges by status; it does not page (L-6).
+- Live-provider chat is untested (L-8).

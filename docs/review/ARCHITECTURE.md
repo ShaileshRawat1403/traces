@@ -1,6 +1,6 @@
 # Traces v1 architecture
 
-Head: `build/traces-v1` at `0f32d4d`. Checked against the code on 2026-10-23 IST. Ownership is in [CONTRACTS.md section 6](../CONTRACTS.md); decisions are in [DECISIONS.md](../DECISIONS.md).
+Head: `build/traces-v1` at `033e1f8`. Checked against the code on 2026-10-23 IST. Ownership is in [CONTRACTS.md section 6](../CONTRACTS.md); decisions are in [DECISIONS.md](../DECISIONS.md).
 
 ## Components and data flow
 
@@ -80,5 +80,5 @@ flowchart TB
 
 - CodeGraph, the adapter and the validators run inside `workers/sandbox.sh` under `unshare -rn`. CT15 and `tests/security/test_outbound.py` check it.
 - The clone runs outside the sandbox because it needs the network. It is anonymous HTTPS to github.com with hooks, LFS, submodules and credential prompts off.
-- History runs in the job thread, not inside `unshare -rn`. Its only subprocess path is `history/gitcmd.py`, which refuses network transports (`protocol.allow=never`, no lazy fetch) and sets RLIMITs, on a local clone. `docs/contracts/history.md` (Safety section) says the index worker runs history under `unshare -rn`; the code does not. Recorded as a v1 limit in the review package.
+- History runs in the job thread, not inside its own `unshare -rn` namespace (D-H16). Its only subprocess path is `history/gitcmd.py`, which refuses network transports (`protocol.allow=never`, no lazy fetch), turns hooks off, builds the environment from scratch and sets RLIMITs, on a local clone. `docs/contracts/history.md` section 11 states this since #39.
 - The API process itself makes no outbound connection on read, explain or chat-bundle endpoints (`test_outbound.py`).

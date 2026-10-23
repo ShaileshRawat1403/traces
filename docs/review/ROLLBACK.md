@@ -1,6 +1,6 @@
 # Rolling back Traces v1
 
-Applies to the integration branch `build/traces-v1`, now at `0f32d4d`. `main` is never touched. Nothing reaches `main` until Shailesh merges it.
+Applies to the integration branch `build/traces-v1`, now at `033e1f8`. `main` is never touched. Nothing reaches `main` until Shailesh merges it.
 
 ## Rules
 
@@ -14,6 +14,9 @@ First-parent merges since the v1 review audit (`git log --first-parent --oneline
 
 | Merge SHA | PR | What |
 | --- | --- | --- |
+| `033e1f8` | #41 | Runtime persistence explain (O-13) |
+| `99ae987` | #40 | Lab final ACCEPTANCE.md |
+| `1313c41` | #39 | History contract, D-H16 |
 | `0f32d4d` | #38 | Trace UI: unresolved-call gaps (F-9) |
 | `320d4c9` | #37 | Manifest rows hash the exact line sent (O-11) |
 | `84d2eda` | #36 | Explain: F-11, F-8 JS, O-12 |
