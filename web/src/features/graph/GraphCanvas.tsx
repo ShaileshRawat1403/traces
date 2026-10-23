@@ -2,6 +2,7 @@ import cytoscape from "cytoscape";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "../../ui/States";
 import { nextInDirection, LAYERS, type Direction, type ElementData } from "./graphModel";
+import { CODE_LAYERS, LAYER_COLOR, isLayer, type Layer } from "../layers";
 
 const C = {
   verified: "#8fd9cf",
@@ -80,14 +81,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
         { selector: "node", style: { label: "data(label)", "font-size": 12, color: "#10211c", "background-color": "#d7fff8", "border-width": 2, "border-color": "#8fd9cf", "text-valign": "bottom", "text-margin-y": 4, width: 22, height: 22, "text-max-width": "140px", "text-wrap": "ellipsis", "min-zoomed-font-size": 7 } },
         { selector: "node:parent", style: { "background-color": "#10211c", "background-opacity": 0.55, color: "#e7f2ef", "border-width": 1, "border-color": "#8fd9cf", "text-valign": "top", "text-margin-y": 4, "font-size": 12, "font-weight": "bold", padding: "16px", shape: "round-rectangle" } },
         { selector: 'node[entity = "component"]', style: { shape: "round-rectangle", width: 156, height: 42, "font-weight": "bold", "font-size": 11, color: "#f4faf7", "background-color": "#1b3330", "background-opacity": 1, "text-valign": "center", "text-halign": "center", "text-margin-y": 0, "text-max-width": "144px", "text-wrap": "wrap" } },
-        { selector: 'node[layer = "frontend"]', style: { "border-color": "#8fd9cf", "border-width": 3 } },
-        { selector: 'node[layer = "api"]', style: { "border-color": "#7eb6ff", "border-width": 3 } },
-        { selector: 'node[layer = "backend"]', style: { "border-color": "#d7fff8", "border-width": 3 } },
-        { selector: 'node[layer = "data"]', style: { "border-color": "#e2b16a", "border-width": 3 } },
-        { selector: 'node[layer = "infra"]', style: { "border-color": "#b7c4ce", "border-width": 3 } },
-        { selector: 'node[layer = "docs"]', style: { "border-color": "#c4b4ea", "border-width": 3 } },
-        { selector: 'node[layer = "tests"]', style: { "border-color": "#ef8d86", "border-width": 3 } },
-        { selector: 'node[layer = "other"]', style: { "border-color": "#8ea399", "border-width": 3 } },
+        ...LAYERS.map((l) => ({ selector: `node[layer = "${l}"]`, style: { "border-color": LAYER_COLOR[l], "border-width": 3 } })),
         { selector: "edge", style: { width: 2.2, "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 1, label: "", "font-size": 10, color: "#e7f2ef", "text-background-color": "#0c1110", "text-background-opacity": 0.85, "text-background-padding": "3px", "text-rotation": "none", "text-wrap": "wrap", "text-max-width": "90px" } },
         { selector: 'edge[tone = "verified"]', style: { "line-color": C.verified, "target-arrow-color": C.verified } },
         { selector: 'edge[tone = "observed"]', style: { "line-color": C.observed, "target-arrow-color": C.observed, width: 1.6 } },
@@ -128,7 +122,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
         cy.fit(cy.elements(), 28);
         if (cy.zoom() < 0.82) {
           cy.zoom(0.92);
-          const core = cy.nodes().filter((n) => ["frontend", "api", "backend", "data"].includes(String(n.data("layer"))));
+          const core = cy.nodes().filter((n) => isLayer(n.data("layer")) && CODE_LAYERS[n.data("layer") as Layer]);
           cy.center(core.nonempty() ? core : cy.nodes());
         }
         return;

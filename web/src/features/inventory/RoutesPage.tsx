@@ -12,11 +12,17 @@ import { StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { useDrawerClaim, useParam } from "./useDrawer";
 
-/** Filter over the fields the API returned. Plain substring match, case-insensitive, on path, handler and file. */
+/** The extractor's route name, exactly as the API sent it, or null. Never built from method and path. */
+export function routeName(r: Pick<RouteItem, "label">): string | null {
+  const l = typeof r.label === "string" ? r.label.trim() : "";
+  return l ? l : null;
+}
+
+/** Filter over the fields the API returned. Plain substring match, case-insensitive, on name, path, handler and file. */
 export function filterRoutes(items: readonly RouteItem[], text: string, method: string): RouteItem[] {
   const t = text.trim().toLowerCase();
   return items.filter(
-    (r) => (!method || r.method === method) && (!t || [r.path, r.handler_symbol ?? "", r.file, r.operation_id ?? ""].some((v) => v.toLowerCase().includes(t))),
+    (r) => (!method || r.method === method) && (!t || [routeName(r) ?? "", r.path, r.handler_symbol ?? "", r.file, r.operation_id ?? ""].some((v) => v.toLowerCase().includes(t))),
   );
 }
 
@@ -31,7 +37,7 @@ export function RoutesView({ items, base, onEvidence, hidden }: { items: RouteIt
       <form role="search" className="mb-3 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-3" onSubmit={(e) => e.preventDefault()}>
         <label htmlFor={ids.q} className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
           <span className="font-medium">Filter routes</span>
-          <input id={ids.q} type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Path, handler or file" className="tap rounded-md border border-line-strong px-2" />
+          <input id={ids.q} type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="Name, path, handler or file" className="tap rounded-md border border-line-strong px-2" />
         </label>
         <label htmlFor={ids.m} className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Method</span>
@@ -60,6 +66,7 @@ export function RoutesView({ items, base, onEvidence, hidden }: { items: RouteIt
           {shown.map((r) => {
             const h = r.handler_symbol ? splitSymbol(r.handler_symbol) : null;
             const label = isStatus(r.status) ? EXPECTED_LABEL[r.status] : undefined;
+            const name = routeName(r);
             return (
               <li key={`${r.claim_id ?? r.path}-${r.method}-${r.handler_symbol ?? ""}`} className="rounded-lg border border-line bg-surface p-3" data-testid="route-item">
                 <div className="flex flex-wrap items-center gap-2">
@@ -69,6 +76,12 @@ export function RoutesView({ items, base, onEvidence, hidden }: { items: RouteIt
                   <code className="break-all text-sm font-semibold">{r.path || "(path not recorded)"}</code>
                   <StatusChip status={r.status} label={label} flags={r.flags} />
                 </div>
+                {name ? (
+                  <p className="mt-1 break-words text-sm" data-testid="route-name">
+                    <span className="text-muted">Route name, as recorded: </span>
+                    <span className="font-mono">{name}</span>
+                  </p>
+                ) : null}
                 <p className="mt-1 break-words text-sm text-ink-2">
                   {h ? (
                     <>
