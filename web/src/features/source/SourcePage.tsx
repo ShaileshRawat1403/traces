@@ -64,10 +64,12 @@ export function SourcePage() {
       ) : (
         <div className="flex flex-col gap-3" data-testid="source-page">
           <SourceLinesView v={q.data} highlight={hl} requested={win} tokens={tok.data} />
-          <div className="flex flex-wrap gap-2" aria-label="Move through the file">
-            {q.data.start_line > 1 ? <Button onClick={() => setParam("from", String(Math.max(1, q.data.start_line - WINDOW)))}>Previous {WINDOW} lines</Button> : null}
-            {q.data.end_line < q.data.total_lines ? <Button onClick={() => setParam("from", String(q.data.end_line + 1))}>Next {WINDOW} lines</Button> : null}
-          </div>
+          {q.data.start_line > 1 || q.data.end_line < q.data.total_lines ? (
+            <nav className="flex flex-wrap gap-2" aria-label="Move through the file">
+              {q.data.start_line > 1 ? <Button onClick={() => setParam("from", String(Math.max(1, q.data.start_line - WINDOW)))}>Previous {WINDOW} lines</Button> : null}
+              {q.data.end_line < q.data.total_lines ? <Button onClick={() => setParam("from", String(q.data.end_line + 1))}>Next {WINDOW} lines</Button> : null}
+            </nav>
+          ) : null}
           {start ? (
             <p className="text-sm text-ink-2">
               Lines {hl.start} to {hl.end} are highlighted because the link that opened this file pointed at them.
