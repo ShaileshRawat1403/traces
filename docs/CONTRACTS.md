@@ -76,7 +76,7 @@ SQLite at `$TRACES_DATA_DIR/traces.sqlite3` (default `.traces-data/`). Migration
 | `runs` | pipeline runs per snapshot with their run directory and result |
 | `claims` | one row per claim: indexed columns (status, label, class, scope, kind, endpoints, injected) plus the full 0.4 `record_json` |
 | `claim_locations` | file/line ranges per claim (source view overlap queries) |
-| `components` | deterministic components per snapshot: layer, kind, paths, rule |
+| `components` | deterministic components per snapshot: layer, kind, paths, rule; `record_json.reason` (D-029) |
 
 Export: `GET .../export` or `Store.export_jsonl()` writes one 0.4 record per line sorted by `claim_id`, with a manifest (counts by status, schema and store version).
 
@@ -112,14 +112,14 @@ Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "d
 | 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job, `Location`); active job for the same snapshot is returned; ready snapshot without `reindex` -> 409 `already_indexed` (D-022) | implemented |
 | | `GET /jobs/{job_id}` | poll; `ETag` = job version, `If-None-Match` gives 304; poll 1-2 s; no SSE | implemented |
 | 4.5 | `GET S/overview` | business / architecture / implementation facts, each tagged fact, interpretation or unknown, with claim ids | implemented (D-024). Purpose is unknown unless a README heading is quoted as interpretation |
-| 4.6 | `GET S/components` | deterministic components and layers with claim counts | implemented (D-024). Rows are what the index stored |
-| 4.7 | `GET S/routes` | route and API inventory with status and claim ids | implemented (D-024). Method is UNKNOWN when the record does not carry one |
+| 4.6 | `GET S/components` | deterministic components and layers with claim counts; `reason` per component (counted files and rule behind the layer; null for rows stored before D-029); layer `library` for a repository that declares a package and has no application framework or entrypoint (D-029) | implemented (D-024). Rows are what the index stored |
+| 4.7 | `GET S/routes` | route and API inventory with status and claim ids; optional `label` = the route name exactly as the extractor recorded it (null when none, never synthesized) | implemented (D-024). Method is UNKNOWN when the record does not carry one |
 | 4.8 | `GET S/graph?focus&depth&layer&rel&status&q&include_rejected&limit` | filtered graph or neighborhood (`focus`, `depth` 0-4); static relationships only; `hidden_counts` by status (scoped to filters and focus, D-028); `truncated`, `truncated_counts` by status | implemented (D-024). History patterns are not edges here |
 | 4.9 | `GET S/claims?status&claim_kind&kind&symbol&file&include_rejected&offset&limit` | claim list; rejected excluded unless `include_rejected=true`; `hidden_counts` | implemented |
 | | `GET S/claims/{claim_id}` | evidence by claim: full 0.4 record (locations, checks, status history, provenance, citations) | implemented |
 | | `GET S/export` | NDJSON export of all 0.4 records | implemented |
 | 4.10 | `GET S/source?path&start&end` | source lines at the SHA from Git objects, blob SHA, `generated`, overlapping claim ids | implemented (D-024). 422 `invalid_request` if the path escapes the tree or the range exceeds 400 lines. 404 if the checkout or blob is absent |
-| 4.11 | `GET S/trace?from&to&include_rejected` | ordered `hops`: `edge` (claim), `gap` (no claim; inferred, reason required), `library_contract` (inferred, reason required); `complete=false` when gaps exist; `hidden_counts` | implemented (D-024). Rejected claims are not used as bridges |
+| 4.11 | `GET S/trace?from&to&include_rejected` | ordered `hops`: `edge` (claim), `gap` (no claim; inferred, reason required), `library_contract` (inferred, reason required); `complete=false` when gaps exist; `hidden_counts`; each `gap` hop's reason states how many outgoing static relationships of that step are hidden, by status, and `hidden_rejected` gives the rejected count (D-029) | implemented (D-024). Rejected claims are not used as bridges |
 | 4.12 | `GET S/history/timeline`, `/lifecycle?path`, `/hotspots?level`, `/cochange?target&level`, `/milestones`, `/rationale?target`; `GET /repos/{id}/compare?base&head` | history views over history records (0.4 `evidence_scope` history/documented). Compare returns stored `snapshot_added` / `snapshot_removed` when history wrote them, otherwise an identity diff of static claims that already exist on the two snapshots (their own kinds, not new records) | implemented (D-024) |
 | 4.13 | `POST S/explain` `{question, focus_claim_ids, mode}` | `no_llm`: deterministic answer from evidence with citations and categories (code structure, history patterns, documented decisions, inference, runtime observations). `prepare_bundle`: scoped prompt bundle + `outbound_manifest` (what would leave the browser, with sha256 per item); `requires_consent: true` | implemented (D-023), Traces UI, EXPLAIN |
 | | `POST S/chat/bundle` | same bundle for a chat turn | implemented (D-023) |
