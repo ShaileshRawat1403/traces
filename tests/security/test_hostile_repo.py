@@ -44,12 +44,7 @@ def test_claims_stay_inside_the_tree(indexed_hostile: Indexed, hostile_client):
                 assert f in tracked or any(f.startswith(t) for t in ("app/", "web/")), f
 
 
-F2 = pytest.mark.xfail(strict=True, reason="FINDING F-2 (Traces seat, evidence/views.safe_repo_path): a tracked file whose name starts "
-                       "with '-' is refused with 422 'path must stay inside the repository'. Safe, but the file cannot be viewed and "
-                       "the message is wrong; git cat-file gets '<sha>:<path>', so a leading dash is not an option there.")
-
-
-@pytest.mark.parametrize("name", ["has space.py", pytest.param("-rf.py", marks=F2), "a:b.py", "..hidden.py", "app/main.py"])
+@pytest.mark.parametrize("name", ["has space.py", "-rf.py", "a:b.py", "..hidden.py", "app/main.py"])
 def test_odd_but_legal_paths_are_readable(indexed_hostile: Indexed, hostile_client, name):
     r = hostile_client.get(f"{_base(indexed_hostile)}/source", params={"path": name})
     assert r.status_code == 200, r.text
@@ -126,9 +121,6 @@ def test_bad_snapshot_sha_is_422(indexed_hostile: Indexed, hostile_client):
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_sha"
 
 
-@pytest.mark.xfail(strict=True, reason="FINDING F-1 (Traces seat, adapter): a tracked file with a non-ASCII name makes the "
-                   "adapter fail closed with E_PATH, so the whole repository cannot be indexed. Likely cause: "
-                   "traces.core.common blob reader parses `git ls-tree -r <sha>` without -z, so Git C-quotes the path.")
 def test_non_ascii_path_indexes(tmp_path, monkeypatch):
     ok, why = toolchain_ready()
     if not ok:

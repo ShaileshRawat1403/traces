@@ -6,9 +6,9 @@ const ts = require(process.env.TS_MODULE);
 const fs = require('fs'), path = require('path'), crypto = require('crypto'), cp = require('child_process');
 
 function blobMap(root, sha) {
-  const out = cp.execFileSync('git', ['-C', root, 'ls-tree', '-r', sha], {encoding: 'utf8', env: {...process.env, GIT_OPTIONAL_LOCKS: '0'}, maxBuffer: 1 << 26});
+  const out = cp.execFileSync('git', ['-C', root, 'ls-tree', '-r', '-z', '--full-tree', sha], {encoding: 'utf8', env: {...process.env, GIT_OPTIONAL_LOCKS: '0'}, maxBuffer: 1 << 26});
   const m = new Map();
-  for (const l of out.split('\n')) { const t = l.split('\t'); if (t.length === 2) m.set(t[1], t[0].split(' ')[2]); }
+  for (const l of out.split('\0')) { const i = l.indexOf('\t'); const t = i < 0 ? [] : [l.slice(0, i), l.slice(i + 1)]; if (t.length === 2) m.set(t[1], t[0].split(' ')[2]); }
   return m;
 }
 function gitBlobSha(buf) { return crypto.createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex'); }

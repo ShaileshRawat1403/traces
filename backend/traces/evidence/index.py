@@ -36,7 +36,7 @@ from typing import Any
 
 from traces.core.config import Settings, get_settings
 from traces.evidence import components as comp
-from traces.evidence.pipeline import CODEGRAPH_PIN, PKG, resolve_isolation, sandbox_cmd
+from traces.evidence.pipeline import CODEGRAPH_PIN, PKG, IsolationUnavailable, resolve_isolation, sandbox_cmd
 from traces.evidence.store import Store, now, update_job
 from traces.fixtures.task002.chain import REPO as T002_REPO
 from traces.fixtures.task002.chain import REPO_SHA as T002_SHA
@@ -194,6 +194,15 @@ class IndexRun:
 
     def _steps(self) -> None:
         s = self.s
+        # isolation first, before any network or disk work: fail closed when it cannot be shown (D-026)
+        try:
+            self.iso = resolve_isolation(s)
+        except IsolationUnavailable as e:
+            raise IndexFailure("isolation_failed", f"E_ISOLATION: {e}", {"adapter_code": "E_ISOLATION"}) from None
+        self.result["isolation"] = self.iso
+        if self.iso == "off":
+            self.event("TRACES_ISOLATION=off (explicit dev override): network NOT isolated; the snapshot is stored as unisolated "
+                       "and is never acceptance evidence", "warning")
         # fetching
         self.phase("fetching", f"fetching {self.ref.slug} (public, no hooks, no LFS, capped)")
         source = ensure_pinned_checkout(self.ref, self.sha, s.targets_dir / self.ref.cache_key / self.sha / "source")
@@ -203,10 +212,6 @@ class IndexRun:
             shutil.rmtree(self.run)
         self.run.mkdir(parents=True)
         real = local_clone(source, self.run / "real", self.sha)
-        self.iso = resolve_isolation(s)
-        if self.iso == "none":
-            self.event("isolation fallback: no network namespace available (TRACES_ISOLATION=none); network NOT isolated", "warning")
-        self.result["isolation"] = self.iso
         # indexing
         self.phase("indexing", "CodeGraph 1.6.2 in the sandbox (no network)")
         if not s.codegraph_bin.exists():
@@ -228,6 +233,9 @@ class IndexRun:
         errs = adapter_out / "errors.json"
         if rc != 0 or not (adapter_out / "records.jsonl").exists():
             detail = json.loads(errs.read_text()) if errs.exists() else {"log_tail": _tail(self.run / "worker.log")}
+            if detail.get("code") == "E_ISOLATION":
+                raise IndexFailure("isolation_failed", "E_ISOLATION: the per-run probe could not show network isolation; the run "
+                                   "stopped and no snapshot was stored", {"adapter": detail})
             raise IndexFailure("adapter_failed", "the CodeGraph adapter refused the index (fail closed)", {"adapter": detail})
         # validating
         fixture = self.ref.slug.lower() == T002_REPO.lower() and self.sha == T002_SHA
@@ -266,7 +274,7 @@ class IndexRun:
                      "python": sys.version.split()[0], "isolation": self.iso, "run_id": self.run_id,
                      "adapter_warnings": adapter_summary.get("warnings", []), "adapter_checks_passed": adapter_summary.get("checks_passed")}
         self.st.finish_snapshot(self.sid, extractor=extractor, languages=facts.languages, frameworks=facts.frameworks,
-                                generated_paths=facts.generated_paths, stats=stats)
+                                generated_paths=facts.generated_paths, stats=stats, isolation=self.iso)
         self.result.update(stats=stats)
         # history
         self.phase("history", "history (native Git)")

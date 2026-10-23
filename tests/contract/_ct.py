@@ -44,7 +44,7 @@ def evaluate(run_dir):
     mism = [r["origin"]["row_ref"] for r in er if {k: v for k, v in r["provenance_raw"]["row"].items()} != {k: v for k, v in rows[r["origin"]["row_ref"]].items() if k in r["provenance_raw"]["row"]} or set(r["provenance_raw"]["row"]) - set(rows[r["origin"]["row_ref"]])]
     cols_missing = [r["origin"]["row_ref"] for r in er if set(rows[r["origin"]["row_ref"]]) - set(r["provenance_raw"]["row"])]
     nm = [r for r in er if r["provenance"] == "codegraph:name-match"]
-    ok = len(er) == len(rows) == 4642 and not mism and not cols_missing and all(r["provenance"] for r in er) and len(nm) == 616 and all(r["class"] == "analyzer_inference" for r in nm)  # [002-B] ruling 5 rename and ncode("CT4_resolvedBy_guess") == "E_PROVENANCE_UNKNOWN"
+    ok = len(er) == len(rows) == 4642 and not mism and not cols_missing and all(r["provenance"] for r in er) and len(nm) == 616 and all(r["class"] == "analyzer_inference" for r in nm) and ncode("CT4_resolvedBy_guess") == "E_PROVENANCE_UNKNOWN"  # [002-B] ruling 5 rename
     ct(4, ok, [rel(ADO) + "/records.jsonl", rel(neg["CT4_resolvedBy_guess"]["out"]) + "/errors.json"],
        {"edge_records": len(er), "edge_rows": len(rows), "provenance_raw_row_mismatch": len(mism), "row_columns_missing_in_raw": len(cols_missing), "by_provenance": dict(Counter(r["provenance"] for r in er)), "name_match": len(nm),
         "name_match_classes": dict(Counter(r["class"] for r in nm)), "copy": neg["CT4_resolvedBy_guess"]["errors"]})

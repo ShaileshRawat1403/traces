@@ -195,12 +195,19 @@ class Store:
             self.db.execute("UPDATE snapshots SET state=? WHERE id=?", (state, snapshot_id))
 
     def finish_snapshot(self, snapshot_id: str, *, extractor: dict[str, Any], languages: dict[str, int], frameworks: list[str],
-                        generated_paths: list[str], stats: dict[str, Any]) -> None:
+                        generated_paths: list[str], stats: dict[str, Any], isolation: str | None = None) -> None:
+        """Mark ready. `isolation` is 'unshare' or 'off' (explicit dev override, stored so the API shows it unisolated)."""
         with self.write_lock, self.db:
             self.db.execute("UPDATE snapshots SET state='ready', extractor_json=?, languages_json=?, frameworks_json=?, generated_paths_json=?, "
-                            "stats_json=?, indexed_at=? WHERE id=?",
+                            "stats_json=?, indexed_at=?, isolation=? WHERE id=?",
                             (json.dumps(extractor, sort_keys=True), json.dumps(languages, sort_keys=True), json.dumps(frameworks),
-                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), snapshot_id))
+                             json.dumps(generated_paths), json.dumps(stats, sort_keys=True), now(), isolation, snapshot_id))
+
+    def set_ai_consent(self, repo_id: str, consent: bool, text_version: str | None, at: str) -> None:
+        """Record the repo-level external AI consent decision (D-027). Revoking keeps the time of the change."""
+        with self.write_lock, self.db:
+            self.db.execute("UPDATE repos SET external_ai_consent=?, external_ai_consent_at=?, external_ai_consent_text_version=? WHERE id=?",
+                            (1 if consent else 0, at, text_version, repo_id))
 
     def update_snapshot_stats(self, snapshot_id: str, stats: dict[str, Any]) -> None:
         with self.write_lock, self.db:

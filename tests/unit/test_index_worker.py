@@ -118,6 +118,21 @@ def test_end_to_end_index_of_synthetic_repo(synth, settings_env, tmp_path):
     # rejected never verified; missing_location never verified (store-level invariant)
     bad = st.db.execute("SELECT count(*) FROM claims WHERE snapshot_id=? AND status='verified' AND (label!='verified')", (snap["id"],)).fetchone()[0]
     assert bad == 0
+    # missing_location is never verified: it carries no verified label, it never jumps straight to verified or observed
+    # (only location_recovery, with recovered locations, moves it to unvalidated first), and nothing verified lacks a location
+    seen_ml = 0
+    for (rj,) in st.db.execute("SELECT record_json FROM claims WHERE snapshot_id=?", (snap["id"],)):
+        rec = json.loads(rj)
+        if rec["status"] == "missing_location":
+            assert rec["label"] != "verified", rec["claim_id"]
+        if rec["status"] == "verified":
+            assert rec.get("locations"), f"verified without a location: {rec['claim_id']}"
+        for h in rec.get("status_history") or []:
+            if h.get("from") == "missing_location":
+                seen_ml += 1
+                assert h["to"] == "unvalidated" and h["by"] == "location_recovery" and h["check_ids"], (rec["claim_id"], h)
+            assert not (h.get("to") == "verified" and h.get("from") == "missing_location"), rec["claim_id"]
+    assert seen_ml > 0, "the synthetic repo should exercise location recovery at least once"
     assert not Path("/tmp/traces-should-never-run").exists()
     assert not (s.runs_dir / "idx-e2e" / "real").exists()  # throwaway working copy removed
     assert (s.runs_dir / "idx-e2e" / "netprobe.log").read_text().count("PROBE_SUMMARY a=pass b=pass c=pass d=pass") == 1
