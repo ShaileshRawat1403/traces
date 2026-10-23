@@ -11,7 +11,7 @@ from typing import Any
 
 from .filters import Filters
 from .ingest import ls_tree_paths, open_runner
-from .lifecycle import identities
+from .lifecycle import LINEAGE_FLAG, identities, lineage_breaks, lineage_caveat
 from .model import Commit, HistoryLog, decode_path
 from .records import RunContext, citation, ep_component, ep_file, finalize, make_record
 from .shapes import ComponentMap, HistoryResult, Record, default_context, validate_component_map
@@ -42,7 +42,8 @@ def _params(log: HistoryLog, flt: Filters, metric_set: str, extra: Mapping[str, 
     return p
 
 
-def collect(log: HistoryLog, flt: Filters, alive: set[str]) -> tuple[dict[str, FileStats], dict[str, int]]:
+def collect(log: HistoryLog, flt: Filters, alive: set[str]) -> tuple[dict[str, FileStats], dict[str, int], dict[str, int]]:
+    """Per HEAD path stats, skipped commit counts, and lineage breaks per HEAD path (D-H15)."""
     ids = identities(log, alive)
     spec = log.config.filters
     t = log.config.thresholds
@@ -75,7 +76,18 @@ def collect(log: HistoryLog, flt: Filters, alive: set[str]) -> tuple[dict[str, F
             s.first = c.committer_time if s.first is None else min(s.first, c.committer_time)
             s.last = c.committer_time if s.last is None else max(s.last, c.committer_time)
             s.cites.setdefault(c.sha, (c, []))[1].append(ch)
-    return stats, dict(skipped)
+    return stats, dict(skipped), lineage_breaks(log, ids)
+
+
+def _with_breaks(path: str, n: int, statement: str, metrics: dict[str, Any], prov: dict[str, Any],
+                 flags: list[str]) -> str:
+    """D-H15: decorate only records whose path has a delete then re-add gap; others stay byte-identical."""
+    if not n:
+        return statement
+    metrics["lineage_breaks"] = n
+    prov["caveat"] = lineage_caveat(path, n)
+    flags.append(LINEAGE_FLAG)
+    return f"{statement} {prov['caveat']}"
 
 
 def _recount(rc: Recounter, flt: Filters, path: str, spec_bots: bool, sizes: Mapping[str, tuple[str, str, int]] | None,
@@ -105,7 +117,7 @@ def churn(log: HistoryLog, *, components: ComponentMap | None = None, ctx: RunCo
     flt = Filters(log.config.filters)
     with open_runner(log.repo, log.config) as runner:
         alive = set(ls_tree_paths(runner, log.repo.sha))
-        stats, skipped = collect(log, flt, alive)
+        stats, skipped, breaks = collect(log, flt, alive)
         now = log.by_sha[log.repo.sha].committer_time
         params = _params(log, flt, "churn")
         rc = recounter or Recounter(log, runner, flt)
@@ -127,15 +139,17 @@ def churn(log: HistoryLog, *, components: ComponentMap | None = None, ctx: RunCo
                 ok = (r_revs, r_churn) == (m["revisions"], m["churn"])
                 chk = _check(ok, f"git log --follow --no-merges --numstat recount: {r_revs} revisions, {r_churn} churn")
             cits = [citation(c, chs) for c, chs in s.cites.values()]
+            prov: dict[str, Any] = {"formula": "revisions = non-merge commits touching the file's identity; churn = added + deleted"}
+            flags: list[str] = []
+            stmt = _with_breaks(path, breaks.get(path, 0),
+                                f"{path}: {m['revisions']} revisions and {m['churn']} lines of churn (+{s.added} -{s.deleted}) "
+                                f"in non-merge commits, {m['authors']} author(s). History pattern.", m, prov, flags)
             out.append(make_record(
                 ctx, claim_kind="node", kind="file_history_metrics", granularity="file", frm=ep_file(path), to=None,
-                statement=(f"{path}: {m['revisions']} revisions and {m['churn']} lines of churn (+{s.added} -{s.deleted}) "
-                           f"in non-merge commits, {m['authors']} author(s). History pattern."),
-                cls="history_pattern", provenance="history:churn",
-                provenance_raw={"formula": "revisions = non-merge commits touching the file's identity; churn = added + deleted"},
+                statement=stmt, cls="history_pattern", provenance="history:churn", provenance_raw=prov,
                 origin={"kind": "history_derived", "derived_from": sorted(s.revisions)}, qualifier="history pattern",
                 citations=_sorted(cits, times), anchor={"range": [None, log.repo.sha], "first_parent": False},
-                params=params, max_status="observed", metrics=m, check=chk))
+                params=params, max_status="observed", metrics=m, check=chk, flags=flags))
         if components is not None:
             out += _component_metrics(log, validate_component_map(components, log.repo.sha, "churn"), stats, ctx, params, times)
     recs = finalize(out)
@@ -226,7 +240,7 @@ def hotspots(log: HistoryLog, *, ctx: RunContext | None = None, recounter: Recou
             if typ == b"blob" and mode != b"120000" and path.endswith(exts) and not flt.is_generated(path):
                 blobs[path] = (oid.decode(), int(size) if size != b"-" else 0)
         alive = set(ls_tree_paths(runner, log.repo.sha))
-        stats, skipped = collect(log, flt, alive)
+        stats, skipped, breaks = collect(log, flt, alive)
         warnings = []
         cx: dict[str, tuple[int, int]] = {}
         want = sorted(p for p, (_, sz) in blobs.items() if sz <= log.config.limits.max_blob_bytes)
@@ -269,16 +283,19 @@ def hotspots(log: HistoryLog, *, ctx: RunContext | None = None, recounter: Recou
                 r_revs, _, r_small = _recount(rc, flt, p, log.config.filters.exclude_bots_from_patterns, sizes, t.max_changeset_size)
                 ok = (r_revs, r_small) == (m["revisions"], m["revisions_small_commits"])
                 chk = _check(ok, f"git log --follow and log --name-only recount: {r_revs} revisions, {r_small} in small commits")
+            hprov: dict[str, Any] = {"loc": loc}
+            hflags = ["complexity_proxy"]
+            hstmt = _with_breaks(p, breaks.get(p, 0),
+                                 f"{p}: hotspot score {score} from {len(s.revisions_small)} revisions in small commits and "
+                                 f"indentation complexity {ind} (a proxy). History pattern.", m, hprov, hflags)
             out.append(make_record(
                 ctx, claim_kind="node", kind="file_history_metrics", granularity="file", frm=ep_file(p), to=None,
-                statement=(f"{p}: hotspot score {score} from {len(s.revisions_small)} revisions in small commits and "
-                           f"indentation complexity {ind} (a proxy). History pattern."),
-                cls="history_pattern", provenance="history:hotspot", provenance_raw={"loc": loc},
+                statement=hstmt, cls="history_pattern", provenance="history:hotspot", provenance_raw=hprov,
                 origin={"kind": "history_derived", "derived_from": sorted(s.revisions)},
                 qualifier="history pattern; complexity is an indentation proxy",
                 citations=_sorted([citation(c, chs) for c, chs in s.cites.values()], times),
                 anchor={"range": [None, log.repo.sha], "first_parent": False}, params=params, max_status="observed",
-                metrics=m, flags=["complexity_proxy"], check=chk))
+                metrics=m, flags=hflags, check=chk))
     recs = finalize(out)
     recs_sorted = sorted(recs, key=lambda r: (-r["metrics"]["hotspot_score"], r["from"]["file"]))
     report = {"stage": "hotspots", "records": len(recs), "skipped_commits": skipped, "parameters": params,
