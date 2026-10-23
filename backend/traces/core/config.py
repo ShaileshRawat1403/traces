@@ -22,7 +22,7 @@ class Settings:
     cache_dir: Path       # pinned target checkouts (gitignored)
     toolchain_dir: Path   # npm project with CodeGraph 1.6.2 + TypeScript 6.0.3 (package-lock.json pinned)
     node: str             # Node.js for the TypeScript validator
-    isolation: str        # "auto" | "unshare" | "none"
+    isolation: str        # "auto" (default) | "unshare" | "off" (explicit unisolated dev run); anything else fails closed (D-026)
 
     @property
     def runs_dir(self) -> Path:
