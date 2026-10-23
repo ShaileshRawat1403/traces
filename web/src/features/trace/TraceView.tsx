@@ -3,7 +3,8 @@ import { splitSymbol } from "../../api/record";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
-import { orderedHops, traceSummary, type HopView } from "./traceModel";
+import { GapHidden } from "./GapHidden";
+import { GAP_MEANING, UNRESOLVED_MEANING, incompleteText, orderedHops, traceSummary, unresolvedCalls, type HopView } from "./traceModel";
 
 function Sym({ id }: { id: string }) {
   const s = splitSymbol(id);
@@ -15,8 +16,9 @@ function Sym({ id }: { id: string }) {
   );
 }
 
-function Hop({ v, onEvidence }: { v: HopView; onEvidence: (id: string) => void }) {
+function Hop({ v, onEvidence, snapshotHidden, reviewHref }: { v: HopView; onEvidence: (id: string) => void; snapshotHidden: Record<string, number> | null | undefined; reviewHref: string }) {
   const { hop } = v;
+  const calls = unresolvedCalls(hop);
   return (
     <li className="flow-hop" data-hop={v.kind}>
       {v.kind === "hidden" ? (
@@ -38,17 +40,44 @@ function Hop({ v, onEvidence }: { v: HopView; onEvidence: (id: string) => void }
           </div>
           <div className="flow-node">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">To</span>
-            <Sym id={hop.to_symbol} />
+            {calls ? (
+              <span className="min-w-0" data-testid="unresolved-calls">
+                <span className="block text-sm">Unresolved calls:</span>
+                <span className="flex flex-wrap gap-1">
+                  {calls.map((c) => (
+                    <code key={c} className="break-all font-semibold">
+                      {c}
+                    </code>
+                  ))}
+                </span>
+              </span>
+            ) : (
+              <Sym id={hop.to_symbol} />
+            )}
           </div>
           <div className="flow-span flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {hop.index + 1}</span>
             <StatusChip status={v.kind === "edge" ? hop.status : v.labelMismatch || !hop.status ? "unvalidated" : hop.status} label={v.kind === "edge" ? hop.label : "inferred"} qualifier={hop.qualifier} />
           </div>
           {v.kind !== "edge" ? (
-            <p className="flow-span text-sm" data-testid="hop-reason">
-              <span className="font-semibold">Why this is inferred: </span>
-              {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
-            </p>
+            v.kind === "gap" ? (
+              <div className="flow-span flex flex-col gap-1 text-sm" data-testid="hop-reason">
+                <p data-testid="gap-meaning">
+                  <span className="font-semibold">What this gap means: </span>
+                  {calls ? UNRESOLVED_MEANING : GAP_MEANING}
+                </p>
+                <GapHidden hop={hop} snapshotHidden={snapshotHidden} reviewHref={reviewHref} />
+                <p className="text-ink-2">
+                  <span className="font-semibold">API note: </span>
+                  {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
+                </p>
+              </div>
+            ) : (
+              <p className="flow-span text-sm" data-testid="hop-reason">
+                <span className="font-semibold">Why this is inferred: </span>
+                {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
+              </p>
+            )
           ) : null}
           {v.labelMismatch ? (
             <p className="flow-span text-xs text-unknown" role="note">
@@ -92,14 +121,20 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
           </p>
         ) : (
           <p className="text-sm font-semibold text-inferred" role="note" data-testid="trace-incomplete">
-            Incomplete: this trace has gaps. Gaps are steps where no relationship was recorded; they are inferred, not observed.
+            {incompleteText(t)}
           </p>
         )}
+        {!t.complete && t.incomplete_reasons?.length ? (
+          <p className="text-xs text-ink-2" data-testid="trace-incomplete-reasons">
+            <span className="font-semibold">API reasons: </span>
+            {t.incomplete_reasons.join("; ")}
+          </p>
+        ) : null}
         <p className="text-xs text-muted">{t.disclaimer}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
           <li>Solid border: a recorded relationship.</li>
           <li>Dotted border: inferred library step.</li>
-          <li>Dashed border: a gap, no recorded relationship.</li>
+          <li>Dashed border: a gap, no accepted static evidence.</li>
         </ul>
         <HiddenCounts counts={t.hidden_counts} reviewHref={reviewHref} />
       </div>
@@ -109,7 +144,7 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
         <>
           <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
             {hops.map((v) => (
-              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
+              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} snapshotHidden={t.hidden_counts} reviewHref={reviewHref} />
             ))}
           </ol>
         </>

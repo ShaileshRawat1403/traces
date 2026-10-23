@@ -1,3 +1,5 @@
+import { GAP_MEANING } from "./traceModel";
+import { GapHidden } from "./GapHidden";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type ClaimSummary, type Component, type TraceHop } from "../../api/client";
@@ -7,18 +9,8 @@ import { componentForFile } from "../graph/graphModel";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button, ErrorState, Loading } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
+import { layerColor } from "../layers";
 import { claimOnHop, componentSymbol, flagNote, flowLine, incomingRender, persistenceOnHop, pickFlowTrace } from "./flowModel";
-
-const LAYER_COLOR: Record<string, string> = {
-  frontend: "#8fd9cf",
-  api: "#7eb6ff",
-  backend: "#d7fff8",
-  data: "#e2b16a",
-  infra: "#b7c4ce",
-  docs: "#c4b4ea",
-  tests: "#ef8d86",
-  other: "#8ea399",
-};
 
 function short(id: string) {
   return splitSymbol(id).name;
@@ -29,7 +21,7 @@ function Layer({ file, components }: { file: string | null; components: readonly
   if (!layer) return null;
   return (
     <span className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 text-xs capitalize text-ink-2">
-      <span className="inline-block h-2 w-2 rounded-full" style={{ background: LAYER_COLOR[layer] ?? "#8ea399" }} aria-hidden="true" />
+      <span className="inline-block h-2 w-2 rounded-full" style={{ background: layerColor(layer) }} aria-hidden="true" />
       {layer}
     </span>
   );
@@ -52,7 +44,13 @@ function Step({
   tone,
   onEvidence,
   graphHref,
+  hop,
+  snapshotHidden,
+  reviewHref,
 }: {
+  hop: TraceHop;
+  snapshotHidden: Record<string, number> | null | undefined;
+  reviewHref: string;
   index: number;
   kind: string;
   from: string;
@@ -91,7 +89,19 @@ function Step({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {index}. </span>
         {flowLine(kind, short(from), short(to))}
       </p>
-      {reason ? <p className="flow-span text-sm text-ink-2">{reason}</p> : null}
+      {tone === "gap" ? (
+        <p className="flow-span text-sm" data-testid="gap-meaning">
+          <span className="font-semibold">What this gap means: </span>
+          {GAP_MEANING}
+        </p>
+      ) : null}
+      {tone === "gap" ? <GapHidden hop={hop} snapshotHidden={snapshotHidden} reviewHref={reviewHref} /> : null}
+      {reason ? (
+        <p className="flow-span text-sm text-ink-2">
+          {tone === "gap" ? <span className="font-semibold">API note: </span> : null}
+          {reason}
+        </p>
+      ) : null}
       {note ? <p className="flow-span text-sm text-ink-2">{note}</p> : null}
       {persistence ? (
         <div className="flow-span rounded-md border border-line bg-canvas p-2 text-sm">
@@ -249,7 +259,7 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
           <span className="inline-block h-0.5 w-6 border-t-2 border-dotted border-unknown" aria-hidden="true" /> Dotted, inferred library
         </li>
         <li className="inline-flex items-center gap-1">
-          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap left open
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-inferred" aria-hidden="true" /> Dashed, gap: no accepted static evidence
         </li>
       </ul>
       <ol className="flow-list mt-3" aria-label="User flow steps">
@@ -272,6 +282,9 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
             tone={s.tone}
             onEvidence={onEvidence}
             graphHref={graph(s.hop.to_symbol)}
+            hop={s.hop}
+            snapshotHidden={s.key === "bridge" ? bridge.data?.hidden_counts : chosen.hidden_counts}
+            reviewHref={`${base}/review`}
           />
         ))}
       </ol>

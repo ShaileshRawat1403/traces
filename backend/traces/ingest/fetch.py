@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from traces.ingest.errors import IngestError
 from traces.ingest.urls import RepoRef, require_sha
@@ -81,9 +83,23 @@ def classify_git_failure(stderr: str, slug: str) -> IngestError:
     return IngestError("fetch_failed", f"git failed for {slug}", {"git": tail})
 
 
+def run_in_group(cmd: list[str], *, timeout: float, cwd: str | Path | None = None) -> subprocess.CompletedProcess[str]:
+    """`subprocess.run(capture_output=True, text=True)` for git, but in its own session: a timeout or interrupt kills the
+    whole process group (git and every helper it started), not just git, and waits for it. Raises TimeoutExpired."""
+    p = subprocess.Popen(cmd, cwd=cwd, env=git_env(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                         text=True, start_new_session=True)
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except BaseException:
+        _kill_group(p)
+        p.communicate()
+        raise
+    _kill_group(p)  # git exited; a helper it left behind in its group must not outlive it
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
 def git(*args: str, cwd: str | Path | None = None, timeout: int = 600) -> str:
-    p = subprocess.run(["git", *SAFE_GIT_CONFIG, *args], cwd=cwd, env=git_env(), capture_output=True, text=True, timeout=timeout,
-                       stdin=subprocess.DEVNULL)
+    p = run_in_group(["git", *SAFE_GIT_CONFIG, *args], cwd=cwd, timeout=timeout)
     if p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args[:3])} failed ({p.returncode}): {p.stderr.strip()[-500:]}")
     return p.stdout
@@ -100,29 +116,58 @@ def dir_bytes(root: Path) -> int:
     return total
 
 
+def _kill_group(p: subprocess.Popen[Any], grace_s: float = 5.0) -> None:
+    """Kill git and every helper it started (git-remote-https, index-pack, fetch-pack). Killing only the parent leaves
+    the helpers writing pack temp files into the partial clone after it was removed (acceptance audit, D-021)."""
+    try:
+        os.killpg(p.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    p.wait()
+    deadline = time.monotonic() + grace_s
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(p.pid, 0)
+        except ProcessLookupError:
+            return
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+
+
 def _clone_capped(url: str, dest: Path, slug: str, limits: FetchLimits) -> None:
-    """`git clone --no-checkout` with a wall-clock cap and a size cap measured while it runs."""
+    """`git clone --no-checkout` with a wall-clock cap and a size cap: measured every 0.5 s while it runs, and once more
+    after git exits (a fast clone can finish between two polls). Git runs in its own process group so a cap kill
+    stops all of its helpers."""
     cmd = ["git", *SAFE_GIT_CONFIG, "clone", "--quiet", "--config", "core.symlinks=false", "--no-checkout",
            "--no-recurse-submodules", url, str(dest)]
     err_path = dest.with_name(dest.name + ".stderr")
-    with open(err_path, "w+") as err:
-        p = subprocess.Popen(cmd, env=git_env(), stdout=subprocess.DEVNULL, stderr=err, stdin=subprocess.DEVNULL)
-        t0, killed = time.monotonic(), None
-        while p.poll() is None:
-            time.sleep(0.5)
-            if time.monotonic() - t0 > limits.clone_timeout_s:
-                killed = "timeout"
-            elif dest.exists() and dir_bytes(dest) > limits.max_clone_bytes:
-                killed = "size"
-            if killed:
-                p.kill()
-                p.wait()
-                break
-        err.seek(0)
-        stderr = err.read()
-    err_path.unlink(missing_ok=True)
+    try:
+        with open(err_path, "w+") as err:
+            p = subprocess.Popen(cmd, env=git_env(), stdout=subprocess.DEVNULL, stderr=err, stdin=subprocess.DEVNULL,
+                                 start_new_session=True)
+            t0, killed = time.monotonic(), None
+            try:
+                while p.poll() is None:
+                    time.sleep(0.5)
+                    if time.monotonic() - t0 > limits.clone_timeout_s:
+                        killed = "timeout"
+                    elif dest.exists() and dir_bytes(dest) > limits.max_clone_bytes:
+                        killed = "size"
+                    if killed:
+                        break
+            finally:
+                _kill_group(p)  # always: on a cap, timeout or interrupt, and after a normal exit (no helper outlives git)
+            err.seek(0)
+            stderr = err.read()
+    finally:
+        err_path.unlink(missing_ok=True)
     if killed == "timeout":
         raise IngestError("fetch_timeout", f"cloning {slug} took longer than {limits.clone_timeout_s} s")
+    if killed is None and p.returncode == 0 and dest.exists() and dir_bytes(dest) > limits.max_clone_bytes:
+        killed = "size"  # final check after git exited
     if killed == "size":
         raise IngestError("too_large", f"{slug} is larger than the {limits.max_clone_bytes // (1024 * 1024)} MiB clone cap",
                           {"max_clone_bytes": limits.max_clone_bytes})
@@ -133,8 +178,10 @@ def _clone_capped(url: str, dest: Path, slug: str, limits: FetchLimits) -> None:
 def _check_tree(repo: Path, sha: str, slug: str, limits: FetchLimits) -> dict[str, int]:
     """Count files and blob bytes of the pinned tree from Git objects before anything is checked out."""
     n, size = 0, 0
-    for line in git("-C", str(repo), "ls-tree", "-r", "-l", "--full-tree", sha).splitlines():
-        meta, _path = line.split("\t", 1)
+    for entry in git("-C", str(repo), "ls-tree", "-r", "-l", "-z", "--full-tree", sha).split("\0"):
+        if not entry:
+            continue
+        meta, _path = entry.split("\t", 1)
         parts = meta.split()
         if parts[1] != "blob":
             continue
@@ -165,6 +212,7 @@ def ensure_pinned_checkout(ref: RepoRef, sha: str, dest: Path, limits: FetchLimi
     tmp = dest.with_name(dest.name + ".partial")
     if tmp.exists():
         shutil.rmtree(tmp)
+    done = False
     try:
         _clone_capped(ref.clone_url, tmp, ref.slug, limits)
         try:
@@ -173,10 +221,12 @@ def ensure_pinned_checkout(ref: RepoRef, sha: str, dest: Path, limits: FetchLimi
             raise IngestError("sha_not_found", f"commit {sha} is not in {ref.slug}") from None
         _check_tree(tmp, sha, ref.slug, limits)
         git("-C", str(tmp), "checkout", "--quiet", "--detach", sha)
-    except BaseException:
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    tmp.rename(dest)
+        tmp.rename(dest)
+        done = True
+    finally:
+        if not done:  # every failure, cap kill, timeout or interrupt: no partial clone is left behind (D-021)
+            shutil.rmtree(tmp, ignore_errors=True)
+            tmp.with_name(tmp.name + ".stderr").unlink(missing_ok=True)
     return dest
 
 

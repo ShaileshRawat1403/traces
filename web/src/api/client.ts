@@ -135,4 +135,6 @@ export const api = {
   historyMilestones: (repoId: string, sha: string) => request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/milestones`),
   compare: (repoId: string, base: string, head: string) => request<ClaimPage>("GET", `/repos/${enc(repoId)}/compare${qs({ base, head })}`),
   explain: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/explain`, body),
+  /** Scoped prompt bundle for browser-side chat. The request never carries a provider key. */
+  chatBundle: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/chat/bundle`, body),
 };

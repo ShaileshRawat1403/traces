@@ -72,7 +72,9 @@ export interface paths {
          * Register Repo
          * @description Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the
          *     default branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.
-         *     Nothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.
+         *     A given `sha` other than HEAD is confirmed to exist with an anonymous shallow fetch of that commit object only (no
+         *     trees or blobs); an unknown commit gives 422 sha_not_found and nothing is registered. Nothing is cloned here;
+         *     indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.
          */
         post: operations["register_repo_api_v1_repos_post"];
         delete?: never;
@@ -91,6 +93,29 @@ export interface paths {
         /** Get Repo */
         get: operations["get_repo_api_v1_repos__repo_id__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repos/{repo_id}/ai-consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Ai Consent
+         * @description Record or revoke repo-level consent to send evidence from this repository to an external AI provider (D-027).
+         *     Stores the decision, its time and the version of the consent text the user saw (required when granting). This
+         *     is bookkeeping for the browser: no key or provider call ever reaches the backend, and the browser still shows the
+         *     outbound manifest and asks before each send.
+         */
+        put: operations["set_ai_consent_api_v1_repos__repo_id__ai_consent_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -532,6 +557,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AiConsentUpdate */
+        AiConsentUpdate: {
+            /**
+             * Consent
+             * @description true grants repo-level consent to send evidence to an external AI provider; false revokes it
+             */
+            consent: boolean;
+            /**
+             * Consent Text Version
+             * @description version of the consent text shown to the user; required when consent is true
+             */
+            consent_text_version?: string | null;
+        };
         /** Citation */
         Citation: {
             /** Claim Id */
@@ -585,11 +623,17 @@ export interface components {
             evidence_scope: string;
             /**
              * Flags
+             * @description record flags; injected records also carry injected_control
              * @default []
              */
             flags: string[];
             /** From Symbol */
             from_symbol?: string | null;
+            /**
+             * Injected
+             * @description true for an injected negative control (Task 002 regression fixture): fed to the validators to prove they reject it, never a statement about the repository
+             */
+            injected?: boolean | null;
             /** Kind */
             kind: string | null;
             /**
@@ -621,13 +665,19 @@ export interface components {
             kind: string;
             /**
              * Layer
+             * @description library: code of a repository that declares a package and has no application framework or entrypoint (D-029); otherwise the path-and-extension rule
              * @enum {string}
              */
-            layer: "frontend" | "api" | "backend" | "data" | "infra" | "docs" | "tests" | "other";
+            layer: "frontend" | "api" | "backend" | "library" | "data" | "infra" | "docs" | "tests" | "other";
             /** Name */
             name: string;
             /** Paths */
             paths: string[];
+            /**
+             * Reason
+             * @description why this layer: the counted files and rule behind it (D-029); null for snapshots indexed before D-029
+             */
+            reason?: string | null;
             /**
              * Rule
              * @description deterministic grouping rule that produced this component
@@ -716,6 +766,7 @@ export interface components {
         GraphEdge: {
             /**
              * Flags
+             * @description record flags; injected records also carry injected_control
              * @default []
              */
             flags: string[];
@@ -724,6 +775,11 @@ export interface components {
              * @description claim_id
              */
             id: string;
+            /**
+             * Injected
+             * @description true for an injected negative control, never a statement about the repository; always sent
+             */
+            injected?: boolean | null;
             /** Kind */
             kind: string;
             /**
@@ -768,7 +824,10 @@ export interface components {
         GraphResponse: {
             /** Edges */
             edges: components["schemas"]["GraphEdge"][];
-            /** Hidden Counts */
+            /**
+             * Hidden Counts
+             * @description edges hidden by the status filter, by status, scoped like the edges: the filtered snapshot when unfocused, the focused neighbourhood or component otherwise
+             */
             hidden_counts: {
                 [key: string]: number;
             };
@@ -780,6 +839,13 @@ export interface components {
             snapshot_id: string;
             /** Truncated */
             truncated: boolean;
+            /**
+             * Truncated Counts
+             * @description edges matched but cut by `limit`, by status (empty when not truncated)
+             */
+            truncated_counts?: {
+                [key: string]: number;
+            } | null;
         };
         /** HeadInfo */
         HeadInfo: {
@@ -903,9 +969,10 @@ export interface components {
             };
             /**
              * Isolation
+             * @description worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no longer emitted (D-026). The probe result is cached for 60 s
              * @enum {string}
              */
-            isolation: "unshare" | "none";
+            isolation: "unshare" | "none" | "off" | "unavailable";
             /** Validators */
             validators: {
                 [key: string]: string;
@@ -979,10 +1046,20 @@ export interface components {
             default_branch?: string | null;
             /**
              * External Ai Consent
-             * @description repo-level consent to send source snippets to an external AI provider; always false in v1 (no endpoint sets it), so explain bundles need per-request consent
+             * @description repo-level consent to send source snippets to an external AI provider, set with PUT /repos/{id}/ai-consent (D-027). The browser still shows the outbound manifest and asks before each send
              * @default false
              */
             external_ai_consent: boolean;
+            /**
+             * External Ai Consent At
+             * @description when the repo-level consent was last granted or revoked (D-027)
+             */
+            external_ai_consent_at?: string | null;
+            /**
+             * External Ai Consent Text Version
+             * @description version of the consent text the user agreed to; null when consent is not granted (D-027)
+             */
+            external_ai_consent_text_version?: string | null;
             /** Host */
             host: string;
             /** Id */
@@ -1034,9 +1111,17 @@ export interface components {
             flags: string[];
             /** Handler Symbol */
             handler_symbol: string | null;
+            /**
+             * Label
+             * @description the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for display; null when none was recorded. Never synthesized
+             */
+            label?: string | null;
             /** Line */
             line: number;
-            /** Method */
+            /**
+             * Method
+             * @description HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount (flag `mount`), which is not an HTTP operation
+             */
             method: string;
             /** Operation Id */
             operation_id: string | null;
@@ -1066,6 +1151,11 @@ export interface components {
             id: string;
             /** Indexed At */
             indexed_at?: string | null;
+            /**
+             * Isolation
+             * @description how the analysis workers ran for the stored evidence: unshare (no network, probe-checked) or off (explicit dev override). null before indexing or for snapshots stored before D-026
+             */
+            isolation?: ("unshare" | "off") | null;
             /** Languages */
             languages: {
                 [key: string]: number;
@@ -1083,6 +1173,11 @@ export interface components {
             stats: {
                 [key: string]: unknown;
             };
+            /**
+             * Unisolated
+             * @description true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is never acceptance evidence (D-026)
+             */
+            unisolated?: boolean | null;
         };
         /** SourceView */
         SourceView: {
@@ -1125,8 +1220,18 @@ export interface components {
             evidence_scope: "static";
             /** From Symbol */
             from_symbol: string;
+            /**
+             * Hidden Rejected
+             * @description gap hops only: rejected relationships leaving this step that the request hides (include_rejected=false); the reason text states all hidden counts
+             */
+            hidden_rejected?: number | null;
             /** Index */
             index: number;
+            /**
+             * Injected
+             * @description true when the hop is an injected negative control, never a repository fact; sent for edge hops
+             */
+            injected?: boolean | null;
             /** Kind */
             kind: string;
             /**
@@ -1150,12 +1255,17 @@ export interface components {
              * @enum {string}
              */
             type: "edge" | "gap" | "library_contract";
+            /**
+             * Unresolved Calls
+             * @description gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references
+             */
+            unresolved_calls?: string[] | null;
         };
         /** TraceResponse */
         TraceResponse: {
             /**
              * Complete
-             * @description false when the trace contains gaps
+             * @description false when the trace contains gaps (including steps with unresolved outgoing calls) or a step that rests on a relationship that is not verified or observed
              */
             complete: boolean;
             /**
@@ -1171,6 +1281,11 @@ export interface components {
             };
             /** Hops */
             hops: components["schemas"]["TraceHop"][];
+            /**
+             * Incomplete Reasons
+             * @description why complete is false; empty when complete
+             */
+            incomplete_reasons?: string[] | null;
             /** Snapshot Id */
             snapshot_id: string;
             /** To Symbol */
@@ -1373,6 +1488,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Repo"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_ai_consent_api_v1_repos__repo_id__ai_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                repo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiConsentUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

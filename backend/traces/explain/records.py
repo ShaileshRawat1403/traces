@@ -1,13 +1,46 @@
 """Read-only views over traces-evidence/0.4 records for the explain engine. Pure functions, no store access."""
+
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 GROUNDED = ("verified", "observed")
 INFERRED = ("unvalidated", "missing_location")
-EXPECTED_LABEL = {"verified": "verified", "observed": "observed", "unvalidated": "inferred", "missing_location": "inferred", "rejected": "rejected"}
+# History records that describe patterns or inferences over commit history (docs/contracts/history.md 6). They are never
+# code structure, never verified and never a "fact" sentence: co-change is a pattern, not a dependency or a cause.
+HISTORY_PATTERN_CLASSES = ("history_pattern", "history_inferred")
+HISTORY_PATTERN_KINDS = (
+    "co_changed_with",
+    "history_impact_candidate",
+    "file_history_metrics",
+    "component_history_metrics",
+    "deleted_soon_after_add",
+    "prefix_moved",
+)
+# Criteria keys echoed with a history pattern, in this order, when the record's parameters carry them.
+CRITERIA_KEYS = (
+    "level",
+    "min_revs",
+    "min_shared_revs",
+    "min_coupling",
+    "max_changeset_size",
+    "commits",
+    "metric_set",
+    "rename_normalization",
+    "bot_filter",
+    "generated_filter",
+    "filters",
+)
+EXPECTED_LABEL = {
+    "verified": "verified",
+    "observed": "observed",
+    "unvalidated": "inferred",
+    "missing_location": "inferred",
+    "rejected": "rejected",
+}
 
 
 def short_symbol(symbol: str | None) -> str:
@@ -19,7 +52,7 @@ def short_symbol(symbol: str | None) -> str:
     if "/" in name and len(parts) >= 2 and name == parts[0]:
         return name.rsplit("/", 1)[-1]
     if name.startswith("route:"):
-        name = name[len("route:"):]
+        name = name[len("route:") :]
     return name
 
 
@@ -39,15 +72,40 @@ class ClaimView:
     flags: tuple[str, ...] = ()
     status_reason: str | None = None
     route: str | None = None
+    record_class: str = ""
+    qualifier: str | None = None
+    # Echoed criteria of a history pattern as (key, compact JSON value) pairs, in CRITERIA_KEYS order.
+    criteria: tuple[tuple[str, str], ...] = ()
+    scope: str = ""
+    # Full commit SHAs this record is about (commit:: endpoints and origin.commit), for commit questions.
+    commits: tuple[str, ...] = ()
+    # Co-change support (shared commits), union of commits touching either side, and coupling degree, from metrics.
+    support: int | None = None
+    union: int | None = None
+    degree: float | None = None
+    # Files in a grouped directory move (prefix_moved), from metrics or provenance_raw.
+    files: int | None = None
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
+    def history_pattern(self) -> bool:
+        """A pattern or inference over commit history (co-change, hotspots, churn, impact candidates, lifecycle guesses)."""
+        return self.record_class in HISTORY_PATTERN_CLASSES or self.kind in HISTORY_PATTERN_KINDS
+
+    @property
     def grounded(self) -> bool:
-        return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label
+        """Grounded code evidence. A history pattern is never grounded, whatever its status: observed only means its
+        counts were rechecked against Git."""
+        return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label and not self.history_pattern
+
+    @property
+    def code_structure(self) -> bool:
+        """Grounded static code evidence (not a Git or history record)."""
+        return self.grounded and self.scope not in ("history", "documented")
 
     @property
     def inferred(self) -> bool:
-        return self.status in INFERRED
+        return self.status in INFERRED and not self.history_pattern
 
     @property
     def rejected(self) -> bool:
@@ -76,6 +134,51 @@ def words_of(*texts: str | None) -> frozenset[str]:
         spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", t)
         out.update(w for w in _WORD.findall(spaced.lower()) if len(w) >= 2)
     return frozenset(out)
+
+
+def _commits_of(record: dict[str, Any]) -> tuple[str, ...]:
+    out: list[str] = []
+    for end in (record.get("from") or {}, record.get("to") or {}):
+        sym = end.get("symbol") if isinstance(end, dict) else None
+        if isinstance(sym, str) and sym.startswith("commit::"):
+            out.append(sym[len("commit::") :].lower())
+    origin = record.get("origin")
+    if isinstance(origin, dict) and isinstance(origin.get("commit"), str):
+        out.append(origin["commit"].lower())
+    return tuple(dict.fromkeys(out))
+
+
+def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """The record's own criteria, echoed verbatim (compact, key-sorted JSON per value). Reads parameters.values, then
+    parameters, then a top-level criteria object."""
+    prm = record.get("parameters")
+    src: Any = None
+    if isinstance(prm, dict):
+        src = prm.get("values") if isinstance(prm.get("values"), dict) else prm
+    if not isinstance(src, dict) or not any(k in src for k in CRITERIA_KEYS):
+        src = record.get("criteria") if isinstance(record.get("criteria"), dict) else src
+    if not isinstance(src, dict):
+        return ()
+    return tuple(
+        (k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+        for k in CRITERIA_KEYS
+        if k in src
+    )
+
+
+def _num(d: Any, key: str) -> float | None:
+    v = d.get(key) if isinstance(d, dict) else None
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def endpoint_path(symbol: str | None) -> str | None:
+    """The repository path of a file:: endpoint, or the name of a component:: endpoint; None otherwise."""
+    if not symbol:
+        return None
+    for pre in ("file::", "component::"):
+        if symbol.startswith(pre):
+            return symbol[len(pre) :] or None
+    return None
 
 
 def view(record: dict[str, Any]) -> ClaimView | None:
@@ -108,5 +211,16 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         flags=tuple(f for f in record.get("flags") or [] if isinstance(f, str)),
         status_reason=record.get("status_reason") if isinstance(record.get("status_reason"), str) else None,
         route=route,
+        record_class=str(record.get("class") or ""),
+        qualifier=record.get("qualifier") if isinstance(record.get("qualifier"), str) else None,
+        criteria=criteria_of(record),
+        scope=str(record.get("evidence_scope") or ""),
+        commits=_commits_of(record),
+        support=int(sup)
+        if (sup := _num(record.get("metrics"), "support") or _num(raw, "support")) is not None
+        else None,
+        union=int(uni) if (uni := _num(record.get("metrics"), "union_commits")) is not None else None,
+        degree=_num(record.get("metrics"), "degree"),
+        files=int(fl) if (fl := _num(record.get("metrics"), "files") or _num(raw, "files")) is not None else None,
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )

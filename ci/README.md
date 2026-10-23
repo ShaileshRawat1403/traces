@@ -12,15 +12,17 @@ All jobs run on free GitHub-hosted `ubuntu-latest` runners with `permissions: co
 | --- | --- | --- |
 | `lint` | `ruff check backend tests` | |
 | `types` | `mypy` (files listed in `pyproject.toml`), `web: tsc --noEmit` | |
-| `unit` | toolchain `npm ci --ignore-scripts`, user namespaces on, `sha256sum -c` on the frozen checker, `pytest tests/unit` | |
+| `unit` | toolchain `npm ci --ignore-scripts`, user namespaces on, `sha256sum -c` on the frozen checker, `pytest tests/unit`, `pytest tests/explain` | |
 | `api` | toolchain, user namespaces, pinned target cache, `pytest tests/api` (OpenAPI currency plus the product index of the Task 002 snapshot) | `target` |
-| `web-build` | `npm run check:api` (generated TS types current), `npm run build` | |
+| `web-build` | `npm test` (vitest, jsdom), `npm run check:api` (generated TS types current), `npm run build` | |
 | `target` | restores or fills the cache of `fastapi/full-stack-fastapi-template` at `b1125d8839482cb7bbae603ddc6d0081bf87532e` (hardened git fetch via `traces.evidence.pipeline.target_checkout`), checks the pinned HEAD | |
 | `contract` | toolchain `npm ci --ignore-scripts`, user namespaces on, `pytest tests/contract` (CT1-CT16, fresh baseline under `unshare -rn`) | `target` |
 | `regression` | same setup, `pytest tests/regression` (RT1-RT8, baseline distribution, canonical hashes, 0.4 migration) | `target` |
-| `e2e` | seed a local snapshot, serve the API and the web app, `playwright test` in `web/` at desktop and 360 px | |
+| `security` | toolchain, user namespaces, `pytest -rxXs tests/security tests/e2e` (bad URLs, traversal, hostile repo, caps, timeouts, rate limits, no-key mode, no unintended outbound calls). `xfail(strict=True)` tests are open findings; one that starts passing fails the job until the marker is removed | |
+| `history` | checks the cached target is a full-history clone, then `pytest -rs tests/history` with `TRACES_HISTORY_FSFT_REPO` set to it. User namespaces on (the no-network tests need `unshare -rn`). Any skip fails the job | `target` |
+| `e2e` | needs `target`. Seeds the real pinned snapshot fsft@b1125d8 (static + history) from the cached full-history clone (`scripts/e2e_seed.py --seed fsft`, no network), serves the API and the web app, runs `playwright test` in `web/` at desktop and 360 px, then `tests/e2e/real_snapshot.cjs` (real content, axe WCAG 2.2 AA and 360 px touch on nine fsft screens), then `tests/e2e/chat_g5.cjs` (BYOK chat against an in-process stub provider: consent, decline, manifest equals what the stub receives, rejected claims never sent, the throwaway key absent from the API, its logs and its store). `TRACES_E2E_SEED=synthetic` keeps the old 4-file seed for fast local runs | |
 
-Target cache: `actions/cache` with key `target-fastapi-full-stack-fastapi-template-<full sha>-v1` on the exact checkout path under `.cache/targets/`. `api`, `contract` and `regression` restore it with `fail-on-cache-miss: true`, so those jobs never fetch the pinned target themselves. Bump the `-v1` suffix to invalidate.
+Target cache: `actions/cache` with key `target-fastapi-full-stack-fastapi-template-<full sha>-v1` on the exact checkout path under `.cache/targets/`. `api`, `contract`, `regression` and `history` restore it with `fail-on-cache-miss: true`, so those jobs never fetch the pinned target themselves. Bump the `-v1` suffix to invalidate.
 
 `contract` and `regression` each run a fresh baseline (3 CodeGraph index runs, D-008) so each job stands alone; about 1 and 2 minutes locally.
 

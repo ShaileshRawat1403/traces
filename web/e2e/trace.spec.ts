@@ -30,6 +30,29 @@ test.describe("trace", () => {
     await page.screenshot({ path: `${SHOTS}/${info.project.name}-live.png`, fullPage: true });
   });
 
+  test("live F-9: a trace without `to` lists unresolved calls as their own gap and says why it is incomplete", async ({ page, request }, info) => {
+    test.skip(caps.trace === false, "trace not available");
+    const api = `/api/v1/repos/${encodeURIComponent(snap.repoId)}/snapshots/${snap.sha}/trace?from=create_item`;
+    const res = await request.get(api);
+    test.skip(!res.ok(), "no create_item symbol in this snapshot");
+    const t = (await res.json()) as { complete: boolean; hops: { unresolved_calls?: string[] | null }[] };
+    const gap = t.hops.find((h) => h.unresolved_calls?.length);
+    test.skip(!gap, "no unresolved calls recorded for create_item in this snapshot");
+    await page.goto(`${base(snap)}/trace?from=create_item`);
+    const step = page.getByRole("list", { name: "Trace steps in order" }).getByRole("listitem").filter({ hasText: "Gap: calls the trace cannot follow" }).first();
+    await expect(step).toBeVisible();
+    for (const c of gap!.unresolved_calls!) await expect(step.getByTestId("unresolved-calls")).toContainText(c);
+    await expect(step).not.toContainText("(unresolved)");
+    await expect(step.getByTestId("gap-meaning")).toContainText("did not resolve them to a declaration");
+    expect(t.complete).toBe(false);
+    await expect(page.getByTestId("trace-incomplete")).toContainText("calls the trace cannot follow");
+    await expect(page.getByTestId("trace-incomplete-reasons")).toContainText("gaps:");
+    await expectAccessible(page);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `${SHOTS}/${info.project.name}-live-unresolved.png`, fullPage: true });
+  });
+
   test("contract-shape: ordered steps, gaps and library contract steps are explicit inferred items", async ({ page }, info) => {
     const lib = traceSample.hops.find((h) => h.type === "library_contract")!;
     const sample = { ...traceSample, hops: traceSample.hops.map((h) => (h === lib && real ? { ...h, claim_id: real.claim_id } : h)) };
@@ -38,7 +61,7 @@ test.describe("trace", () => {
     const steps = page.getByRole("list", { name: "Trace steps in order" }).getByRole("listitem");
     await expect(steps).toHaveCount(5);
     expect(await steps.evaluateAll((els) => els.map((e) => e.getAttribute("data-hop")))).toEqual(["edge", "edge", "library_contract", "gap", "edge"]);
-    await expect(steps.nth(3)).toContainText("Gap: no recorded relationship");
+    await expect(steps.nth(3)).toContainText("Gap: no static evidence connects these steps");
     await expect(steps.nth(3).getByTestId("hop-reason")).toContainText("dependency injection");
     await expect(steps.nth(2).getByTestId("hop-reason")).toBeVisible();
     await expect(page.getByTestId("trace-incomplete")).toBeVisible();

@@ -42,6 +42,7 @@ class FakeProbe:
     def __init__(self) -> None:
         self.heads: dict[str, RemoteHead | IngestError] = {}
         self.calls = 0
+        self.missing: set[str] = set()
 
     def head(self, ref, *, max_age_s=None):
         self.calls += 1
@@ -49,6 +50,11 @@ class FakeProbe:
         if isinstance(h, IngestError):
             raise h
         return h
+
+    def commit_exists(self, ref, sha):
+        return sha not in self.missing
+
+
 
 
 @pytest.fixture()

@@ -257,5 +257,46 @@ def test_run_end_to_end_totals(fsft_repo: RepoRef, tmp_path_factory: pytest.Temp
     for a, b in zip(ms, ms[1:], strict=False):
         direct += list(snapshot_compare(log, a.sha, b.sha, ctx=CTX).records)
     assert rep["records_digest"] == canonical_hash(finalize(direct))
+    # D-H15 moved the digest from 402d3d34eff4 to 2fb288167ebf: the same 8402 claim_ids, 4 records gain lineage
+    # fields (churn for CONTRIBUTING.md, frontend/src/index.css, frontend/src/utils.ts; hotspot for utils.ts).
+    assert rep["records_digest"].startswith("2fb288167ebf")  # aliases off by default (D-H14)
+    flagged = sorted((r["provenance"], r["from"]["file"]) for r in res.records if "x-lineage_restart" in r["flags"])
+    assert flagged == [("history:churn", "CONTRIBUTING.md"), ("history:churn", "frontend/src/index.css"),
+                       ("history:churn", "frontend/src/utils.ts"), ("history:hotspot", "frontend/src/utils.ts")]
+    assert all(r["metrics"]["lineage_breaks"] == 1 for r in res.records if "x-lineage_restart" in r["flags"])
+    assert st["aliases"] == ("skipped", "not_in_v1_default", 0)
     v = rep["volatile"]
     assert v["finalize_s"] > 0 and v["elapsed_s"] >= v["finalize_s"]
+
+
+def test_ht13_alias_crud_622(log_default: HistoryLog) -> None:
+    from traces.history.aliases import alias_suggestions
+
+    res = alias_suggestions(log_default, ctx=CTX)
+    assert_valid(res.records)
+    assert len(res.records) == 54 and res.report["skipped"] == {"pairs_over_cap": 1, "blob_over_max_bytes": 0}
+    assert all(r["status"] == "unvalidated" and r["class"] == "history_inferred" for r in res.records)
+    (crud,) = [r for r in res.records if r["from"]["file"].startswith("src/backend/app/crud/")]
+    assert crud["to"]["file"] == "src/backend/app/crud.py" and crud["provenance_raw"]["head_to"] == "backend/app/crud.py"
+    assert crud["citations"][0]["commit"].startswith("2d0f7742")
+    assert crud["metrics"]["line_containment"] == 0.6667
+
+
+def test_run_aliases_enabled_adds_54(fsft_repo: RepoRef, log_default: HistoryLog,
+                                      tmp_path_factory: pytest.TempPathFactory) -> None:
+    """D-H14: opting in adds exactly the 54 alias suggestions; everything else is the default run."""
+    from traces.history.aliases import alias_suggestions
+    from traces.history.records import finalize
+    from traces.history.runner import run
+
+    cache = tmp_path_factory.mktemp("acache")
+    base = run(fsft_repo, HistoryConfig(), cache_dir=cache, run_id=CTX.run_id, at=CTX.at)
+    a = run(fsft_repo, HistoryConfig(aliases=True), cache_dir=cache, run_id=CTX.run_id, at=CTX.at)
+    b = run(fsft_repo, HistoryConfig(aliases=True), run_id=CTX.run_id, at=CTX.at)
+    st = {s["stage"]: (s["status"], s["reason"], s["records"]) for s in a.report["stages"]}
+    assert st["aliases"] == ("completed", None, 54) and a.report["records"] == 8402 + 54
+    assert_valid([x for x in a.records if x["provenance"] == "history:alias-suggest"])
+    al = alias_suggestions(log_default, ctx=CTX).records
+    assert a.report["records_digest"] == canonical_hash(finalize(list(base.records) + list(al)))
+    assert b.report["records_digest"] == a.report["records_digest"]
+    assert a.report["records_digest"].startswith("832325576eaa")  # D-H15; was 8d7313302536 before lineage fields

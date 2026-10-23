@@ -19,7 +19,7 @@ export const STATUS_FILTERS = ["verified", "observed", "unvalidated", "missing_l
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 /** Unvalidated and missing_location (both "Inferred") are off by default; rejected is never requested. */
 export const DEFAULT_STATUS: readonly StatusFilter[] = ["verified", "observed"];
-export const LAYERS: readonly Component["layer"][] = ["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"];
+export { LAYERS } from "../layers";
 
 export interface GraphState {
   focus: string | null;

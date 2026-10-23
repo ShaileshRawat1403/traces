@@ -1,6 +1,36 @@
 {
  "components": {
   "schemas": {
+   "AiConsentUpdate": {
+    "additionalProperties": false,
+    "properties": {
+     "consent": {
+      "description": "true grants repo-level consent to send evidence to an external AI provider; false revokes it",
+      "title": "Consent",
+      "type": "boolean"
+     },
+     "consent_text_version": {
+      "anyOf": [
+       {
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9._:-]+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "version of the consent text shown to the user; required when consent is true",
+      "title": "Consent Text Version"
+     }
+    },
+    "required": [
+     "consent"
+    ],
+    "title": "AiConsentUpdate",
+    "type": "object"
+   },
    "Citation": {
     "additionalProperties": false,
     "properties": {
@@ -144,6 +174,7 @@
      },
      "flags": {
       "default": [],
+      "description": "record flags; injected records also carry injected_control",
       "items": {
        "type": "string"
       },
@@ -160,6 +191,18 @@
        }
       ],
       "title": "From Symbol"
+     },
+     "injected": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true for an injected negative control (Task 002 regression fixture): fed to the validators to prove they reject it, never a statement about the repository",
+      "title": "Injected"
      },
      "kind": {
       "anyOf": [
@@ -252,10 +295,12 @@
       "type": "string"
      },
      "layer": {
+      "description": "library: code of a repository that declares a package and has no application framework or entrypoint (D-029); otherwise the path-and-extension rule",
       "enum": [
        "frontend",
        "api",
        "backend",
+       "library",
        "data",
        "infra",
        "docs",
@@ -275,6 +320,18 @@
       },
       "title": "Paths",
       "type": "array"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "why this layer: the counted files and rule behind it (D-029); null for snapshots indexed before D-029",
+      "title": "Reason"
      },
      "rule": {
       "description": "deterministic grouping rule that produced this component",
@@ -469,6 +526,7 @@
     "properties": {
      "flags": {
       "default": [],
+      "description": "record flags; injected records also carry injected_control",
       "items": {
        "type": "string"
       },
@@ -479,6 +537,18 @@
       "description": "claim_id",
       "title": "Id",
       "type": "string"
+     },
+     "injected": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true for an injected negative control, never a statement about the repository; always sent",
+      "title": "Injected"
      },
      "kind": {
       "title": "Kind",
@@ -611,6 +681,7 @@
       "additionalProperties": {
        "type": "integer"
       },
+      "description": "edges hidden by the status filter, by status, scoped like the edges: the filtered snapshot when unfocused, the focused neighbourhood or component otherwise",
       "title": "Hidden Counts",
       "type": "object"
      },
@@ -632,6 +703,21 @@
      "truncated": {
       "title": "Truncated",
       "type": "boolean"
+     },
+     "truncated_counts": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "integer"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "edges matched but cut by `limit`, by status (empty when not truncated)",
+      "title": "Truncated Counts"
      }
     },
     "required": [
@@ -960,9 +1046,12 @@
       "type": "object"
      },
      "isolation": {
+      "description": "worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no longer emitted (D-026). The probe result is cached for 60 s",
       "enum": [
        "unshare",
-       "none"
+       "none",
+       "off",
+       "unavailable"
       ],
       "title": "Isolation",
       "type": "string"
@@ -1188,9 +1277,33 @@
      },
      "external_ai_consent": {
       "default": false,
-      "description": "repo-level consent to send source snippets to an external AI provider; always false in v1 (no endpoint sets it), so explain bundles need per-request consent",
+      "description": "repo-level consent to send source snippets to an external AI provider, set with PUT /repos/{id}/ai-consent (D-027). The browser still shows the outbound manifest and asks before each send",
       "title": "External Ai Consent",
       "type": "boolean"
+     },
+     "external_ai_consent_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "when the repo-level consent was last granted or revoked (D-027)",
+      "title": "External Ai Consent At"
+     },
+     "external_ai_consent_text_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "version of the consent text the user agreed to; null when consent is not granted (D-027)",
+      "title": "External Ai Consent Text Version"
      },
      "host": {
       "title": "Host",
@@ -1328,11 +1441,24 @@
       ],
       "title": "Handler Symbol"
      },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for display; null when none was recorded. Never synthesized",
+      "title": "Label"
+     },
      "line": {
       "title": "Line",
       "type": "integer"
      },
      "method": {
+      "description": "HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount (flag `mount`), which is not an HTTP operation",
       "title": "Method",
       "type": "string"
      },
@@ -1421,6 +1547,22 @@
       ],
       "title": "Indexed At"
      },
+     "isolation": {
+      "anyOf": [
+       {
+        "enum": [
+         "unshare",
+         "off"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "how the analysis workers ran for the stored evidence: unshare (no network, probe-checked) or off (explicit dev override). null before indexing or for snapshots stored before D-026",
+      "title": "Isolation"
+     },
      "languages": {
       "additionalProperties": {
        "type": "integer"
@@ -1450,6 +1592,18 @@
       "additionalProperties": true,
       "title": "Stats",
       "type": "object"
+     },
+     "unisolated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is never acceptance evidence (D-026)",
+      "title": "Unisolated"
      }
     },
     "required": [
@@ -1559,9 +1713,33 @@
       "title": "From Symbol",
       "type": "string"
      },
+     "hidden_rejected": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "gap hops only: rejected relationships leaving this step that the request hides (include_rejected=false); the reason text states all hidden counts",
+      "title": "Hidden Rejected"
+     },
      "index": {
       "title": "Index",
       "type": "integer"
+     },
+     "injected": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "true when the hop is an injected negative control, never a repository fact; sent for edge hops",
+      "title": "Injected"
      },
      "kind": {
       "title": "Kind",
@@ -1630,6 +1808,21 @@
       ],
       "title": "Type",
       "type": "string"
+     },
+     "unresolved_calls": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "gap hops for unresolved calls only (F-9, traces without `to`): the call names this step makes that the extractor stored as unresolved references",
+      "title": "Unresolved Calls"
      }
     },
     "required": [
@@ -1648,7 +1841,7 @@
     "additionalProperties": false,
     "properties": {
      "complete": {
-      "description": "false when the trace contains gaps",
+      "description": "false when the trace contains gaps (including steps with unresolved outgoing calls) or a step that rests on a relationship that is not verified or observed",
       "title": "Complete",
       "type": "boolean"
      },
@@ -1674,6 +1867,21 @@
       },
       "title": "Hops",
       "type": "array"
+     },
+     "incomplete_reasons": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "why complete is false; empty when complete",
+      "title": "Incomplete Reasons"
      },
      "snapshot_id": {
       "title": "Snapshot Id",
@@ -1850,7 +2058,7 @@
     ]
    },
    "post": {
-    "description": "Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the\ndefault branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.\nNothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.",
+    "description": "Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the\ndefault branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.\nA given `sha` other than HEAD is confirmed to exist with an anonymous shallow fetch of that commit object only (no\ntrees or blobs); an unknown commit gives 422 sha_not_found and nothing is registered. Nothing is cloned here;\nindexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public.",
     "operationId": "register_repo_api_v1_repos_post",
     "requestBody": {
      "content": {
@@ -1977,6 +2185,69 @@
      }
     },
     "summary": "Get Repo",
+    "tags": [
+     "repos"
+    ]
+   }
+  },
+  "/api/v1/repos/{repo_id}/ai-consent": {
+   "put": {
+    "description": "Record or revoke repo-level consent to send evidence from this repository to an external AI provider (D-027).\nStores the decision, its time and the version of the consent text the user saw (required when granting). This\nis bookkeeping for the browser: no key or provider call ever reaches the backend, and the browser still shows the\noutbound manifest and asks before each send.",
+    "operationId": "set_ai_consent_api_v1_repos__repo_id__ai_consent_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "repo_id",
+      "required": true,
+      "schema": {
+       "title": "Repo Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AiConsentUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Repo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    },
+    "summary": "Set Ai Consent",
     "tags": [
      "repos"
     ]

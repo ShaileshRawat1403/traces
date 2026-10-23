@@ -38,5 +38,7 @@ All tests pass. A few tests are skipped by design because they apply to one view
 Specs:
 - `shell.spec.ts`, `snapshot.spec.ts`: app shell, repos, claims, evidence, and the honest 501 states.
 - `overview.spec.ts`, `graph.spec.ts`, `trace.spec.ts`, `ask.spec.ts`: each has a **live** test against the real API, plus **contract-shape** tests. A contract-shape test answers only the endpoints that return 501 today (overview, graph, components, source, trace, explain), using generic schema-typed samples from `src/testing/samples.ts`. Claims always come from the real store. Once an endpoint is implemented, its live test checks the real renderer, and the contract-shape test keeps checking the shape.
+- `history.spec.ts`: history screens.
+- `chat.spec.ts`: BYOK chat. It starts its own stub AI provider (`e2e/stubProvider.ts`) on 127.0.0.1 with an OS-assigned port, inside the Playwright process. No real or paid provider is ever called, and no key or network access is needed. The live test uses the real `/chat/bundle` endpoint; the contract-shape tests answer `/chat/bundle` with `src/testing/bundle.fixture.json` (generic engine output from `tests/explain/test_bundle_fence.py`). The Ollama test is skipped unless a local Ollama with a pulled model answers on 127.0.0.1:11434.
 
-Known flake: the API shares one sqlite3 connection across threads. Under parallel workers it sometimes returns 500 (`sqlite3.InterfaceError`), which fails `firstSnapshot` in a `beforeAll`. This was reported to the Traces seat. Until it is fixed, run with `--workers=1` for a clean signal.
+No new prerequisites for chat. The suite runs clean with parallel workers (for example `--workers=4`) now that the store concurrency fix (#8) is in.

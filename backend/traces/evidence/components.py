@@ -107,7 +107,43 @@ def component_key(path: str) -> str:
     return "/".join(prefix)
 
 
-def build_components(files: Iterable[str]) -> tuple[list[ComponentDef], dict[str, str]]:
+LIBRARY_RULE = "library-v1:no-app-entrypoint"
+APP_FRAMEWORKS = {"FastAPI", "Django", "Flask", "Starlette", "Express", "Fastify", "NestJS", "Next.js", "React", "Vue", "Svelte",
+                  "Angular", "Vite"}
+ENTRYPOINT_NAMES = {"manage.py", "wsgi.py", "asgi.py", "app.py", "main.py", "server.py", "index.html", "server.js", "server.ts",
+                    "procfile"}
+NON_PRODUCT_DIRS = {"tests", "test", "docs", "doc", "examples", "example", "benchmarks", "scripts", ".github", "e2e"}
+LAYER_WHY = {"api": "under an api/routes/endpoints/controllers/handlers directory", "frontend": "UI files or a frontend/web/client/ui tree",
+             "data": "models, schemas, migrations, db or SQL", "backend": "code outside api, data and UI paths",
+             "infra": "CI, deploy, docker or scripts", "tests": "test files or test directories", "docs": "documentation files",
+             "other": "no code, docs or infra files"}
+
+
+@dataclass(frozen=True)
+class RepoKind:
+    """Whether the snapshot looks like an importable library rather than an application, and why (D-029)."""
+    library: bool
+    reason: str
+
+
+def repo_kind(files: Iterable[str], frameworks: Iterable[str], package_decl: str | None) -> RepoKind:
+    """A library: a package is declared (pyproject/setup or a non-private package.json), no application framework is
+    a dependency, and no application entrypoint file exists outside tests, docs and examples. Deterministic, from Git
+    objects only; nothing is run."""
+    app_fw = sorted(set(frameworks) & APP_FRAMEWORKS)
+    entry = sorted(f for f in files if PurePosixPath(f).name.lower() in ENTRYPOINT_NAMES
+                   and not any(d.lower() in NON_PRODUCT_DIRS for d in PurePosixPath(f).parts[:-1]))
+    if package_decl is None:
+        return RepoKind(False, "no package declaration (pyproject.toml [project], setup.py/setup.cfg or a public package.json)")
+    if app_fw:
+        return RepoKind(False, f"application framework dependency: {', '.join(app_fw)}")  # runtime deps for package.json
+    if entry:
+        return RepoKind(False, f"application entrypoint file(s): {', '.join(entry[:3])}")
+    return RepoKind(True, f"package declared in {package_decl}, no application framework dependency and no application "
+                          "entrypoint outside tests, docs and examples")
+
+
+def build_components(files: Iterable[str], kind: RepoKind | None = None) -> tuple[list[ComponentDef], dict[str, str]]:
     groups: dict[str, list[str]] = defaultdict(list)
     lay: dict[str, str] = {}
     for f in files:
@@ -119,8 +155,33 @@ def build_components(files: Iterable[str]) -> tuple[list[ComponentDef], dict[str
         counts = Counter(lay[m] for m in members if lay[m] not in ("other",)) or Counter(lay[m] for m in members)
         top = max(counts.values())
         layer = next(l for l in LAYER_ORDER if counts.get(l) == top)
-        comps.append(ComponentDef(id=f"component::{key}", name=key, layer=layer, paths=tuple(members), rule=COMPONENT_RULE))
+        reason = f"{layer}: {top} of {len(members)} file(s) are {LAYER_WHY[layer]} ({LAYER_RULE})"
+        rule = COMPONENT_RULE
+        if layer == "backend" and kind is not None and kind.library:
+            layer, rule = "library", f"{COMPONENT_RULE}+{LIBRARY_RULE}"
+            reason = (f"library: {top} of {len(members)} file(s) are code outside api, data and UI paths, and the repository "
+                      f"looks like a library ({kind.reason}), so 'backend' would overstate it ({LIBRARY_RULE})")
+        comps.append(ComponentDef(id=f"component::{key}", name=key, layer=layer, paths=tuple(members), rule=rule, reason=reason))
     return comps, lay
+
+
+def package_declaration(root: Path, sha: str, files: Iterable[str]) -> str | None:
+    """Top-level package declaration file, if any: pyproject.toml with [project] or [tool.poetry], setup.py, setup.cfg,
+    or a package.json with a name that is not private."""
+    top = {f for f in files if "/" not in f}
+    if "pyproject.toml" in top and re.search(r"^\[(project|tool\.poetry)\]", blob(root, sha, "pyproject.toml") or "", re.M):
+        return "pyproject.toml"
+    for f in ("setup.py", "setup.cfg"):
+        if f in top:
+            return f
+    if "package.json" in top:
+        try:
+            pj = json.loads(blob(root, sha, "package.json") or "{}")
+        except ValueError:
+            pj = {}
+        if isinstance(pj, dict) and pj.get("name") and pj.get("private") is not True:
+            return "package.json"
+    return None
 
 
 def component_map(sha: str, comps: Iterable[ComponentDef]) -> ComponentMap:
@@ -130,13 +191,15 @@ def component_map(sha: str, comps: Iterable[ComponentDef]) -> ComponentMap:
     return ComponentMap(sha=sha, components=cs, digest="sha256:" + hashlib.sha256(canon.encode()).hexdigest(), _index=index)
 
 
-def _js_frameworks(text: str) -> set[str]:
+def _js_frameworks(text: str, keys: tuple[str, ...] = ("dependencies", "devDependencies", "peerDependencies")) -> set[str]:
     try:
         pj = json.loads(text)
     except ValueError:
         return set()
+    if not isinstance(pj, dict):
+        return set()
     deps: dict[str, Any] = {}
-    for k in ("dependencies", "devDependencies", "peerDependencies"):
+    for k in keys:
         if isinstance(pj.get(k), Mapping):
             deps.update(pj[k])
     return {v for k, v in JS_FRAMEWORKS.items() if k in deps}
@@ -173,19 +236,26 @@ def snapshot_facts(root: Path, sha: str) -> SnapshotFacts:
     files = tree_files(root, sha)
     langs = Counter(EXT_LANG[PurePosixPath(f).suffix.lower()] for f in files if PurePosixPath(f).suffix.lower() in EXT_LANG)
     fw: dict[str, list[str]] = defaultdict(list)
+    runtime_fw: set[str] = set()  # JS devDependencies (test servers, bundlers) do not make a library an application
     for f in files:
         name = PurePosixPath(f).name
         if "node_modules/" in f:
             continue
         if name == "package.json":
-            for x in _js_frameworks(blob(root, sha, f) or ""):
+            text = blob(root, sha, f) or ""
+            for x in _js_frameworks(text):
                 fw[x].append(f)
+            runtime_fw |= _js_frameworks(text, ("dependencies", "peerDependencies"))
         elif name in ("pyproject.toml", "requirements.txt", "setup.cfg", "Pipfile") or re.match(r"requirements[-_.].*\.txt$", name):
             for x in _py_frameworks(blob(root, sha, f) or ""):
                 fw[x].append(f)
+                runtime_fw.add(x)
     gen, gen_src = generated_paths(root, sha, files)
-    comps, lay = build_components(files)
+    kind = repo_kind(files, runtime_fw, package_declaration(root, sha, files))
+    comps, lay = build_components(files, kind)
     return SnapshotFacts(files=tuple(files), languages=dict(sorted(langs.items())), frameworks=sorted(fw), generated_paths=gen,
                          components=comps, layer_of=lay, sources={"frameworks": {k: sorted(v) for k, v in sorted(fw.items())},
                                                                   "generated_paths": gen_src, "component_rule": COMPONENT_RULE,
-                                                                  "layer_rule": LAYER_RULE})
+                                                                  "layer_rule": LAYER_RULE,
+                                                                  "repo_kind": {"library": kind.library, "reason": kind.reason,
+                                                                                "rule": LIBRARY_RULE}})

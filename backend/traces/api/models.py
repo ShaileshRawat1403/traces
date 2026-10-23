@@ -42,7 +42,11 @@ class Meta(Strict):
     evidence_schemas_readable: list[str]
     extractor: dict[str, str]
     validators: dict[str, str]
-    isolation: Literal["unshare", "none"]
+    isolation: Literal["unshare", "none", "off", "unavailable"] = Field(
+        description="worker isolation as probed now: unshare (the network-namespace probe through workers/sandbox.sh "
+                    "passed), unavailable (auto or unshare is configured but the probe failed, so index jobs fail closed "
+                    "with E_ISOLATION), off (explicit dev override; snapshots indexed this way are unisolated). none is no "
+                    "longer emitted (D-026). The probe result is cached for 60 s")
     capabilities: dict[str, bool] = Field(description="capability -> implemented in this build")
 
 
@@ -58,8 +62,18 @@ class Repo(Strict):
     latest_discovered_at: str | None = None
     default_branch: str | None = None
     visibility_checked_at: str | None = Field(None, description="when an anonymous (credential-free) ls-remote last confirmed the repo is public")
-    external_ai_consent: bool = Field(False, description="repo-level consent to send source snippets to an external AI provider; "
-                                      "always false in v1 (no endpoint sets it), so explain bundles need per-request consent")
+    external_ai_consent: bool = Field(False, description="repo-level consent to send source snippets to an external AI provider, set "
+                                      "with PUT /repos/{id}/ai-consent (D-027). The browser still shows the outbound manifest and asks "
+                                      "before each send")
+    external_ai_consent_at: str | None = Field(None, description="when the repo-level consent was last granted or revoked (D-027)")
+    external_ai_consent_text_version: str | None = Field(None, description="version of the consent text the user agreed to; null when "
+                                                         "consent is not granted (D-027)")
+
+
+class AiConsentUpdate(Strict):
+    consent: bool = Field(description="true grants repo-level consent to send evidence to an external AI provider; false revokes it")
+    consent_text_version: str | None = Field(None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$",
+                                             description="version of the consent text shown to the user; required when consent is true")
 
 
 class RepoCreate(Strict):
@@ -80,6 +94,11 @@ class Snapshot(Strict):
     stats: dict[str, Any]
     created_at: str
     indexed_at: str | None = None
+    isolation: Literal["unshare", "off"] | None = Field(None, description="how the analysis workers ran for the stored evidence: "
+                                                        "unshare (no network, probe-checked) or off (explicit dev override). null "
+                                                        "before indexing or for snapshots stored before D-026")
+    unisolated: bool | None = Field(None, description="true when the evidence was produced with TRACES_ISOLATION=off; such a snapshot is "
+                                               "never acceptance evidence (D-026)")
 
 
 class HeadInfo(Strict):
@@ -134,7 +153,9 @@ class ClaimSummary(Strict):
     to_symbol: str | None = None
     statement: str
     qualifier: str | None = None
-    flags: list[str] = []
+    flags: list[str] = Field([], description="record flags; injected records also carry injected_control")
+    injected: bool | None = Field(None, description="true for an injected negative control (Task 002 regression fixture): fed to the "
+                                              "validators to prove they reject it, never a statement about the repository")
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -150,15 +171,20 @@ class ClaimPage(Strict):
 class Component(Strict):
     id: str
     name: str
-    layer: Literal["frontend", "api", "backend", "data", "infra", "docs", "tests", "other"]
+    layer: Literal["frontend", "api", "backend", "library", "data", "infra", "docs", "tests", "other"] = Field(
+        description="library: code of a repository that declares a package and has no application framework or entrypoint "
+                    "(D-029); otherwise the path-and-extension rule")
     kind: str
     paths: list[str]
     rule: str = Field(description="deterministic grouping rule that produced this component")
     claim_counts: dict[str, int]
+    reason: str | None = Field(None, description="why this layer: the counted files and rule behind it (D-029); null for "
+                                                 "snapshots indexed before D-029")
 
 
 class RouteItem(Strict):
-    method: str
+    method: str = Field(description="HTTP method as recorded; UNKNOWN when the record has none; USE for an Express-style mount "
+                                    "(flag `mount`), which is not an HTTP operation")
     path: str
     handler_symbol: str | None
     operation_id: str | None
@@ -167,6 +193,8 @@ class RouteItem(Strict):
     status: Status
     claim_id: str | None
     flags: list[str] = []
+    label: str | None = Field(None, description="the route's name exactly as the extractor recorded it (e.g. 'GET /items'), for "
+                                                 "display; null when none was recorded. Never synthesized")
 
 
 class OverviewFact(Strict):
@@ -203,15 +231,18 @@ class GraphEdge(Strict):
     status: Status
     label: Label
     qualifier: str | None = None
-    flags: list[str] = []
+    flags: list[str] = Field([], description="record flags; injected records also carry injected_control")
+    injected: bool | None = Field(None, description="true for an injected negative control, never a statement about the repository; always sent")
 
 
 class GraphResponse(Strict):
     snapshot_id: str
     nodes: list[GraphNode]
     edges: list[GraphEdge]
-    hidden_counts: HiddenCounts
+    hidden_counts: HiddenCounts = Field(description="edges hidden by the status filter, by status, scoped like the edges: the "
+                                                    "filtered snapshot when unfocused, the focused neighbourhood or component otherwise")
     truncated: bool
+    truncated_counts: dict[str, int] | None = Field(None, description="edges matched but cut by `limit`, by status (empty when not truncated)")
     limit: int
 
 
@@ -240,6 +271,11 @@ class TraceHop(Strict):
     reason: str | None = Field(None, description="required for gap and library_contract hops (both are inferred)")
     qualifier: str | None = None
     evidence_scope: Literal["static"] = "static"
+    injected: bool | None = Field(None, description="true when the hop is an injected negative control, never a repository fact; sent for edge hops")
+    hidden_rejected: int | None = Field(None, description="gap hops only: rejected relationships leaving this step that the request hides "
+                                                    "(include_rejected=false); the reason text states all hidden counts")
+    unresolved_calls: list[str] | None = Field(None, description="gap hops for unresolved calls only (F-9, traces without `to`): the call names "
+                                                                  "this step makes that the extractor stored as unresolved references")
 
 
 class TraceResponse(Strict):
@@ -248,7 +284,9 @@ class TraceResponse(Strict):
     to_symbol: str | None
     hops: list[TraceHop]
     hidden_counts: HiddenCounts
-    complete: bool = Field(description="false when the trace contains gaps")
+    complete: bool = Field(description="false when the trace contains gaps (including steps with unresolved outgoing calls) or a "
+                                        "step that rests on a relationship that is not verified or observed")
+    incomplete_reasons: list[str] | None = Field(None, description="why complete is false; empty when complete")
     disclaimer: str = "Static analysis only. No runtime behavior has been observed."
 
 

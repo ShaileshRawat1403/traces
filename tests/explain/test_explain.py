@@ -1,4 +1,5 @@
 """Explain engine tests on generic synthetic records (no fixture names). Collected by the default pytest run (testpaths = tests)"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,17 +17,42 @@ SID = f"github.com__example__app@{SHA}"
 _n = 0
 
 
-def rec(kind: str, status: str, frm: str, to: str | None = None, *, claim_kind: str = "relationship", line: int = 1, **extra: Any) -> dict[str, Any]:
+def rec(
+    kind: str,
+    status: str,
+    frm: str,
+    to: str | None = None,
+    *,
+    claim_kind: str = "relationship",
+    line: int = 1,
+    **extra: Any,
+) -> dict[str, Any]:
     global _n
     _n += 1
     file = frm.split("::")[0]
-    label = {"verified": "verified", "observed": "observed", "unvalidated": "inferred", "missing_location": "inferred", "rejected": "rejected"}[status]
+    label = {
+        "verified": "verified",
+        "observed": "observed",
+        "unvalidated": "inferred",
+        "missing_location": "inferred",
+        "rejected": "rejected",
+    }[status]
     r: dict[str, Any] = {
-        "claim_id": f"c_{_n:064x}", "run_id": "t", "schema_version": "traces-evidence/0.4", "claim_kind": claim_kind,
-        "status": status, "label": label, "class": "analyzer_inference", "evidence_scope": "static", "injected": False,
-        "originator": {"name": "test", "role": "extractor", "version": "0"}, "flags": [],
+        "claim_id": f"c_{_n:064x}",
+        "run_id": "t",
+        "schema_version": "traces-evidence/0.4",
+        "claim_kind": claim_kind,
+        "status": status,
+        "label": label,
+        "class": "analyzer_inference",
+        "evidence_scope": "static",
+        "injected": False,
+        "originator": {"name": "test", "role": "extractor", "version": "0"},
+        "flags": [],
         "from": {"symbol": frm, "file": file, "start_line": line, "end_line": line},
-        "locations": [] if status == "missing_location" else [{"file": file, "start_line": line, "end_line": line, "role": "site", "range_kind": "site"}],
+        "locations": []
+        if status == "missing_location"
+        else [{"file": file, "start_line": line, "end_line": line, "role": "site", "range_kind": "site"}],
         "statement": f"{frm} {kind} {to}",
     }
     if claim_kind == "node":
@@ -50,8 +76,22 @@ RECORDS = [
     rec("routes_to", "verified", CLIENT, HANDLER, line=3),
     rec("persistence_path", "verified", HANDLER, MODEL, line=20),
     rec("calls", "rejected", FORM, MODEL, line=11),
-    rec("route", "observed", "api/tasks.py::api/tasks.py::POST:/tasks", claim_kind="node", line=18, provenance_raw={"route_local_path": "POST /tasks"}),
-    rec("route", "observed", "web/src/routes/home.tsx::web/src/routes/home.tsx::route:/", claim_kind="node", line=5, provenance_raw={"route_local_path": "/"}),
+    rec(
+        "route",
+        "observed",
+        "api/tasks.py::api/tasks.py::POST:/tasks",
+        claim_kind="node",
+        line=18,
+        provenance_raw={"route_local_path": "POST /tasks"},
+    ),
+    rec(
+        "route",
+        "observed",
+        "web/src/routes/home.tsx::web/src/routes/home.tsx::route:/",
+        claim_kind="node",
+        line=5,
+        provenance_raw={"route_local_path": "/"},
+    ),
     rec("writes", "missing_location", HANDLER, MODEL),
 ]
 IDS = {r["claim_id"]: r for r in RECORDS}

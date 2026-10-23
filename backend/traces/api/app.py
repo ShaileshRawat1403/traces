@@ -6,10 +6,11 @@ source, trace, history views, explain and chat bundle are implemented. Nothing r
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Iterator
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
 from fastapi import Depends, FastAPI, Header, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -17,6 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from traces import __version__
 from traces.api.models import (
+    AiConsentUpdate,
     ClaimPage,
     ClaimSummary,
     Component,
@@ -51,6 +53,7 @@ from traces.evidence.views import (
     components_view,
     graph_view,
     history_page,
+    output_flags,
     overview_view,
     routes_view,
     source_view,
@@ -89,25 +92,63 @@ app = FastAPI(title="Traces API", version=__version__,
 
 @app.exception_handler(ApiError)
 async def _api_error(_: Request, e: ApiError) -> JSONResponse:
-    return JSONResponse(e.body, status_code=e.status)
+    return JSONResponse({"error": {**e.body["error"], "detail": redact(e.body["error"].get("detail"))}}, status_code=e.status)
 
 
 @app.exception_handler(IngestError)
 async def _ingest_error(_: Request, e: IngestError) -> JSONResponse:
     headers = {"Retry-After": str(int((e.detail or {}).get("retry_after_s", 5)) + 1)} if e.code == "rate_limited" else None
-    return JSONResponse({"error": {"code": e.code, "message": e.message, "owner": None, "milestone": None, "detail": e.detail}},
+    return JSONResponse({"error": {"code": e.code, "message": e.message, "owner": None, "milestone": None, "detail": redact(e.detail)}},
                         status_code=e.http_status, headers=headers)
+
+
+SENSITIVE_NAME = re.compile(r"(key|token|secret|authorization|password|passwd|credential|cookie)", re.I)
+REDACTED = "[redacted]"
+
+
+def redact(obj: Any) -> Any:
+    """Replace the value of every mapping entry whose name looks sensitive (key, token, secret, authorization, ...),
+    at any depth. Used on every error detail the API returns (security finding F-3)."""
+    if isinstance(obj, dict):
+        return {k: (REDACTED if isinstance(k, str) and SENSITIVE_NAME.search(k) else redact(v)) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [redact(v) for v in obj]
+    return obj
+
+
+def _safe_validation_errors(errors: Any) -> list[dict[str, Any]]:
+    """Field location, message and error type only. Never the rejected input (pydantic's `input`, `ctx`, `url`), so a key
+    submitted by mistake is not echoed back where proxies or browser logs could keep it (F-3)."""
+    out: list[dict[str, Any]] = []
+    for err in errors:
+        loc = [x if isinstance(x, (str, int)) else str(x) for x in err.get("loc", ())]
+        msg = str(err.get("msg", "invalid value"))
+        raw = err.get("input")
+        if isinstance(raw, str) and len(raw) >= 4 and raw in msg:
+            msg = msg.replace(raw, REDACTED)
+        out.append({"loc": loc, "msg": msg, "type": str(err.get("type", "value_error"))})
+    return redact(out)  # type: ignore[no-any-return]
 
 
 @app.exception_handler(RequestValidationError)
 async def _validation_error(_: Request, e: RequestValidationError) -> JSONResponse:
     return JSONResponse({"error": {"code": "invalid_request", "message": "request validation failed", "owner": None, "milestone": None,
-                                   "detail": {"errors": json.loads(json.dumps(e.errors(), default=str))}}}, status_code=422)
+                                   "detail": {"errors": _safe_validation_errors(e.errors())}}}, status_code=422)
 
 
 @lru_cache(maxsize=1)
 def _default_store() -> Store:
-    return Store(get_settings().db_path)
+    s = get_settings()
+    st = Store(s.db_path)
+    try:  # O-9: idempotent startup cleanup of pre-F-6 rows for commits that do not exist (logged)
+        from traces.evidence.maintenance import purge_missing_commit_snapshots
+
+        purge_missing_commit_snapshots(st, s.targets_dir)
+    except Exception:  # noqa: BLE001  maintenance must never stop the API from starting
+        import logging
+
+        logging.getLogger("traces.maintenance").exception("O-9 startup cleanup failed; nothing was changed by this step")
+    return st
 
 
 def get_store() -> Store:
@@ -166,7 +207,7 @@ def _snapshot_out(s: dict[str, Any]) -> Snapshot:
     return Snapshot(id=s["id"], repo_id=s["repo_id"], sha=s["sha"], state=s["state"], evidence_schema=s["evidence_schema"],
                     extractor=json.loads(s["extractor_json"]), languages=json.loads(s["languages_json"]), frameworks=json.loads(s["frameworks_json"]),
                     generated_paths=json.loads(s["generated_paths_json"]), stats=json.loads(s["stats_json"]), created_at=s["created_at"],
-                    indexed_at=s["indexed_at"])
+                    indexed_at=s["indexed_at"], isolation=s.get("isolation"), unisolated=s.get("isolation") == "off")
 
 
 # ------------------------------------------------------------------------------------------------ service
@@ -175,13 +216,37 @@ def health(st: StoreDep) -> Health:
     return Health(status="ok", version=__version__, store_migration=st.schema_version())
 
 
+IsoState = Literal["unshare", "off", "unavailable"]
+_ISO_CACHE: dict[str, tuple[float, IsoState]] = {}
+
+
+def _probed_isolation(s: Any) -> IsoState:
+    """What an index job would get now (D-026): the real sandbox probe, not the configured value. Cached for 60 s."""
+    import time
+
+    from traces.evidence.pipeline import IsolationUnavailable, resolve_isolation
+
+    key = f"{s.isolation}|{s.workers_dir}"
+    hit = _ISO_CACHE.get(key)
+    if hit and time.monotonic() - hit[0] < 60:
+        return hit[1]
+    out: IsoState
+    try:
+        out = "off" if resolve_isolation(s) == "off" else "unshare"
+    except IsolationUnavailable:
+        out = "unavailable"
+    _ISO_CACHE[key] = (time.monotonic(), out)
+    return out
+
+
 @app.get(f"{API}/meta", response_model=Meta, tags=["service"])
 def meta() -> Meta:
     s = get_settings()
     return Meta(version=__version__, evidence_schema=CURRENT, evidence_schemas_readable=sorted(SCHEMAS),
                 extractor={"codegraph": "@colbymchenry/codegraph@1.6.2"},
-                validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api"},
-                isolation="none" if s.isolation == "none" else "unshare",
+                validators={"python": "cpython-3.14 ast", "typescript": "typescript@6.0.3 compiler api",
+                            "javascript": "typescript@6.0.3 parser, imports only (D-030)"},
+                isolation=_probed_isolation(s),
                 capabilities={"repos": True, "snapshots": True, "claims": True, "export": True, "jobs_poll": True,
                               "index_jobs": True, "head": True, "overview": True, "components": True, "routes": True,
                               "graph": True, "source": True, "trace": True, "history": True, "compare": True,
@@ -193,7 +258,9 @@ def meta() -> Meta:
 def register_repo(body: RepoCreate, st: StoreDep, probe: ProbeDep) -> Repo:
     """Validate a public GitHub URL, confirm anonymously that it is public (credential-free `git ls-remote`), record the
     default branch and HEAD, and pin a snapshot (state `pending`) at `sha` or, when omitted, at the discovered HEAD.
-    Nothing is cloned here; indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public."""
+    A given `sha` other than HEAD is confirmed to exist with an anonymous shallow fetch of that commit object only (no
+    trees or blobs); an unknown commit gives 422 sha_not_found and nothing is registered. Nothing is cloned here;
+    indexing is a separate job. A private, missing or renamed repository gives 422 repo_not_public."""
     try:
         ref = parse_repo_url(body.url)
     except ValueError as e:
@@ -204,6 +271,11 @@ def register_repo(body: RepoCreate, st: StoreDep, probe: ProbeDep) -> Repo:
         except ValueError as e:
             raise ApiError(422, "invalid_sha", str(e)) from None
     head = probe.head(ref, max_age_s=0)
+    if body.sha is not None and body.sha != head.sha:
+        check = getattr(probe, "commit_exists", None)  # test doubles that only stand in for ls-remote may omit it
+        if callable(check) and not check(ref, body.sha):
+            raise ApiError(422, "sha_not_found", f"commit {body.sha} is not in {ref.slug} (checked anonymously at registration); "
+                           "nothing was registered")
     st.upsert_repo(ref.cache_key, ref.host, ref.owner, ref.name, f"https://github.com/{ref.slug}")
     st.record_remote_head(ref.cache_key, head.sha, head.default_branch, head.checked_at)
     st.ensure_snapshot(ref.cache_key, body.sha or head.sha)
@@ -217,6 +289,19 @@ def list_repos(st: StoreDep) -> list[Repo]:
 
 @app.get(f"{API}/repos/{{repo_id}}", response_model=Repo, responses=ERR, tags=["repos"])
 def get_repo(repo_id: str, st: StoreDep) -> Repo:
+    return Repo(**_repo(st, repo_id))
+
+
+@app.put(f"{API}/repos/{{repo_id}}/ai-consent", response_model=Repo, responses=ERR, tags=["repos"])
+def set_ai_consent(repo_id: str, body: AiConsentUpdate, st: StoreDep) -> Repo:
+    """Record or revoke repo-level consent to send evidence from this repository to an external AI provider (D-027).
+    Stores the decision, its time and the version of the consent text the user saw (required when granting). This
+    is bookkeeping for the browser: no key or provider call ever reaches the backend, and the browser still shows the
+    outbound manifest and asks before each send."""
+    _repo(st, repo_id)
+    if body.consent and not body.consent_text_version:
+        raise ApiError(422, "invalid_request", "consent_text_version is required when granting consent")
+    st.set_ai_consent(repo_id, body.consent, body.consent_text_version if body.consent else None, now())
     return Repo(**_repo(st, repo_id))
 
 
@@ -274,6 +359,11 @@ def create_index_job(repo_id: str, body: IndexJobCreate, st: StoreDep, probe: Pr
             st.record_remote_head(repo_id, head.sha, head.default_branch, head.checked_at)
             sha = head.sha
     snap = st.get_snapshot(f"{repo_id}@{sha}")
+    if body.sha is not None and sha != r["latest_discovered_sha"] and not (snap and snap["state"] == "ready"):
+        # F-6: refuse an unknown commit before any snapshot row, job or clone exists
+        check = getattr(probe, "commit_exists", None)
+        if callable(check) and not check(ref, sha):
+            raise ApiError(422, "sha_not_found", f"commit {sha} is not in {ref.slug} (checked anonymously); no job was created")
     if snap and snap["state"] == "ready" and not body.reindex and not st.active_job(snap["id"]):
         raise ApiError(409, "already_indexed", f"{snap['id']} is already indexed; send reindex=true to index it again",
                        detail={"snapshot_id": snap["id"]})
@@ -336,7 +426,8 @@ def list_claims(repo_id: str, sha: str, st: StoreDep,
             "claim_id": r["claim_id"], "claim_kind": r["claim_kind"], "kind": r.get("relationship_kind") or r.get("node_kind"),
             "status": r["status"], "label": r["label"], "class": r["class"], "evidence_scope": r["evidence_scope"],
             "from_symbol": (r.get("from") or {}).get("symbol"), "to_symbol": (r.get("to") or {}).get("symbol"),
-            "statement": r["statement"], "qualifier": r.get("qualifier"), "flags": r.get("flags", [])}))
+            "statement": r["statement"], "qualifier": r.get("qualifier"), "flags": output_flags(r),
+            "injected": bool(r.get("injected"))}))
     total = sum(c for s, c in counts.items() if s in allowed)
     return ClaimPage(items=items, total=total, offset=offset, limit=limit, hidden_counts=hidden)
 

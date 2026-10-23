@@ -24,7 +24,7 @@ const CATEGORY: Record<string, { title: string; help: string }> = {
   code_structure: { title: "Code structure", help: "Verified or observed static claims." },
   inference: { title: "Inference", help: "Claims that are not established." },
   documented_decisions: { title: "Documented decisions", help: "Statements from README, ADRs or docs." },
-  history_patterns: { title: "History patterns", help: "Patterns from commit history." },
+  history_patterns: { title: "History patterns", help: "Patterns in commit history, such as files changed together. A pattern, not a code dependency or a cause." },
   runtime_observations: { title: "Runtime observations", help: "Always empty: Traces analyzes code statically." },
 };
 const CATEGORY_ORDER = ["code_structure", "inference", "documented_decisions", "history_patterns", "runtime_observations"];
@@ -40,7 +40,7 @@ function Cites({ ids, base, citations }: { ids: readonly string[]; base: string;
   const shown = ids.slice(0, CITE_CAP);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <span className="inline-flex flex-wrap gap-1" aria-label={`${ids.length} citations`}>
+      <span role="group" className="inline-flex flex-wrap gap-1" aria-label={`${ids.length} citations`}>
         {shown.map((id, i) => {
           const c = citations.find((x) => x.claim_id === id);
           const file = c?.file ? c.file.split("/").pop() : null;
@@ -127,7 +127,9 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
                 {CATEGORY[k]?.title ?? k}
                 <span className="block text-xs text-muted">{CATEGORY[k]?.help ?? ""}</span>
               </dt>
-              <dd className="tabular-nums">{(r.categories[k] ?? []).length}</dd>
+              <dd className="tabular-nums" data-testid={`category-${k}`}>
+                {(r.categories[k] ?? []).length}
+              </dd>
             </div>
           ))}
         </dl>

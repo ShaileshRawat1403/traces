@@ -1,7 +1,8 @@
 """Task 002 step 7/8/9 orchestrator: adds independent checks to adapter records, the expected-chain fixture and the
 injected set; computes status by EVIDENCE_SCHEMA v3 section 7 (V1 to V6, Decision 002-B); writes the validation output.
 Ported from research/task002/validators/run_validation.py; status logic unchanged. Runs inside the isolation wrapper.
-Families: cpython-ast (in process) and typescript-compiler (node + TS 6.0.3 subprocess).
+Families: cpython-ast (in process) and typescript-compiler (node + TS 6.0.3 subprocess; for JavaScript the TS parser only,
+for `imports` edges, D-030).
 Usage: python -m traces.validators.orchestrator --run-dir <run> --records <records.jsonl> --src <checkout> --sha <sha>
        --ts-module <typescript dir> [--node node] (--fixture <chain.json> --injected <injected.jsonl> | --no-fixture)
 --no-fixture (INDEX worker, any repository): validates the adapter records only; no expected-chain fixture, no injected
@@ -10,6 +11,7 @@ import argparse, json, os, re, subprocess, time
 from collections import Counter
 from traces.core.common import Blobs, canon, sha256_hex, now_ist, line_count, normalize_file_range
 from traces.validators.python_ast import PyValidator, Rules, chk as pychk, loc as pyloc
+from traces.validators import js_imports
 import ast
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +27,7 @@ GITV = {"name": "traces-lchecks 1.0.0", "version": "git blob at repo_sha + text 
 
 
 def lang(path):
-    return "py" if path.endswith(".py") else "ts" if path.endswith((".ts", ".tsx")) else None
+    return "py" if path.endswith(".py") else "ts" if path.endswith((".ts", ".tsx")) else "js" if js_imports.is_js(path) else None
 
 
 class Orchestrator:
@@ -57,7 +59,7 @@ class Orchestrator:
         return {"file": row["file_path"], "name": row["name"], "qualified_name": row["qualified_name"], "kind": row["kind"], "start_line": row["start_line"], "end_line": row["end_line"]}
 
     def tasks(self):
-        ts, py, none = [], [], []
+        ts, py, js, none = [], [], [], []
         for r in self.records:
             raw = r["provenance_raw"]; row = raw["row"]; rk = r["_rk"]
             if r["claim_kind"] == "node":
@@ -71,14 +73,42 @@ class Orchestrator:
                 t = {"type": "edge", "rk": rk, "rel_kind": r["relationship_kind"], "src": self.node_of(s), "tgt": self.node_of(g), "line": row["line"], "col": row["col"],
                      "missing": row["line"] is None, "value_ref": md.get("valueRef") is True, "enclosing": bool(site) and site[0]["range_kind"] == "enclosing_scope"}
                 f = s["file_path"] if r["relationship_kind"] != "contains" else g["file_path"]
+            if lang(f) == "js":  # D-030: JavaScript imports only; JS nodes, calls and references have no validator in v1
+                (js if t["type"] == "edge" and t["rel_kind"] == "imports" else none).append(t)
+                continue
             (py if lang(f) == "py" else ts if lang(f) == "ts" else none).append(t)
         if self.with_fixture:
             for fid in ("L1", "L2A", "L2B", "L3", "H1", "H2"):
                 ts.append({"type": "fixture", "rk": "fixture:" + fid, "fixture": fid})
             ts.append({"type": "r3facts", "rk": "r3facts"})
-        return ts, py, none
+        return ts, py, js, none
 
     # ---------- run validators ----------
+    def run_js(self, tasks):
+        """D-030: parse the importing JavaScript files with the pinned TS parser (node subprocess, no type checker), then
+        resolve each module specifier against the Git tree here. Only `imports` edges are checked."""
+        if not tasks:
+            return {}
+        tp = os.path.join(self.a.run_dir, "validation", "js_job.json"); op = os.path.join(self.a.run_dir, "validation", "js_refs.json")
+        json.dump({"root": SRC, "sha": REPO_SHA, "files": js_imports.files_to_parse(tasks)}, open(tp, "w"))
+        t0 = time.time()
+        out = subprocess.run([NODE, os.path.join(HERE, "js", "js_imports.js"), tp, op], env={**os.environ, "TS_MODULE": TS_MODULE}, capture_output=True, text=True)
+        self.timing["js_validator_s"] = round(time.time() - t0, 1)
+        self.log.append(f"$ TS_MODULE={TS_MODULE} {NODE} validators/js/js_imports.js {tp} {op}\n{out.stdout}{out.stderr}[exit={out.returncode}]")
+        if out.returncode != 0:
+            raise SystemExit("js import parser failed: " + out.stderr[-2000:])
+        parsed = json.load(open(op))
+        tree = self.blobs.tree
+        res = {}
+        for t in tasks:
+            r = js_imports.edge_check(t, parsed["files"], tree, self._text_or_none, parsed["parser"])
+            if r is not None:
+                res[t["rk"]] = r
+        return res
+
+    def _text_or_none(self, path):
+        return self.blobs.text(path) if self.blobs.exists(path) else None
+
     def run_ts(self, tasks):
         tp = os.path.join(self.a.run_dir, "validation", "ts_tasks.json"); op = os.path.join(self.a.run_dir, "validation", "ts_results.json")
         job = {"root": SRC, "sha": REPO_SHA, "tasks": tasks}
@@ -288,6 +318,8 @@ class Orchestrator:
             return name_tok(g)
         if l["range_kind"] == "enclosing_scope" or s["kind"] == "route":
             return name_tok(s)
+        if rec["relationship_kind"] == "imports" and js_imports.is_js(s["file_path"]) and g["kind"] in ("file", "import"):
+            return ("js_module_ref", {"importer": s["file_path"], "kind": g["kind"], "file": g["file_path"], "name": g["name"]})
         if rec["relationship_kind"] == "imports":
             tn = g["name"] if g["kind"] in ("file", "import") else g["name"].split("::")[-1].split(".")[-1]
             return ("word", "import|from|export") if g["kind"] in ("file", "import") else ("word", "import|from|export|" + re.escape(tn))
@@ -326,6 +358,12 @@ class Orchestrator:
                 out.append({"method": "L3_token_at_location", "establishes": "location", "rule_id": None, "validator": GITV, "inputs": [l], "expected": "non-empty source text in range (no token rule: file range or validator-added location)", "result": "pass" if ok3 else "fail", "detail": f"{len(seg)} chars"})
             else:
                 mode, t = tok
+                if mode == "js_module_ref":  # F-10: ES keywords as before, or require('x') matching the target exactly
+                    ok3, why3 = js_imports.l3_pass(seg, t["importer"], t, self.blobs.tree, self._text_or_none)
+                    out.append({"method": "L3_token_at_location", "establishes": "location", "rule_id": None, "validator": GITV, "inputs": [l],
+                                "expected": f"token 'import|from|export' (word), or require('<spec>') whose specifier resolves exactly to {t['kind']} {t['name']!r}, in {l['file']}:{l['start_line']}-{l['end_line']}",
+                                "result": "pass" if ok3 else "fail", "detail": why3 if ok3 else f"not found ({why3}); first line: {seg.split(chr(10))[0].strip()[:100]!r}"})
+                    continue
                 if mode == "word":
                     try:
                         ok3 = re.search(r"(?<![A-Za-z0-9_$])(?:" + (t if "|" in t else re.escape(t)) + r")(?![A-Za-z0-9_$])", seg) is not None
@@ -425,13 +463,14 @@ class Orchestrator:
         os.makedirs(os.path.join(self.a.run_dir, "validation"), exist_ok=True)
         self.log = []
         t0 = time.time()
-        ts_tasks, py_tasks, none = self.tasks()
+        ts_tasks, py_tasks, js_tasks, none = self.tasks()
         ts_res = self.run_ts(ts_tasks)
         py_res = self.run_py(py_tasks)
+        js_res = self.run_js(js_tasks)
         fx_py = self.fixture_py(ts_res) if self.with_fixture else {}
         no_family = Counter()
         for r in self.records:
-            rk = r["_rk"]; res = ts_res.get(rk) or py_res.get(rk)
+            rk = r["_rk"]; res = ts_res.get(rk) or py_res.get(rk) or js_res.get(rk)
             if res is None:
                 no_family[r["claim_kind"]] += 1
                 res = {"checks": [], "reason": "no validator family for this file language"}

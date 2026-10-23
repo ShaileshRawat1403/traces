@@ -5,6 +5,8 @@
 - Identities: every non-merge change is attributed to the HEAD path it became, walking commits newest to oldest and
   following renames backwards. Copies start a new identity. A path reused after a delete is a new identity.
 - Bulk moves: renames in one commit grouped by common-suffix stripping into old_prefix -> new_prefix.
+- Lineage breaks (D-H15): the identity rule above is unchanged. `lineage_breaks` only counts, per HEAD path, the
+  delete then re-add gaps before its identity starts, so churn, hotspot and co-change records can say so.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from .records import RunContext, citation, ep_commit, ep_component, ep_path, fin
 from .shapes import ComponentMap, HistoryResult, Record, default_context, validate_component_map
 
 DIR_DEPTH = 3
+LINEAGE_FLAG = "x-lineage_restart"
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,39 @@ def identities(log: HistoryLog, alive: set[str] | frozenset[str]) -> Identities:
                 moved[ch.old_path] = hp
         mapping.update(moved)
     return Identities(attr, frozenset(alive))
+
+
+def lineage_breaks(log: HistoryLog, ids: Identities) -> dict[str, int]:
+    """HEAD path -> number of delete then re-add gaps hidden before its identity starts (D-H15).
+
+    An identity starts at the oldest `A` or `C` change attributed to it (path P at commit i). Every non-merge `D` of
+    the same path P earlier in the analysed range (topological order, oldest first) is one gap: the history before it
+    belongs to an identity that did not survive, so it is not counted for the HEAD path. Paths without a gap are
+    absent. Lineage itself is not changed."""
+    starts: dict[str, tuple[int, str]] = {}
+    deletes: dict[str, list[int]] = defaultdict(list)
+    for i, c in enumerate(log.commits):
+        if c.is_merge:
+            continue
+        for ch in c.changes:
+            if ch.status == "D":
+                deletes[ch.path].append(i)
+            elif ch.status in "AC":
+                hp = ids.head_path(c.sha, ch.path)
+                if hp is not None and hp not in starts:
+                    starts[hp] = (i, ch.path)
+    out: dict[str, int] = {}
+    for hp, (i, p) in starts.items():
+        n = sum(1 for j in deletes.get(p, ()) if j < i)
+        if n:
+            out[hp] = n
+    return out
+
+
+def lineage_caveat(path: str, n: int) -> str:
+    gaps = "1 delete and re-add gap" if n == 1 else f"{n} delete and re-add gaps"
+    return (f"History for {path} restarts after {gaps} in the analysed range; commits before the last re-add are "
+            "not counted for this path.")
 
 
 def _dirs(path: str) -> set[str]:
@@ -168,7 +204,8 @@ def lifecycle(log: HistoryLog, *, components: ComponentMap | None = None, ctx: R
     report = {"stage": "lifecycle", "replay_check": check, "records": len(recs), "bulk_moves": len(recs),
               "dir_events": dir_events(log), "parameters": params,
               "components": "used" if components else "component map not supplied: component lifecycles skipped",
-              "identity_rule": "newest-to-oldest walk over non-merge commits; renames carry identity, copies start a new one"}
+              "identity_rule": "newest-to-oldest walk over non-merge commits; renames carry identity, copies start a new one",
+              "lineage_breaks": dict(sorted(lineage_breaks(log, ids).items()))}
     if components is not None:
         report["bulk_moves"] = sum(1 for r in recs if r.get("relationship_kind") == "prefix_moved")
     return HistoryResult(recs, report)
