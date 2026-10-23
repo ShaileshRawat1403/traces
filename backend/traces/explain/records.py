@@ -52,6 +52,9 @@ class ClaimView:
     qualifier: str | None = None
     # Echoed criteria of a history pattern as (key, compact JSON value) pairs, in CRITERIA_KEYS order.
     criteria: tuple[tuple[str, str], ...] = ()
+    scope: str = ""
+    # Full commit SHAs this record is about (commit:: endpoints and origin.commit), for commit questions.
+    commits: tuple[str, ...] = ()
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
@@ -64,6 +67,11 @@ class ClaimView:
         """Grounded code evidence. A history pattern is never grounded, whatever its status: observed only means its
         counts were rechecked against Git."""
         return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label and not self.history_pattern
+
+    @property
+    def code_structure(self) -> bool:
+        """Grounded static code evidence (not a Git or history record)."""
+        return self.grounded and self.scope not in ("history", "documented")
 
     @property
     def inferred(self) -> bool:
@@ -96,6 +104,18 @@ def words_of(*texts: str | None) -> frozenset[str]:
         spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", t)
         out.update(w for w in _WORD.findall(spaced.lower()) if len(w) >= 2)
     return frozenset(out)
+
+
+def _commits_of(record: dict[str, Any]) -> tuple[str, ...]:
+    out: list[str] = []
+    for end in (record.get("from") or {}, record.get("to") or {}):
+        sym = end.get("symbol") if isinstance(end, dict) else None
+        if isinstance(sym, str) and sym.startswith("commit::"):
+            out.append(sym[len("commit::"):].lower())
+    origin = record.get("origin")
+    if isinstance(origin, dict) and isinstance(origin.get("commit"), str):
+        out.append(origin["commit"].lower())
+    return tuple(dict.fromkeys(out))
 
 
 def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
@@ -145,5 +165,7 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         record_class=str(record.get("class") or ""),
         qualifier=record.get("qualifier") if isinstance(record.get("qualifier"), str) else None,
         criteria=criteria_of(record),
+        scope=str(record.get("evidence_scope") or ""),
+        commits=_commits_of(record),
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )

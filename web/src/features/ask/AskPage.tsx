@@ -64,7 +64,7 @@ function ExplainPanel({ repoId, sha }: { repoId: string; sha: string }) {
         <label htmlFor={qid} className="text-sm font-medium">
           Question about this snapshot
         </label>
-        <textarea id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-line-strong p-2" placeholder="What does the items page depend on?" />
+        <textarea id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-line-strong p-2" placeholder="For example: What does a function depend on? What calls it? Trace from one symbol to another." />
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" variant="primary" disabled={!question.trim() || ask.isPending}>
             {ask.isPending ? "Asking" : "Explain (no key needed)"}
