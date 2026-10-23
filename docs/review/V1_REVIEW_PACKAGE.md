@@ -36,8 +36,6 @@ Short paths used below: `F` = `/r/github.com__fastapi__full-stack-fastapi-templa
 | 17 | `I` and `I/graph` | Second repo, a Python library: no routes, shown as an absence of records. Component `src/itsdangerous` is in the Library layer with its reason. 0 rejected claims after the F-4 and F-5 fixes. Unvalidated edges are hidden by default, not deleted |
 | 18 | Browser devtools at 360 px wide: `F/trace`, tap **Open evidence**; then `F/graph` | The flow and drawer fit the phone width, with no sideways scroll |
 
-Two notes in DEMO_SCRIPT.md's "Things to say" section are out of date. Routes, Components and Source now render real data (G-3 closed). Ask now routes by intent (F-7 fixed), so "What does create_item depend on?" answers with `get_db` and `get_current_user`.
-
 **Known limits to expect on the walk:**
 - Graph and trace take about 0.6 to 0.9 s on fsft (L-1).
 - JavaScript repos: only imports can be verified; calls and references stay unvalidated (L-2).

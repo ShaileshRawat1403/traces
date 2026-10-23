@@ -42,8 +42,8 @@ The same API path (`POST /api/v1/repos`, `POST /api/v1/repos/{id}/index-jobs`) w
 - Say "statically established", never "it saves to the database". Nothing in Traces runs the target code.
 - Library steps (react-hook-form, TanStack Query) stay Inferred on purpose.
 - History screens show Git facts and patterns. A milestone or co-change is not a statement of intent.
-- Do not open Routes, Components or Source as standalone pages: they still say "scheduled for the next UI checkpoint" (gap G-3).
-- Ask is keyword retrieval. Use the two questions above; "What does create_item depend on?" returns unrelated matches (finding F-7).
+- Routes, Components and Source render real data at the pinned commit (G-3 closed), so they are safe to open.
+- Ask routes by intent (F-7 fixed). "What does create_item depend on?" answers with get_db and get_current_user, all verified.
 
 ## Re-check before a demo
 
