@@ -52,6 +52,13 @@ class ClaimView:
     qualifier: str | None = None
     # Echoed criteria of a history pattern as (key, compact JSON value) pairs, in CRITERIA_KEYS order.
     criteria: tuple[tuple[str, str], ...] = ()
+    scope: str = ""
+    # Full commit SHAs this record is about (commit:: endpoints and origin.commit), for commit questions.
+    commits: tuple[str, ...] = ()
+    # Co-change support (shared commits), union of commits touching either side, and coupling degree, from metrics.
+    support: int | None = None
+    union: int | None = None
+    degree: float | None = None
     words: frozenset[str] = field(default=frozenset(), compare=False)
 
     @property
@@ -64,6 +71,11 @@ class ClaimView:
         """Grounded code evidence. A history pattern is never grounded, whatever its status: observed only means its
         counts were rechecked against Git."""
         return self.status in GROUNDED and EXPECTED_LABEL.get(self.status) == self.label and not self.history_pattern
+
+    @property
+    def code_structure(self) -> bool:
+        """Grounded static code evidence (not a Git or history record)."""
+        return self.grounded and self.scope not in ("history", "documented")
 
     @property
     def inferred(self) -> bool:
@@ -98,6 +110,18 @@ def words_of(*texts: str | None) -> frozenset[str]:
     return frozenset(out)
 
 
+def _commits_of(record: dict[str, Any]) -> tuple[str, ...]:
+    out: list[str] = []
+    for end in (record.get("from") or {}, record.get("to") or {}):
+        sym = end.get("symbol") if isinstance(end, dict) else None
+        if isinstance(sym, str) and sym.startswith("commit::"):
+            out.append(sym[len("commit::"):].lower())
+    origin = record.get("origin")
+    if isinstance(origin, dict) and isinstance(origin.get("commit"), str):
+        out.append(origin["commit"].lower())
+    return tuple(dict.fromkeys(out))
+
+
 def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     """The record's own criteria, echoed verbatim (compact, key-sorted JSON per value). Reads parameters.values, then
     parameters, then a top-level criteria object."""
@@ -110,6 +134,21 @@ def criteria_of(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     if not isinstance(src, dict):
         return ()
     return tuple((k, json.dumps(src[k], sort_keys=True, separators=(",", ":"), ensure_ascii=False)) for k in CRITERIA_KEYS if k in src)
+
+
+def _num(d: Any, key: str) -> float | None:
+    v = d.get(key) if isinstance(d, dict) else None
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def endpoint_path(symbol: str | None) -> str | None:
+    """The repository path of a file:: endpoint, or the name of a component:: endpoint; None otherwise."""
+    if not symbol:
+        return None
+    for pre in ("file::", "component::"):
+        if symbol.startswith(pre):
+            return symbol[len(pre):] or None
+    return None
 
 
 def view(record: dict[str, Any]) -> ClaimView | None:
@@ -145,5 +184,10 @@ def view(record: dict[str, Any]) -> ClaimView | None:
         record_class=str(record.get("class") or ""),
         qualifier=record.get("qualifier") if isinstance(record.get("qualifier"), str) else None,
         criteria=criteria_of(record),
+        scope=str(record.get("evidence_scope") or ""),
+        commits=_commits_of(record),
+        support=int(sup) if (sup := _num(record.get("metrics"), "support") or _num(raw, "support")) is not None else None,
+        union=int(uni) if (uni := _num(record.get("metrics"), "union_commits")) is not None else None,
+        degree=_num(record.get("metrics"), "degree"),
         words=words_of(fr.get("symbol"), to.get("symbol"), kind, route, first.get("file")),
     )

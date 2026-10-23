@@ -3,7 +3,7 @@ import { splitSymbol } from "../../api/record";
 import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
-import { orderedHops, traceSummary, type HopView } from "./traceModel";
+import { GAP_MEANING, gapHiddenNote, orderedHops, traceSummary, type HopView } from "./traceModel";
 
 function Sym({ id }: { id: string }) {
   const s = splitSymbol(id);
@@ -15,7 +15,7 @@ function Sym({ id }: { id: string }) {
   );
 }
 
-function Hop({ v, onEvidence }: { v: HopView; onEvidence: (id: string) => void }) {
+function Hop({ v, onEvidence, hiddenNote }: { v: HopView; onEvidence: (id: string) => void; hiddenNote: string | null }) {
   const { hop } = v;
   return (
     <li className="flow-hop" data-hop={v.kind}>
@@ -45,10 +45,24 @@ function Hop({ v, onEvidence }: { v: HopView; onEvidence: (id: string) => void }
             <StatusChip status={v.kind === "edge" ? hop.status : v.labelMismatch || !hop.status ? "unvalidated" : hop.status} label={v.kind === "edge" ? hop.label : "inferred"} qualifier={hop.qualifier} />
           </div>
           {v.kind !== "edge" ? (
-            <p className="flow-span text-sm" data-testid="hop-reason">
-              <span className="font-semibold">Why this is inferred: </span>
-              {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
-            </p>
+            v.kind === "gap" ? (
+              <div className="flow-span flex flex-col gap-1 text-sm" data-testid="hop-reason">
+                <p data-testid="gap-meaning">
+                  <span className="font-semibold">What this gap means: </span>
+                  {GAP_MEANING}
+                </p>
+                {hiddenNote ? <p className="text-ink-2" data-testid="gap-hidden">{hiddenNote}</p> : null}
+                <p className="text-ink-2">
+                  <span className="font-semibold">API note: </span>
+                  {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
+                </p>
+              </div>
+            ) : (
+              <p className="flow-span text-sm" data-testid="hop-reason">
+                <span className="font-semibold">Why this is inferred: </span>
+                {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
+              </p>
+            )
           ) : null}
           {v.labelMismatch ? (
             <p className="flow-span text-xs text-unknown" role="note">
@@ -92,14 +106,14 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
           </p>
         ) : (
           <p className="text-sm font-semibold text-inferred" role="note" data-testid="trace-incomplete">
-            Incomplete: this trace has gaps. Gaps are steps where no relationship was recorded; they are inferred, not observed.
+            Incomplete: this trace has gaps. A gap is a step that no accepted static evidence connects. It is not evidence that a call does or does not happen.
           </p>
         )}
         <p className="text-xs text-muted">{t.disclaimer}</p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
           <li>Solid border: a recorded relationship.</li>
           <li>Dotted border: inferred library step.</li>
-          <li>Dashed border: a gap, no recorded relationship.</li>
+          <li>Dashed border: a gap, no accepted static evidence.</li>
         </ul>
         <HiddenCounts counts={t.hidden_counts} reviewHref={reviewHref} />
       </div>
@@ -109,7 +123,7 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
         <>
           <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
             {hops.map((v) => (
-              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
+              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} hiddenNote={gapHiddenNote(t.hidden_counts)} />
             ))}
           </ol>
         </>

@@ -40,7 +40,7 @@ function Cites({ ids, base, citations }: { ids: readonly string[]; base: string;
   const shown = ids.slice(0, CITE_CAP);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <span className="inline-flex flex-wrap gap-1" aria-label={`${ids.length} citations`}>
+      <span role="group" className="inline-flex flex-wrap gap-1" aria-label={`${ids.length} citations`}>
         {shown.map((id, i) => {
           const c = citations.find((x) => x.claim_id === id);
           const file = c?.file ? c.file.split("/").pop() : null;

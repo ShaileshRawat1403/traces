@@ -38,7 +38,7 @@ test.describe("trace", () => {
     const steps = page.getByRole("list", { name: "Trace steps in order" }).getByRole("listitem");
     await expect(steps).toHaveCount(5);
     expect(await steps.evaluateAll((els) => els.map((e) => e.getAttribute("data-hop")))).toEqual(["edge", "edge", "library_contract", "gap", "edge"]);
-    await expect(steps.nth(3)).toContainText("Gap: no recorded relationship");
+    await expect(steps.nth(3)).toContainText("Gap: no static evidence connects these steps");
     await expect(steps.nth(3).getByTestId("hop-reason")).toContainText("dependency injection");
     await expect(steps.nth(2).getByTestId("hop-reason")).toBeVisible();
     await expect(page.getByTestId("trace-incomplete")).toBeVisible();

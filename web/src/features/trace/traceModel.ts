@@ -1,6 +1,17 @@
 import type { TraceHop, TraceResponse } from "../../api/client";
 import { presentStatus, type StatusPresentation } from "../../status/status";
 
+/** Plain wording for a trace gap (acceptance note O-2). It says what the evidence lacks, never whether a call happens. */
+export const GAP_MEANING =
+  "No static evidence that Traces accepts connects these two steps. This does not mean a call happens here, and it does not mean one never does.";
+
+/** Rejected relationships are hidden from traces; when there are any, a gap may sit where one of them was. */
+export function gapHiddenNote(hidden: Record<string, number> | null | undefined): string | null {
+  const n = hidden?.rejected ?? 0;
+  if (!n) return null;
+  return `${n.toLocaleString("en-US")} rejected relationship${n === 1 ? " is" : "s are"} hidden from this trace, so a rejected one may touch this step. The API's note below does not count them.`;
+}
+
 export type HopKind = "edge" | "gap" | "library_contract" | "hidden";
 
 export interface HopView {
@@ -42,7 +53,7 @@ export function presentHop(hop: TraceHop): HopView {
     hop,
     kind: hop.type,
     status,
-    title: hop.type === "gap" ? "Gap: no recorded relationship" : "Library contract step",
+    title: hop.type === "gap" ? "Gap: no static evidence connects these steps" : "Library contract step",
     reason,
     reasonMissing: reason === null,
     labelMismatch,

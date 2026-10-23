@@ -37,7 +37,7 @@ const LABEL_TEXT: Record<Label, string> = {
 };
 
 // Allowed status -> label pairs (CONTRACTS.md section 2).
-const EXPECTED_LABEL: Record<Status, Label> = {
+export const EXPECTED_LABEL: Record<Status, Label> = {
   verified: "verified",
   observed: "observed",
   unvalidated: "inferred",
