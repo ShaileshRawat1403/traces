@@ -19,7 +19,7 @@ typecheck:
 	uv run --frozen mypy
 	cd web && npm run -s typecheck
 
-# Unit + API tests (no network, no toolchain).
+# Unit + API tests. The index tests need the pinned toolchain (`make toolchain`) and, for the Task 002 product index, the cached target.
 test-fast:
 	uv run --frozen pytest -q tests/unit tests/api
 

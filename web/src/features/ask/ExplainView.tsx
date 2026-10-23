@@ -1,7 +1,22 @@
 import { Link } from "react-router-dom";
 import type { ExplainResponse } from "../../api/client";
-import { CitationLinks, StandingChip, factStanding } from "../../ui/Facts";
+import { StandingChip, factStanding } from "../../ui/Facts";
 import { StatusChip } from "../../ui/StatusChip";
+
+function Meter({ label, n, total, cls }: { label: string; n: number; total: number; cls: string }) {
+  const pct = total === 0 ? 0 : Math.round((n / total) * 100);
+  return (
+    <div className="rounded-md border border-line bg-canvas px-2 py-1">
+      <div className="flex justify-between gap-2 text-ink-2">
+        <span>{label}</span>
+        <span className="tabular-nums">{n}</span>
+      </div>
+      <span className="mt-1 block h-1.5 rounded bg-sunken">
+        <span className={`block h-1.5 rounded ${cls}`} style={{ width: `${pct}%` }} />
+      </span>
+    </div>
+  );
+}
 
 const CITE_CAP = 12;
 
@@ -20,12 +35,30 @@ export function sentenceStanding(f: ExplainResponse["answer"][number]): "grounde
   return s === "uncited" ? "unknown" : s;
 }
 
-function Cites({ ids, base }: { ids: readonly string[]; base: string }) {
-  if (ids.length <= CITE_CAP) return <CitationLinks claimIds={ids} base={base} />;
+function Cites({ ids, base, citations }: { ids: readonly string[]; base: string; citations: ExplainResponse["citations"] }) {
+  if (ids.length === 0) return null;
+  const shown = ids.slice(0, CITE_CAP);
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <CitationLinks claimIds={ids.slice(0, CITE_CAP)} base={base} />
-      <span className="text-xs text-muted">and {ids.length - CITE_CAP} more, listed under Citations</span>
+      <span className="inline-flex flex-wrap gap-1" aria-label={`${ids.length} citations`}>
+        {shown.map((id, i) => {
+          const c = citations.find((x) => x.claim_id === id);
+          const file = c?.file ? c.file.split("/").pop() : null;
+          const where = file ? `${file}${c?.start_line ? `:${c.start_line}` : ""}` : `[${i + 1}]`;
+          return (
+            <Link
+              key={id}
+              to={`${base}/claim/${id}`}
+              className="tap-sm inline-flex max-w-full items-center break-all rounded-sm border border-line bg-canvas px-1.5 font-mono text-xs text-ink no-underline hover:border-accent"
+              aria-label={`${where}, claim ${id.slice(0, 10)}`}
+              data-testid="citation"
+            >
+              {where}
+            </Link>
+          );
+        })}
+      </span>
+      {ids.length > CITE_CAP ? <span className="text-xs text-muted">and {ids.length - CITE_CAP} more, listed under Citations</span> : null}
     </span>
   );
 }
@@ -42,16 +75,28 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
         <p className="mt-1 text-xs text-muted" data-testid="answer-summary">
           {counts.grounded} grounded, {counts.interpretation} interpretation, {counts.unknown} unknown. Built from evidence records without an AI model. Static analysis only.
         </p>
-        <ol className="mt-3 flex flex-col gap-3">
-          {r.answer.map((f, i) => (
-            <li key={i} className="flex flex-col gap-1" data-standing={sentenceStanding(f)} data-testid="answer-sentence">
-              <span className="flex flex-wrap items-center gap-2">
-                <StandingChip fact={f} />
-                <Cites ids={f.claim_ids ?? []} base={base} />
-              </span>
-              <span className={sentenceStanding(f) === "interpretation" ? "italic text-ink-2" : ""}>{f.text}</span>
-            </li>
-          ))}
+        <div className="mt-3 grid grid-cols-3 gap-2 text-xs" aria-hidden="true">
+          <Meter label="Grounded" n={counts.grounded} total={r.answer.length} cls="bg-verified" />
+          <Meter label="Interpretation" n={counts.interpretation} total={r.answer.length} cls="bg-inferred" />
+          <Meter label="Unknown" n={counts.unknown} total={r.answer.length} cls="bg-unknown" />
+        </div>
+        <ol className="mt-3 flex flex-col gap-2">
+          {r.answer.map((f, i) => {
+            const standing = sentenceStanding(f);
+            const bar = standing === "grounded" ? "bg-verified" : standing === "interpretation" ? "bg-inferred" : "bg-unknown";
+            return (
+              <li key={i} className="grid grid-cols-[4px_minmax(0,1fr)] gap-3 rounded-lg border border-line bg-canvas p-3" data-standing={standing} data-testid="answer-sentence">
+                <span className={`rounded-full ${bar}`} aria-hidden="true" />
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <StandingChip fact={f} />
+                    <Cites ids={f.claim_ids ?? []} base={base} citations={r.citations} />
+                  </span>
+                  <span className={standing === "grounded" ? "text-ink" : "text-sm text-ink-2"}>{f.text}</span>
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </div>
 
@@ -73,9 +118,9 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
         </ul>
       </details>
 
-      <div className="mt-3 rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold">Where the cited evidence comes from</h2>
-        <dl className="mt-2 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-sm" data-testid="categories">
+      <details className="mt-3 rounded-lg border border-line bg-surface">
+        <summary className="tap flex cursor-pointer items-center px-4 text-sm font-semibold">Where the cited evidence comes from</summary>
+        <dl className="mt-0 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 border-t border-line p-4 text-sm" data-testid="categories">
           {cats.map((k) => (
             <div key={k} className="contents">
               <dt>
@@ -86,7 +131,7 @@ export function ExplainView({ r, base }: { r: ExplainResponse; base: string }) {
             </div>
           ))}
         </dl>
-      </div>
+      </details>
 
       {r.prompt_bundle || r.outbound_manifest.length ? (
         <section className="mt-3 rounded-lg border border-inferred/50 bg-surface p-4" aria-label="What would be sent" data-testid="outbound">

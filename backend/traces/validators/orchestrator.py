@@ -3,7 +3,9 @@ injected set; computes status by EVIDENCE_SCHEMA v3 section 7 (V1 to V6, Decisio
 Ported from research/task002/validators/run_validation.py; status logic unchanged. Runs inside the isolation wrapper.
 Families: cpython-ast (in process) and typescript-compiler (node + TS 6.0.3 subprocess).
 Usage: python -m traces.validators.orchestrator --run-dir <run> --records <records.jsonl> --src <checkout> --sha <sha>
-       --ts-module <typescript dir> [--node node] --fixture <chain.json> --injected <injected.jsonl>"""
+       --ts-module <typescript dir> [--node node] (--fixture <chain.json> --injected <injected.jsonl> | --no-fixture)
+--no-fixture (INDEX worker, any repository): validates the adapter records only; no expected-chain fixture, no injected
+negatives and no FASTAPI_RULES fixture rules. The fixture path is unchanged, so the Task 002 hashes still reproduce."""
 import argparse, json, os, re, subprocess, time
 from collections import Counter
 from traces.core.common import Blobs, canon, sha256_hex, now_ist, line_count, normalize_file_range
@@ -33,9 +35,15 @@ class Orchestrator:
         self.a = a; self.run_id = json.load(open(os.path.join(a.run_dir, "manifest.json")))["run_id"]; self.at = now_ist()
         self.blobs = Blobs(SRC, REPO_SHA)
         self.records = [json.loads(l) for l in open(a.records)]
-        fx = json.load(open(a.fixture)); self.fixture_meta = fx
-        self.fixture = fx["claims"]
-        self.injected = [json.loads(l) for l in open(a.injected)]
+        self.with_fixture = not getattr(a, "no_fixture", False)
+        if self.with_fixture:
+            fx = json.load(open(a.fixture)); self.fixture_meta = fx
+            self.fixture = fx["claims"]
+            self.injected = [json.loads(l) for l in open(a.injected)]
+        else:
+            self.fixture_meta, self.fixture, self.injected = {"negative_controls": {}}, [], []
+            self.findings = {"fixture": "none (--no-fixture)"}
+            self.r3facts = {"sdk_methods": [], "data_types": [], "config": None, "sdk_header": None}
         for r in self.records:
             r["_rk"] = r["origin"]["row_ref"]
         for r in self.fixture:
@@ -64,15 +72,22 @@ class Orchestrator:
                      "missing": row["line"] is None, "value_ref": md.get("valueRef") is True, "enclosing": bool(site) and site[0]["range_kind"] == "enclosing_scope"}
                 f = s["file_path"] if r["relationship_kind"] != "contains" else g["file_path"]
             (py if lang(f) == "py" else ts if lang(f) == "ts" else none).append(t)
-        for fid in ("L1", "L2A", "L2B", "L3", "H1", "H2"):
-            ts.append({"type": "fixture", "rk": "fixture:" + fid, "fixture": fid})
-        ts.append({"type": "r3facts", "rk": "r3facts"})
+        if self.with_fixture:
+            for fid in ("L1", "L2A", "L2B", "L3", "H1", "H2"):
+                ts.append({"type": "fixture", "rk": "fixture:" + fid, "fixture": fid})
+            ts.append({"type": "r3facts", "rk": "r3facts"})
         return ts, py, none
 
     # ---------- run validators ----------
     def run_ts(self, tasks):
         tp = os.path.join(self.a.run_dir, "validation", "ts_tasks.json"); op = os.path.join(self.a.run_dir, "validation", "ts_results.json")
-        json.dump({"root": SRC, "sha": REPO_SHA, "tasks": tasks}, open(tp, "w"))
+        job = {"root": SRC, "sha": REPO_SHA, "tasks": tasks}
+        if not self.with_fixture:
+            if not tasks:
+                return {}
+            job["projects"] = self.ts_projects()
+            self.log.append(f"ts projects: {job['projects']}")
+        json.dump(job, open(tp, "w"))
         t0 = time.time()
         out = subprocess.run([NODE, "--max-old-space-size=3072", os.path.join(HERE, "ts", "ts_validate.js"), tp, op], env={**os.environ, "TS_MODULE": TS_MODULE}, capture_output=True, text=True)
         self.timing["ts_validator_s"] = round(time.time() - t0, 1)
@@ -80,6 +95,12 @@ class Orchestrator:
         if out.returncode != 0:
             raise SystemExit("ts validator failed: " + out.stderr[-2000:])
         return json.load(open(op))["results"]
+
+    def ts_projects(self):
+        """--no-fixture: every directory with a tracked tsconfig.json is a TS project; the repo root ("") is added
+        (default compiler options when it has no tsconfig.json) so files outside any project still get a Program."""
+        dirs = sorted({os.path.dirname(p) for p in self.blobs.tree if os.path.basename(p) == "tsconfig.json" and "node_modules/" not in p})
+        return dirs if "" in dirs else dirs + [""]
 
     def run_py(self, tasks):
         t0 = time.time()
@@ -306,7 +327,10 @@ class Orchestrator:
             else:
                 mode, t = tok
                 if mode == "word":
-                    ok3 = re.search(r"(?<![A-Za-z0-9_$])(?:" + (t if "|" in t else re.escape(t)) + r")(?![A-Za-z0-9_$])", seg) is not None
+                    try:
+                        ok3 = re.search(r"(?<![A-Za-z0-9_$])(?:" + (t if "|" in t else re.escape(t)) + r")(?![A-Za-z0-9_$])", seg) is not None
+                    except re.error:  # a name with "|" that is not a valid pattern: match its parts literally
+                        ok3 = re.search(r"(?<![A-Za-z0-9_$])(?:" + "|".join(re.escape(x) for x in t.split("|")) + r")(?![A-Za-z0-9_$])", seg) is not None
                 else:
                     ok3 = t in seg
                 out.append({"method": "L3_token_at_location", "establishes": "location", "rule_id": None, "validator": GITV, "inputs": [l], "expected": f"token {t!r} ({mode}) in {l['file']}:{l['start_line']}-{l['end_line']}", "result": "pass" if ok3 else "fail", "detail": "found" if ok3 else f"not found; first line: {seg.split(chr(10))[0].strip()[:100]!r}"})
@@ -404,7 +428,7 @@ class Orchestrator:
         ts_tasks, py_tasks, none = self.tasks()
         ts_res = self.run_ts(ts_tasks)
         py_res = self.run_py(py_tasks)
-        fx_py = self.fixture_py(ts_res)
+        fx_py = self.fixture_py(ts_res) if self.with_fixture else {}
         no_family = Counter()
         for r in self.records:
             rk = r["_rk"]; res = ts_res.get(rk) or py_res.get(rk)
@@ -450,10 +474,15 @@ class Orchestrator:
 
 def main():
     ap = argparse.ArgumentParser()
-    for k in ("--run-dir", "--records", "--fixture", "--injected", "--src", "--sha", "--ts-module"):
+    for k in ("--run-dir", "--records", "--src", "--sha", "--ts-module"):
         ap.add_argument(k, required=True)
+    ap.add_argument("--fixture"); ap.add_argument("--injected")
+    ap.add_argument("--no-fixture", action="store_true")
     ap.add_argument("--node", default="node")
-    Orchestrator(ap.parse_args()).run()
+    a = ap.parse_args()
+    if not a.no_fixture and not (a.fixture and a.injected):
+        ap.error("--fixture and --injected are required unless --no-fixture is given")
+    Orchestrator(a).run()
 
 
 if __name__ == "__main__":

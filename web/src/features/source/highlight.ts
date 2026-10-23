@@ -35,14 +35,14 @@ export function langFor(path: string): string | null {
   return LANG_BY_EXT[ext] ?? null;
 }
 
-export const THEME = "github-light-high-contrast";
+export const THEME = "github-dark-high-contrast";
 let highlighter: Promise<HighlighterCore> | null = null;
 
 function load(): Promise<HighlighterCore> {
   highlighter ??= (async () => {
     const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([import("shiki/core"), import("shiki/engine/javascript")]);
     return createHighlighterCore({
-      themes: [import("@shikijs/themes/github-light-high-contrast")],
+      themes: [import("@shikijs/themes/github-dark-high-contrast")],
       langs: [
         import("@shikijs/langs/typescript"),
         import("@shikijs/langs/tsx"),

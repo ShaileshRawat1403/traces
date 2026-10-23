@@ -7,12 +7,18 @@ Only read-only subcommands are allowed; network transports are refused (`protoco
 
 from __future__ import annotations
 
+import contextlib
+import errno
 import os
 import re
+import resource
 import shutil
+import signal
 import subprocess
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 
 from .errors import (
@@ -51,6 +57,75 @@ GLOBAL_CONFIG: tuple[str, ...] = (
 # Messages Git prints when an object is absent; with a promisor remote we report E_MISSING_OBJECT, never fetch.
 _MISSING_RE = re.compile(rb"(missing|could not read|bad object|unable to read|not a valid object|promisor)", re.I)
 _SECRET_RE = re.compile(r"(gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|//[^/\s@]+@)")
+
+
+_OOM_RE = re.compile(rb"(out of memory|mmap failed|cannot allocate memory|malloc failed|unable to allocate)", re.I)
+_LIMIT_SIGNALS = frozenset({signal.SIGXCPU, signal.SIGKILL, signal.SIGSEGV, signal.SIGABRT, signal.SIGBUS})
+
+
+class GitBudgetExceeded(Exception):
+    """Raised by a git call when the run budget (not a contract limit) is exhausted. Only history.runner catches it;
+    it never escapes run(). `reason` is one of runner.BUDGET_REASONS."""
+
+    def __init__(self, reason: str, detail: str) -> None:
+        super().__init__(f"{reason}: {detail}")
+        self.reason = reason
+        self.detail = detail
+
+
+@dataclass(frozen=True)
+class CallLimits:
+    """Per-run bounds applied to every git child while active (set by history.runner from RunBudget).
+
+    as_bytes: RLIMIT_AS for each git child. cpu_s: RLIMIT_CPU ceiling for each git child (further capped by the
+    remaining time). deadline: absolute time on `clock` after which no git call starts and running calls time out
+    as budget exhaustion. check: called before each git call; raises GitBudgetExceeded (memory, time)."""
+
+    as_bytes: int | None = None
+    cpu_s: int | None = None
+    deadline: float | None = None
+    clock: Callable[[], float] | None = None
+    check: Callable[[], None] | None = None
+
+
+_LIMITS: ContextVar[CallLimits | None] = ContextVar("traces_history_git_limits", default=None)
+
+
+@contextlib.contextmanager
+def call_limits(limits: CallLimits | None) -> Iterator[None]:
+    token = _LIMITS.set(limits)
+    try:
+        yield
+    finally:
+        _LIMITS.reset(token)
+
+
+def _rlimit_preexec(as_bytes: int | None, cpu_s: int | None) -> Callable[[], None] | None:
+    if as_bytes is None and cpu_s is None:
+        return None
+    pairs: list[tuple[int, int]] = []
+    if as_bytes is not None:
+        hard = resource.getrlimit(resource.RLIMIT_AS)[1]
+        v = as_bytes if hard == resource.RLIM_INFINITY else min(as_bytes, hard)
+        pairs.append((resource.RLIMIT_AS, v))
+    if cpu_s is not None:
+        hard = resource.getrlimit(resource.RLIMIT_CPU)[1]
+        v = cpu_s if hard == resource.RLIM_INFINITY else min(cpu_s, hard)
+        pairs.append((resource.RLIMIT_CPU, v))
+
+    def apply() -> None:  # runs in the child between fork and exec
+        for which, v in pairs:
+            resource.setrlimit(which, (v, v))
+    return apply
+
+
+def limit_violation(returncode: int, stderr: bytes) -> str | None:
+    """Plain-text reason when a git child under CallLimits died from a resource limit, else None."""
+    if returncode < 0 and -returncode in _LIMIT_SIGNALS:
+        return f"git child killed by signal {signal.Signals(-returncode).name} under the run's resource limits"
+    if returncode != 0 and _OOM_RE.search(stderr):
+        return "git child ran out of address space under the run's RLIMIT_AS"
+    return None
 
 
 def _redact(text: str, keep: Sequence[str]) -> str:
@@ -122,6 +197,9 @@ class GitRunner:
         argv = [self.git_bin, "--no-pager", f"--git-dir={self.git_dir}", f"--work-tree={self._worktree}"]
         for c in GLOBAL_CONFIG:
             argv += ["-c", c]
+        lim = _LIMITS.get()
+        if lim is not None and lim.as_bytes is not None:  # keep pack mmaps well inside RLIMIT_AS
+            argv += ["-c", "core.packedGitWindowSize=32m", "-c", f"core.packedGitLimit={max(lim.as_bytes // 4, 64 << 20)}"]
         if self.mailmap_blob:
             argv += ["-c", f"mailmap.blob={self.mailmap_blob}"]
         else:
@@ -129,12 +207,39 @@ class GitRunner:
         return argv
 
     def _exec(self, argv: list[str], stdin: bytes | None) -> subprocess.CompletedProcess[bytes]:
+        lim = _LIMITS.get()
+        timeout = self.timeout_s
+        clamped = False
+        preexec = None
+        if lim is not None:
+            if lim.check is not None:
+                lim.check()
+            cpu = lim.cpu_s
+            if lim.deadline is not None and lim.clock is not None:
+                remaining = lim.deadline - lim.clock()
+                if remaining <= 0:
+                    raise GitBudgetExceeded("budget_time", "run time budget exhausted before a git call")
+                if remaining < timeout:
+                    timeout, clamped = remaining, True
+                cap = int(remaining) + 1
+                cpu = cap if cpu is None else min(cpu, cap)
+            preexec = _rlimit_preexec(lim.as_bytes, cpu)
         try:
             p = subprocess.run(argv, input=stdin, stdin=None if stdin is not None else subprocess.DEVNULL,
-                               capture_output=True, timeout=self.timeout_s, env=self.env(), cwd=self._worktree,
-                               check=False)
+                               capture_output=True, timeout=timeout, env=self.env(), cwd=self._worktree,
+                               check=False, preexec_fn=preexec)
         except subprocess.TimeoutExpired as e:
+            if clamped:
+                raise GitBudgetExceeded("budget_time", "a git call ran past the run time budget") from e
             raise HistoryError(E_TIMEOUT, f"git call exceeded {self.timeout_s}s", "gitcmd") from e
+        except OSError as e:
+            if preexec is not None and e.errno in (errno.ENOMEM, errno.E2BIG, errno.EAGAIN):
+                raise HistoryError(E_LIMIT, "git child could not start under the run's resource limits", "gitcmd") from e
+            raise HistoryError(E_GIT, f"git could not be started: {e.strerror}", "gitcmd") from e
+        if preexec is not None:
+            why = limit_violation(p.returncode, p.stderr)
+            if why:
+                raise HistoryError(E_LIMIT, why, "gitcmd")
         if len(p.stdout) > self.max_output_bytes:
             raise HistoryError(E_LIMIT, f"git output exceeded {self.max_output_bytes} bytes", "gitcmd")
         return p
@@ -222,4 +327,4 @@ def git_missing(text: bytes) -> bool:
     return bool(_MISSING_RE.search(text))
 
 
-__all__ = ["GitRunner", "validate_sha", "SHA_RE", "ALLOWED_SUBCOMMANDS", "GLOBAL_CONFIG", "MIN_GIT_VERSION", "E_MISSING_OBJECT"]
+__all__ = ["CallLimits", "GitBudgetExceeded", "call_limits", "limit_violation", "GitRunner", "validate_sha", "SHA_RE", "ALLOWED_SUBCOMMANDS", "GLOBAL_CONFIG", "MIN_GIT_VERSION", "E_MISSING_OBJECT"]

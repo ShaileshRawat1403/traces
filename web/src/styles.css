@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
-/* Design tokens (IA.md section 11). One source of truth for color, type and spacing. */
+/* Design tokens. One source of truth for color, type and spacing. */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --color-canvas: #faf9f7;
-  --color-surface: #ffffff;
-  --color-sunken: #f2f0ec;
-  --color-line: #e2ded7;
-  --color-line-strong: #c9c3b8;
-  --color-ink: #1d1b18;
-  --color-ink-2: #4a463f;
-  --color-muted: #6b665d;
-  --color-accent: #0f5e63;
-  --color-accent-ink: #ffffff;
-  --color-accent-soft: #e3f0f0;
-  /* Evidence line highlight: light enough that every Shiki token keeps 4.5:1 contrast. */
-  --color-hit: #eef7f7;
-  --color-focus: #1c64d8;
+  --color-canvas: #0c1110;
+  --color-surface: #151c1a;
+  --color-sunken: #1d2623;
+  --color-line: #2c3834;
+  --color-line-strong: #3d4d48;
+  --color-ink: #e8f0ec;
+  --color-ink-2: #c5d2cb;
+  --color-muted: #8ea399;
+  --color-accent: #2fafa4;
+  --color-accent-ink: #06211f;
+  --color-accent-soft: #163430;
+  /* Evidence line highlight: dark enough that Shiki's dark-high-contrast tokens stay readable. */
+  --color-hit: #1a3330;
+  --color-focus: #7eb6ff;
 
-  /* Status tones. Color is never the only signal: every chip carries its word and a line sample. */
-  --color-verified: #0f5e63;
-  --color-verified-soft: #e3f0f0;
-  --color-observed: #475569;
-  --color-observed-soft: #eef1f4;
-  --color-inferred: #8a5300;
-  --color-inferred-soft: #fdf3e1;
-  --color-rejected: #9b1c1c;
-  --color-rejected-soft: #fbeaea;
-  --color-unknown: #5b21b6;
-  --color-unknown-soft: #f1ecfb;
+  --color-verified: #8fd9cf;
+  --color-verified-soft: #14332f;
+  --color-observed: #b7c4ce;
+  --color-observed-soft: #243038;
+  --color-inferred: #e2b16a;
+  --color-inferred-soft: #3a2c16;
+  --color-rejected: #ef8d86;
+  --color-rejected-soft: #3a1c1a;
+  --color-unknown: #c4b4ea;
+  --color-unknown-soft: #2a2340;
 
   --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.35);
 }
 
 @layer base {
@@ -45,11 +45,24 @@
     @apply bg-canvas text-ink font-sans antialiased;
     font-size: 16px;
     line-height: 1.5;
+    background-image:
+      radial-gradient(ellipse 70% 42% at 8% -8%, rgb(47 175 164 / 0.16), transparent 58%),
+      radial-gradient(ellipse 50% 36% at 100% 0%, rgb(126 182 255 / 0.08), transparent 52%);
+    background-attachment: fixed;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  [role="tab"]:not(:disabled) {
+    cursor: pointer;
   }
   :focus-visible {
     outline: 3px solid var(--color-focus);
     outline-offset: 2px;
     border-radius: 2px;
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
   }
   a {
     @apply text-accent underline underline-offset-2 decoration-1 hover:decoration-2;
@@ -65,6 +78,21 @@
   h3 {
     @apply text-ink;
     text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+  input,
+  textarea,
+  select {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    border-color: var(--color-line-strong);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted);
+  }
+  input[type="checkbox"] {
+    accent-color: var(--color-accent);
   }
 }
 
@@ -77,15 +105,148 @@
   }
 }
 
-/* Touch targets: at least 44px for interactive controls. */
 .tap {
   min-height: 44px;
   min-width: 44px;
 }
 
-/* Compact targets inside dense text (citations); still 32px tall with spacing around them. */
 .tap-sm {
   min-height: 32px;
   min-width: 32px;
   justify-content: center;
+}
+
+.flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-hop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: 0.6rem 0.7rem;
+}
+
+.flow-hop[data-hop="gap"],
+.flow-hop[data-flow="gap"] {
+  border-style: dashed;
+  border-color: var(--color-inferred);
+  background: var(--color-inferred-soft);
+}
+
+.flow-hop[data-hop="library_contract"],
+.flow-hop[data-flow="library"] {
+  border-style: dotted;
+  border-color: var(--color-unknown);
+}
+
+.flow-hop[data-hop="hidden"] {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.flow-node {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-canvas);
+  padding: 0.4rem 0.55rem;
+}
+
+.flow-join {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-ink-2);
+}
+
+.flow-join::before {
+  content: "";
+  display: block;
+  width: 100%;
+  border-top: 2px solid var(--color-verified);
+}
+
+.flow-hop[data-hop="gap"] .flow-join::before,
+.flow-hop[data-flow="gap"] .flow-join::before,
+.flow-hop[data-hop="library_contract"] .flow-join::before,
+.flow-hop[data-flow="library"] .flow-join::before {
+  border-top-style: dashed;
+  border-top-color: var(--color-inferred);
+}
+
+.flow-hop[data-hop="library_contract"] .flow-join::before,
+.flow-hop[data-flow="library"] .flow-join::before {
+  border-top-style: dotted;
+  border-top-color: var(--color-unknown);
+}
+
+.flow-span {
+  min-width: 0;
+}
+
+@media (min-width: 720px) {
+  .flow-hop {
+    grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr);
+    column-gap: 0.75rem;
+  }
+  .flow-span {
+    grid-column: 1 / -1;
+  }
+}
+
+.history-spine {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.85rem;
+  list-style: none;
+}
+
+.history-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.history-pill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-canvas);
+  padding: 0.15rem 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.panel {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.stage {
+  height: min(70vh, 52rem);
+  min-height: 22rem;
+}
+
+* {
+  scrollbar-color: var(--color-line-strong) transparent;
 }

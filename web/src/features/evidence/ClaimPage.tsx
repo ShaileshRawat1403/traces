@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useClaim } from "../../api/queries";
 import { readRecord, splitSymbol, type EvidenceRecordView } from "../../api/record";
+import { HistoryEvidence } from "../history/HistoryEvidence";
 import { SourcePanel } from "../source/SourceLines";
 import { snapshotBase } from "../../app/nav";
 import { presentStatus } from "../../status/status";
@@ -159,6 +160,8 @@ export function ClaimEvidence({ repoId, sha, claimId, inDrawer = false }: { repo
         )}
       </Section>
 
+
+      <HistoryEvidence raw={q.data} />
 
       <Section title="Provenance">
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-3 gap-y-1 text-sm">

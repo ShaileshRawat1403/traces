@@ -126,7 +126,14 @@ export const api = {
     request<SourceView>("GET", `${snapPath(repoId, sha)}/source${qs({ path, start, end })}`),
   trace: (repoId: string, sha: string, from: string, to?: string) =>
     request<TraceResponse>("GET", `${snapPath(repoId, sha)}/trace${qs({ from, to })}`),
-  historyTimeline: (repoId: string, sha: string) => request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/timeline`),
+  historyTimeline: (repoId: string, sha: string, q: { path?: string; component?: string; offset?: number; limit?: number } = {}) =>
+    request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/timeline${qs({ ...q })}`),
+  historyHotspots: (repoId: string, sha: string, level: "file" | "component" = "file") =>
+    request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/hotspots${qs({ level })}`),
+  historyCochange: (repoId: string, sha: string, q: { target?: string; level?: "file" | "component" } = {}) =>
+    request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/cochange${qs({ ...q })}`),
+  historyMilestones: (repoId: string, sha: string) => request<ClaimPage>("GET", `${snapPath(repoId, sha)}/history/milestones`),
+  compare: (repoId: string, base: string, head: string) => request<ClaimPage>("GET", `/repos/${enc(repoId)}/compare${qs({ base, head })}`),
   explain: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/explain`, body),
   /** Scoped prompt bundle for browser-side chat. The request never carries a provider key. */
   chatBundle: (repoId: string, sha: string, body: ExplainRequest) => request<ExplainResponse>("POST", `${snapPath(repoId, sha)}/chat/bundle`, body),

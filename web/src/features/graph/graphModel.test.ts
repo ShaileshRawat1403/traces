@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENT_IDS, componentsSample, graphComponentsSample, graphSymbolsSample } from "../../testing/samples";
-import { componentForFile, countsFor, drawableEdges, graphQuery, nextInDirection, readGraphState, toElements, writeGraphState } from "./graphModel";
+import { componentForFile, componentRollup, countsFor, drawableEdges, graphQuery, nextInDirection, openingDiagram, readGraphState, toElements, writeGraphState } from "./graphModel";
 
 describe("graph URL state and query", () => {
   it("defaults to verified and observed, depth 1, no focus", () => {
@@ -65,6 +65,28 @@ describe("compound grouping", () => {
   it("reads component counts by id", () => {
     expect(countsFor(COMPONENT_IDS.api, componentsSample)).toEqual(componentsSample[1]!.claim_counts);
     expect(countsFor("nope", componentsSample)).toBeNull();
+  });
+  it("rolls cross-component edges up and hides rejected and same-component edges", () => {
+    const edges = componentRollup(graphSymbolsSample, componentsSample);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.data.source).toBe(COMPONENT_IDS.web);
+    expect(edges[0]!.data.target).toBe(COMPONENT_IDS.api);
+    expect(edges[0]!.data.line).toBe("dashed");
+    expect(edges[0]!.data.label).toContain("http call");
+    expect(edges[0]!.data.id.startsWith("rollup::")).toBe(true);
+  });
+  it("counts a component-to-component edge once, at its own status", () => {
+    const edges = componentRollup(graphComponentsSample, componentsSample);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]!.data.line).toBe("thin");
+    expect(edges[0]!.data.label).toBe("1 calls");
+  });
+  it("draws every stored component on the opening diagram", () => {
+    const els = openingDiagram(componentsSample, graphSymbolsSample);
+    expect(els.filter((e) => !e.data.source).map((e) => e.data.id).sort()).toEqual([COMPONENT_IDS.api, COMPONENT_IDS.web].sort());
+    expect(els.some((e) => String(e.data.id).startsWith("rollup::"))).toBe(true);
+    const fallback = openingDiagram([], graphComponentsSample);
+    expect(fallback.filter((e) => !e.data.source).map((e) => e.data.id).sort()).toEqual([COMPONENT_IDS.api, COMPONENT_IDS.web].sort());
   });
 });
 

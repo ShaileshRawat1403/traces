@@ -69,7 +69,7 @@ SQLite at `$TRACES_DATA_DIR/traces.sqlite3` (default `.traces-data/`). Migration
 
 | Table | Purpose |
 | --- | --- |
-| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch |
+| `repos` | id, host, owner, name, url, visibility (`public` only), latest discovered SHA and time, default branch; 0002: `visibility_checked_at`, `external_ai_consent` (D-021) |
 | `snapshots` | id, repo_id, sha, state (`pending`/`indexing`/`ready`/`failed`), evidence_schema, extractor pins, languages, frameworks, `generated_paths`, stats |
 | `jobs` | id, repo, snapshot, kind, state, phase, progress, message, error code/detail, `version` (ETag), timestamps |
 | `job_events` | append-only progress log per job |
@@ -97,31 +97,31 @@ The index worker (milestone INDEX) runs: validate URL, resolve SHA, `ensure_pinn
 
 Base path `/api/v1`. JSON. Read-only except repo registration and job creation. Generated OpenAPI: [contracts/openapi.json](contracts/openapi.json); a test fails if it is stale, and the UI's TypeScript types are generated from it (`web/src/api/schema.d.ts`, `npm run check:api`).
 
-Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "detail"}}`. Codes: `invalid_request` (422), `invalid_repo_url` (422), `invalid_sha` (422), `not_found` (404), `not_implemented` (501, with the owning seat and milestone). Stubs never return placeholder data.
+Errors use one envelope: `{"error": {"code", "message", "owner", "milestone", "detail"}}`. Codes: `invalid_request` (422), `invalid_repo_url` (422), `invalid_sha` (422), `not_found` (404), `not_implemented` (501, with the owning seat and milestone); ingest (D-021): `repo_not_public`, `repo_empty`, `sha_not_found` (422), `too_large`, `too_many_files` (413), `rate_limited` (429, `Retry-After`), `upstream_unavailable`, `fetch_failed` (502), `fetch_timeout` (504). Stubs never return placeholder data.
 
 `S` = `/repos/{repo_id}/snapshots/{sha}`.
 
 | # | Method and path | Purpose | Build status |
 | --- | --- | --- | --- |
 | 4.1 | `GET /health`, `GET /meta` | liveness, versions, schema, pins, isolation mode, capability flags | implemented |
-| 4.2 | `POST /repos` `{url, sha?}` | validate and register a public GitHub repo (no fetch) | implemented |
+| 4.2 | `POST /repos` `{url, sha?}` | validate, confirm public with an anonymous `ls-remote`, register, pin a `pending` snapshot at `sha` or HEAD (no clone; D-021) | implemented |
 | | `GET /repos`, `GET /repos/{id}` | list, get | implemented |
-| | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`) | 501, Traces, INGEST |
+| | `GET /repos/{id}/head` | latest discovered HEAD vs displayed snapshot (`behind`); cached 60 s, rate limited | implemented |
 | 4.3 | `GET /repos/{id}/snapshots`, `GET S` | snapshots and metadata | implemented |
-| 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job) | 501, Traces, INDEX |
+| 4.4 | `POST /repos/{id}/index-jobs` `{sha?, reindex}` | start index job (202 + Job, `Location`); active job for the same snapshot is returned; ready snapshot without `reindex` -> 409 `already_indexed` (D-022) | implemented |
 | | `GET /jobs/{job_id}` | poll; `ETag` = job version, `If-None-Match` gives 304; poll 1-2 s; no SSE | implemented |
-| 4.5 | `GET S/overview` | business / architecture / implementation facts, each tagged fact, interpretation or unknown, with claim ids | 501, Traces, VIEWS |
-| 4.6 | `GET S/components` | deterministic components and layers with claim counts | 501, Traces, VIEWS |
-| 4.7 | `GET S/routes` | route and API inventory with status and claim ids | 501, Traces, VIEWS |
-| 4.8 | `GET S/graph?focus&depth&layer&rel&status&q&include_rejected&limit` | filtered graph or neighborhood (`focus`, `depth` 0-4); `hidden_counts` by status; `truncated` | 501, Traces, VIEWS |
+| 4.5 | `GET S/overview` | business / architecture / implementation facts, each tagged fact, interpretation or unknown, with claim ids | implemented (D-024). Purpose is unknown unless a README heading is quoted as interpretation |
+| 4.6 | `GET S/components` | deterministic components and layers with claim counts | implemented (D-024). Rows are what the index stored |
+| 4.7 | `GET S/routes` | route and API inventory with status and claim ids | implemented (D-024). Method is UNKNOWN when the record does not carry one |
+| 4.8 | `GET S/graph?focus&depth&layer&rel&status&q&include_rejected&limit` | filtered graph or neighborhood (`focus`, `depth` 0-4); static relationships only; `hidden_counts` by status; `truncated` | implemented (D-024). History patterns are not edges here |
 | 4.9 | `GET S/claims?status&claim_kind&kind&symbol&file&include_rejected&offset&limit` | claim list; rejected excluded unless `include_rejected=true`; `hidden_counts` | implemented |
 | | `GET S/claims/{claim_id}` | evidence by claim: full 0.4 record (locations, checks, status history, provenance, citations) | implemented |
 | | `GET S/export` | NDJSON export of all 0.4 records | implemented |
-| 4.10 | `GET S/source?path&start&end` | source lines at the SHA from Git objects, blob SHA, `generated`, overlapping claim ids | 501, Traces, VIEWS |
-| 4.11 | `GET S/trace?from&to&include_rejected` | ordered `hops`: `edge` (claim), `gap` (no claim; inferred, reason required), `library_contract` (inferred, reason required); `complete=false` when gaps exist; `hidden_counts` | 501, Traces, VIEWS |
-| 4.12 | `GET S/history/timeline`, `/lifecycle?path`, `/hotspots?level`, `/cochange?target&level`, `/milestones`, `/rationale?target`; `GET /repos/{id}/compare?base&head` | history views over history records (0.4 `evidence_scope` history/documented) | 501, Traces History, HISTORY |
-| 4.13 | `POST S/explain` `{question, focus_claim_ids, mode}` | `no_llm`: deterministic answer from evidence with citations and categories (code structure, history patterns, documented decisions, inference, runtime observations). `prepare_bundle`: scoped prompt bundle + `outbound_manifest` (what would leave the browser, with sha256 per item); `requires_consent: true` | 501, Traces UI, EXPLAIN |
-| | `POST S/chat/bundle` | same bundle for a chat turn | 501, Traces UI, EXPLAIN |
+| 4.10 | `GET S/source?path&start&end` | source lines at the SHA from Git objects, blob SHA, `generated`, overlapping claim ids | implemented (D-024). 422 `invalid_request` if the path escapes the tree or the range exceeds 400 lines. 404 if the checkout or blob is absent |
+| 4.11 | `GET S/trace?from&to&include_rejected` | ordered `hops`: `edge` (claim), `gap` (no claim; inferred, reason required), `library_contract` (inferred, reason required); `complete=false` when gaps exist; `hidden_counts` | implemented (D-024). Rejected claims are not used as bridges |
+| 4.12 | `GET S/history/timeline`, `/lifecycle?path`, `/hotspots?level`, `/cochange?target&level`, `/milestones`, `/rationale?target`; `GET /repos/{id}/compare?base&head` | history views over history records (0.4 `evidence_scope` history/documented). Compare returns stored `snapshot_added` / `snapshot_removed` when history wrote them, otherwise an identity diff of static claims that already exist on the two snapshots (their own kinds, not new records) | implemented (D-024) |
+| 4.13 | `POST S/explain` `{question, focus_claim_ids, mode}` | `no_llm`: deterministic answer from evidence with citations and categories (code structure, history patterns, documented decisions, inference, runtime observations). `prepare_bundle`: scoped prompt bundle + `outbound_manifest` (what would leave the browser, with sha256 per item); `requires_consent: true` | implemented (D-023), Traces UI, EXPLAIN |
+| | `POST S/chat/bundle` | same bundle for a chat turn | implemented (D-023) |
 
 BYOK: provider keys never reach the backend. The browser holds the key, shows the outbound manifest, asks for consent and calls the provider directly. Request models forbid extra fields, so a request carrying `api_key` is refused with 422 (tested).
 
@@ -133,7 +133,7 @@ The history module's contract is [docs/contracts/history.md](contracts/history.m
 
 | Hook | Direction | Contract |
 | --- | --- | --- |
-| H1 | index worker -> history | `HistoryRunner.run(repo=HistoryRepoRef(path, repo, sha), components=..., evidence_sets=..., pr_provider=..., cache_dir=...)` with a full-history clone made by `traces.ingest.fetch` and a pinned SHA. Returns `HistoryResult(records, report)`; records are 0.4 with `evidence_scope` history or documented. |
+| H1 | index worker -> history | `HistoryRunner.run(repo=HistoryRepoRef(path, repo, sha), config=..., budget=..., components=..., evidence_sets=..., pr_provider=..., cache_dir=...)` with a full-history clone made by `traces.ingest.fetch` and a pinned SHA; `config` (`HistoryConfig`) and `budget` (`RunBudget`) default to the runner's own. Concrete runner: `traces.history.GitHistoryRunner(config, budget, max_milestones=8)`, or the function `traces.history.run(repo, config, budget=...)`. Returns `HistoryResult(records, report)`; records are 0.4 with `evidence_scope` history or documented; report is `traces-history-run/1` with per-stage status and partial flags (docs/contracts/history.md section 8.11). |
 | H2 | evidence -> history | `traces.evidence.types.ComponentMap` (deterministic, with digest) for the snapshot SHA. |
 | H3 | history -> index worker | `select_milestones()` returns up to 8 SHAs (20 on demand). The worker runs the evidence pipeline at each and passes `{sha: EvidenceSet}` back through `evidence_sets`. |
 | H4 | API/ingest -> history | `PrContextProvider.get(pr_number) -> CachedPr`. The GitHub client, token, cache and rate limits live in the API/ingest layer; history never touches the network or a token. |

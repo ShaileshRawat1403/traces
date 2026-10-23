@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 from traces.history import HistoryConfig, ingest
-from traces.history.interface import CachedComment, CachedPr
+from traces.history.interface import CachedComment, CachedPr, PrContextProvider
 from traces.history.pr_context import RATIONALE_QUALIFIER, link_prs, pr_context
 from traces.history.records import RunContext, canonical_hash, recompute_claim_id
 
@@ -165,11 +165,12 @@ def test_shape_and_artifact_problems_skip(synth: SynthRepo) -> None:
                         3: (wrong_number, b"{}"), 4: (bad_time, b"{}")})
     res = pr_context(log, fake, ctx=CTX)
     reasons = {x["pr"]: x["reason"] for x in res.report["prs_skipped"]}
-    assert "returned none" in reasons[1]
+    assert 1 not in reasons  # artifact_bytes None means "not offered": used, sha256 unverified
     assert "other than CachedPr" in reasons[2]
     assert "does not match requested #3" in reasons[3]
     assert "fetched_at" in reasons[4]
-    assert res.records == [] and res.report["pr_context"] == "none"
+    assert res.report["sha256_unverified"] == [1] and res.report["prs_used"] == 1
+    assert res.records and all(r["status"] == "unvalidated" and r["from"]["symbol"].endswith("#1") for r in res.records)
     notjson = b"not json"
     pr = CachedPr(1, s["c1"], "Body.", [], "github/pr/1.json", hashlib.sha256(notjson).hexdigest(), FETCHED)
     res2 = pr_context(log, OfflineFake({1: (pr, notjson), 2: (cached(2, s["m2"], "M.", [])[0], raw)}), ctx=CTX)
@@ -201,3 +202,37 @@ def test_ht25_quote_match_never_beyond_observed(synth: SynthRepo) -> None:
         assert all(c["method"] == "quote_match" and c["establishes"] == "presence" for c in r["checks"])
         assert [h["to"] for h in r["status_history"]] in (["unvalidated"], ["unvalidated", "observed"])
         assert "intent" not in r["statement"].lower() or r["qualifier"] == RATIONALE_QUALIFIER
+
+
+class SubclassedProvider(PrContextProvider):
+    """Subclasses the Protocol and implements only get(): inherits artifact_bytes -> None."""
+
+    def __init__(self, pr: CachedPr) -> None:
+        self.pr = pr
+
+    def get(self, pr_number: int) -> CachedPr | None:
+        return self.pr if pr_number == self.pr.number else None
+
+
+def test_interface_artifact_bytes_default_and_optional(synth: SynthRepo) -> None:
+    import inspect
+
+    sig = inspect.signature(PrContextProvider.artifact_bytes)
+    assert list(sig.parameters) == ["self", "pr_number"]
+    assert sig.return_annotation in ("bytes | None", bytes | None)
+    s = _build(synth)
+    log = ingest(ref(synth), HistoryConfig())
+    pr, raw = cached(1, s["c1"], BODY1, [])
+    sub = SubclassedProvider(pr)
+    assert sub.artifact_bytes(1) is None  # inherited default
+    a = pr_context(log, sub, ctx=CTX)
+    b = pr_context(log, FieldsOnlyFake({1: pr}), ctx=CTX)  # structural, no method at all
+    assert a.records == b.records and a.report["sha256_unverified"] == [1]
+    assert all(r["status"] == "unvalidated" for r in a.records)
+
+    class WithBytes(SubclassedProvider):
+        def artifact_bytes(self, pr_number: int) -> bytes | None:
+            return raw if pr_number == 1 else None
+
+    c = pr_context(log, WithBytes(pr), ctx=CTX)
+    assert c.report["sha256_unverified"] == [] and all(r["status"] == "observed" for r in c.records)

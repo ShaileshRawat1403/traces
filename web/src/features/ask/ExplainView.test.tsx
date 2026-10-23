@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -24,6 +25,7 @@ describe("ExplainView", () => {
     expect(within(items[4]!).getAllByTestId("citation")).toHaveLength(12);
     expect(items[4]!.textContent).toContain("and 3 more");
     expect(screen.getByTestId("answer-summary").textContent).toContain("2 grounded, 2 interpretation, 1 unknown");
+    await userEvent.click(screen.getByText("Where the cited evidence comes from"));
     expect(screen.getByTestId("categories").textContent).toContain("Runtime observations");
     expect(screen.queryByTestId("outbound")).toBeNull();
     const r = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });

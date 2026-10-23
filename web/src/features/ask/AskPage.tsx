@@ -17,7 +17,7 @@ export function AskPage() {
   return (
     <>
       <PageHeader title="Ask">
-        Explain answers from evidence with citations and needs no AI key. Chat uses your own key from this browser; keys never reach Traces.
+        Explain answers from stored evidence. Each sentence is marked grounded, interpretation, or unknown, and points at the record it uses; no model is called. Chat uses your own key from this browser, and keys never reach Traces.
       </PageHeader>
       <Tabs.Root
         value={mode}

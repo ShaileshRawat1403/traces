@@ -6,7 +6,7 @@ export function EvidenceDrawer({ repoId, sha, claimId, onClose }: { repoId: stri
   return (
     <Dialog.Root open={!!claimId} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/30" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
         <Dialog.Content
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[88dvh] flex-col rounded-t-lg border-t border-line bg-canvas shadow-xl focus:outline-none md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(560px,92vw)] md:rounded-none md:border-l md:border-t-0"
           data-testid="evidence-drawer"

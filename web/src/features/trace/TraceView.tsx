@@ -15,55 +15,55 @@ function Sym({ id }: { id: string }) {
   );
 }
 
-const FRAME: Record<HopView["kind"], string> = {
-  edge: "border-line bg-surface",
-  hidden: "border-dashed border-line-strong bg-sunken",
-  gap: "border-2 border-dashed border-inferred bg-inferred-soft",
-  library_contract: "border-2 border-dotted border-inferred bg-surface",
-};
-
 function Hop({ v, onEvidence }: { v: HopView; onEvidence: (id: string) => void }) {
   const { hop } = v;
-  if (v.kind === "hidden") {
-    return (
-      <li className={`rounded-lg border p-3 text-sm text-ink-2 ${FRAME.hidden}`} data-hop="hidden">
-        <span className="font-semibold">Step {hop.index + 1}: hidden.</span> A rejected relationship sits here. It is shown only in the reviewer view.
-      </li>
-    );
-  }
   return (
-    <li className={`rounded-lg border p-3 ${FRAME[v.kind]}`} data-hop={v.kind}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {hop.index + 1}</span>
-        <span className={`text-sm font-semibold ${v.kind === "edge" ? "" : "text-inferred"}`}>{v.title}</span>
-        <StatusChip status={v.kind === "edge" ? hop.status : v.labelMismatch || !hop.status ? "unvalidated" : hop.status} label={v.kind === "edge" ? hop.label : "inferred"} qualifier={hop.qualifier} />
-      </div>
-      <div className="mt-2 grid grid-cols-[1fr] gap-1 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-start sm:gap-3">
-        <Sym id={hop.from_symbol} />
-        <span className="text-muted" aria-label={`then ${hop.kind}`}>
-          <span aria-hidden="true">→ </span>
-          {hop.kind}
-        </span>
-        <Sym id={hop.to_symbol} />
-      </div>
-      {v.kind !== "edge" ? (
-        <p className="mt-2 text-sm" data-testid="hop-reason">
-          <span className="font-semibold">Why this is inferred: </span>
-          {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
-        </p>
-      ) : null}
-      {v.labelMismatch ? (
-        <p className="mt-1 text-xs text-unknown" role="note">
-          The API labelled this step "{hop.label}". Gap and library contract steps are always inferred, so it is shown as Inferred.
-        </p>
-      ) : null}
-      {v.claimId ? (
-        <Button className="mt-2" onClick={() => onEvidence(v.claimId!)}>
-          Open evidence
-        </Button>
-      ) : v.kind === "gap" ? (
-        <p className="mt-2 text-xs text-ink-2">No claim backs this step, so there is no evidence to open.</p>
-      ) : null}
+    <li className="flow-hop" data-hop={v.kind}>
+      {v.kind === "hidden" ? (
+        <div className="flow-span text-sm text-ink-2">
+          <span className="font-semibold">Step {hop.index + 1}: hidden.</span> A rejected relationship sits here. It is shown only in the reviewer view.
+        </div>
+      ) : (
+        <>
+          <div className="flow-node">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">From</span>
+            <Sym id={hop.from_symbol} />
+          </div>
+          <div className="flow-join">
+            <span className={`font-semibold ${v.kind === "edge" ? "text-ink" : "text-inferred"}`}>{v.title}</span>
+            <span>
+              {hop.kind}
+              {v.kind === "edge" ? "" : " · inferred"}
+            </span>
+          </div>
+          <div className="flow-node">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">To</span>
+            <Sym id={hop.to_symbol} />
+          </div>
+          <div className="flow-span flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {hop.index + 1}</span>
+            <StatusChip status={v.kind === "edge" ? hop.status : v.labelMismatch || !hop.status ? "unvalidated" : hop.status} label={v.kind === "edge" ? hop.label : "inferred"} qualifier={hop.qualifier} />
+          </div>
+          {v.kind !== "edge" ? (
+            <p className="flow-span text-sm" data-testid="hop-reason">
+              <span className="font-semibold">Why this is inferred: </span>
+              {v.reason ?? <span className="text-unknown">The API gave no reason, which the contract requires for this step.</span>}
+            </p>
+          ) : null}
+          {v.labelMismatch ? (
+            <p className="flow-span text-xs text-unknown" role="note">
+              The API labelled this step "{hop.label}". Gap and library contract steps are always inferred, so it is shown as Inferred.
+            </p>
+          ) : null}
+          {v.claimId ? (
+            <div className="flow-span">
+              <Button onClick={() => onEvidence(v.claimId!)}>Open evidence</Button>
+            </div>
+          ) : v.kind === "gap" ? (
+            <p className="flow-span text-xs text-ink-2">No claim backs this step, so there is no evidence to open.</p>
+          ) : null}
+        </>
+      )}
     </li>
   );
 }
@@ -96,16 +96,23 @@ export function TraceView({ t, reviewHref, onEvidence }: { t: TraceResponse; rev
           </p>
         )}
         <p className="text-xs text-muted">{t.disclaimer}</p>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2" aria-label="How to read the flow">
+          <li>Solid border: a recorded relationship.</li>
+          <li>Dotted border: inferred library step.</li>
+          <li>Dashed border: a gap, no recorded relationship.</li>
+        </ul>
         <HiddenCounts counts={t.hidden_counts} reviewHref={reviewHref} />
       </div>
       {hops.length === 0 ? (
         <p className="text-sm text-ink-2">The API returned no steps for this trace.</p>
       ) : (
-        <ol className="flex flex-col gap-2" aria-label="Trace steps in order">
-          {hops.map((v) => (
-            <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
-          ))}
-        </ol>
+        <>
+          <ol className="flow-list" aria-label="Trace steps in order" data-testid="trace-rail">
+            {hops.map((v) => (
+              <Hop key={`${v.hop.index}-${v.hop.from_symbol}-${v.hop.to_symbol}`} v={v} onEvidence={onEvidence} />
+            ))}
+          </ol>
+        </>
       )}
     </section>
   );

@@ -1,59 +1,64 @@
 # Status (Traces v1)
 
-Updated 2026-10-21 IST. Milestone: FOUNDATION.
+Updated 2026-10-21 IST, after integrating PRs #9, #15, #16, #17, #19 and #14 into `build/traces-v1`. Authority is the code and the tests, not earlier seat notes.
 
-## Seat assignments
+## Integrated
 
-Seats push their own `ws/<seat>-<topic>` branches and open PRs into `build/traces-v1`. A seat does not modify another seat's owned paths.
+| PR | Branch | What landed |
+| --- | --- | --- |
+| #9 | `ws/arch-ingest` | Anonymous public check, pinned snapshot, HEAD discovery, capped clone (D-021) |
+| #15 | `ws/arch-index` | Index jobs, sandboxed worker, generic validation, RSS cap, history hook H1 (D-022) |
+| #16 | `ws/history-runner` | `run()` / `GitHistoryRunner` with budgets |
+| #17 | `ws/ui-history` | History screens (timeline, hotspots, co-change, milestones, compare) |
+| #14 | `ws/ui-explain-tests` | Explain tests moved to `tests/explain` so pytest collects them |
+| #19 | `ws/arch-explain` | Explain and chat bundle wired to the deterministic engine (D-023) |
+| #18 | `ws/lab-ci` | CI workflow active at `.github/workflows/ci.yml` (already merged before this pass) |
 
-| Seat | Owns |
+Earlier merges on the branch: history contract and core, history analysis, UI shell, overview, graph, trace, explain screen, store concurrency.
+
+## What the API does now
+
+| Area | State |
 | --- | --- |
-| Traces | evidence, ingest, index, views and API (`backend/traces/{evidence,adapter,validators,ingest,core,api}`, `workers/`, `toolchain/`) |
-| Traces Lab | CI, e2e harness, security, second repo, acceptance (`ci/` and `.github/workflows/`, `tests/e2e`, security tests) |
-| Traces History | `backend/traces/history`, `tests/history/` (and `docs/contracts/history.md`) |
-| Traces UI | `web/` and explain (`backend/traces/explain`) |
-| Architect | `docs/CONTRACTS.md`, `docs/DECISIONS.md`, `docs/STATUS.md`, integration merges |
+| Register a public GitHub URL, confirm it anonymously, pin a snapshot | done |
+| Discover HEAD, show `behind` against the newest ready snapshot | done |
+| Index job: capped clone, CodeGraph in the sandbox, adapter, validators, store, history hook | done |
+| Overview, components, routes, graph, source, trace | done (D-024). Graph and trace are static evidence only |
+| History timeline, lifecycle, hotspots, co-change, milestones, rationale | done, from stored history records |
+| Compare | done, with a limit: rename-aware `snapshot_added` / `snapshot_removed` records are returned when history stored them. Otherwise the endpoint returns an identity diff of static claims that already exist. It does not invent records and it does not map renames |
+| Explain (no LLM) and chat bundle | done. Provider keys never reach the backend |
+| Task 002 CT1-CT16 and RT1-RT8 | still the baseline suite. The product index path is `tests/api/test_index_baseline.py` |
 
-## Progress
+`/meta` capability flags for the rows above are true.
 
-| Area | State | Owner | Notes |
-| --- | --- | --- | --- |
-| Integration branch, draft PR | done | Architect | `build/traces-v1`; draft PR "Traces v1 (integration, do not merge)" |
-| Task 002 pipeline port | done | Traces | `backend/traces/{adapter,validators,evidence/pipeline.py,fixtures}`, `workers/`; reproduces the closeout hashes |
-| CT1-CT16, RT1-RT8 | done | Traces | pytest; [TEST_MAPPING.md](TEST_MAPPING.md) |
-| Schema 0.4 + migration from 0.3 | done | Traces | includes the approved History requests |
-| SQLite store, migrations, export | done | Traces | migration 0001 |
-| Job state machine, ETag polling | done | Traces | worker that drives it: INDEX |
-| API: health, meta, repos, snapshots, claims, export, jobs | done | Traces | |
-| API: head, index jobs | 501 | Traces | INGEST, INDEX |
-| API: overview, components, routes, graph, source, trace | 501 | Traces | VIEWS |
-| History contract | done | Traces History | [docs/contracts/history.md](contracts/history.md), merged from PR #3 |
-| API: history endpoints, compare | 501 | Traces History | HISTORY |
-| API: explain, chat bundle | 501 | Traces UI | EXPLAIN |
-| Web UI shell | merged (#6) | Traces UI | working screens: repos list and register, repo page, claims, reviewer view, evidence page, job polling (ETag). Overview, components, routes, graph, trace, source, history and ask call their real endpoints and show the 501 state. Bundle: main 120 kB gzip, graph chunk 140 kB gzip (lazy-loaded). Playwright e2e in `web/e2e` (not yet in CI; Traces Lab owns the harness) |
-| OpenAPI copy + generated TS types | done | Traces / Traces UI | checked in tests and `npm run check:api` |
-| CI workflow | staged, waiting on Shailesh | Traces Lab | at `ci/github-actions-ci.yml`; the push token lacks `workflow` scope (D-018). Waiting on Shailesh to grant the token `workflow` scope, then move it to `.github/workflows/ci.yml`. No CI run yet. |
-| Playwright e2e, security tests, second-repo acceptance | not started | Traces Lab | |
-| History module | core merged (#5); analysis merged (#11) | Traces History | steps 1-11 done: gitcmd, ingest/cache, filters, records/verify, facts, lifecycle, churn, hotspots, co-change (#5); manifests, reverts and quick deletes, milestones, snapshot compare, evidence-set diff, history impact, PR context (#11). Test gaps HT4, HT12, HT21 closed (#11). Next: HistoryRunner (`run()`), so the INDEX history step can call it. Deferred: `alias_suggestions`, component-level snapshot compare, `component_removed` / `continues_as`. Deviations: see note below and the PR #11 body |
+## Not done
 
-## History deviations (PR #5, PR #11)
+- Hook H3: the index job does not re-index milestone SHAs, so history's evidence-set diff usually has only the pinned SHA. Compare then falls back to an identity diff of static claims (D-024).
+- Private repositories. v1 never asks for credentials.
+- No LLM is called by the server. Optional chat is a browser-side bundle after consent. There is no provider adapter in the backend.
+- Playwright specs live in `web/e2e`. The CI `e2e` job stays opt-in (`workflow_dispatch`) and is still a placeholder. A browser pass was not part of the automated suite recorded below.
+- Compare is not a full rename-aware architecture diff unless those records were stored by a history run that received two evidence sets.
 
-PR #11 lists its own deviations under "Deviations for review" in [PR #11](https://github.com/ShaileshRawat1403/traces/pull/11); see also D-019 and D-020. PR #5's list:
+## CI
 
-Listed by Traces History in [PR #5](https://github.com/ShaileshRawat1403/traces/pull/5) ("Deviations from the contract"); the PR body is authoritative. In short:
-1. Ingest uses `diff-tree --stdin` (raw and numstat) over a rev-list instead of one log stream; independent checks use separate plumbing.
-2. Cache: corrupt or mismatched entries are discarded and recomputed; the E_CACHE recompute-and-compare path is not implemented.
-3. Hotspots skip blobs over `max_blob_bytes` with a warning instead of raising E_LIMIT.
-4. Component maps only at the pinned SHA; `component_removed` and `continues_as` deferred; component-level churn and co-change stay unvalidated in v1.
-5. Recount mismatches give an inconclusive check; the record stays unvalidated with the reason; nothing is marked rejected.
-6. Added `HistoryConfig.verify` (default True); with it off nothing reaches observed.
-7. Hotspot records use node_kind `file_history_metrics` and differ from churn records by parameters, so their claim_ids differ.
-8. Test gaps against section 18: HT4 separate id-recompute test, HT21 rename_limit synthetic test, HT12 combined synthetic repo. Closed in #11.
+GitHub Actions is active. Do not treat a mergeable PR as a tested integration. A green Actions run on `build/traces-v1` after this push is the CI result. The earlier green run `39593694100` predates the six integrated PRs and this checkpoint.
 
-## Open items
+## Verified locally (2026-10-21, this checkpoint)
 
-1. CI activation: waiting on Shailesh to add the `workflow` scope to the push token (D-018); until then CI has not run.
-2. Memory cap for the indexer: `ulimit -v` breaks CodeGraph's WebAssembly; choose cgroup v2 or container limits (D-006).
-3. Bug (owner: Traces): concurrent API requests cause intermittent 500s, `sqlite3.InterfaceError: bad parameter or other API misuse` in `Store.get_repo` (`backend/traces/evidence/store.py`): one `sqlite3` connection opened with `check_same_thread=False` is shared across request threads without a lock. Reported by Traces UI in PR #6 (7 times in about 300 e2e page loads).
-4. `starlette.testclient` warns that `httpx` is deprecated in favor of `httpx2`; switch when FastAPI's test client does.
-5. Index worker, HEAD discovery and the GitHub client (with token, cache, rate limits) are not built (INGEST/INDEX).
+Not a CI result. Commands used git 2.47.3, CPython 3.14.8, Node 22.23.3, and the pinned CodeGraph 1.6.2.
+
+| Check | Result |
+| --- | --- |
+| `pytest tests/unit tests/api tests/explain tests/history` except `test_index_baseline` | 254 passed, 17 skipped (2 live-network tests were not in this command; the fsft history regression skips without `TRACES_HISTORY_FSFT_REPO`) |
+| `TRACES_NETWORK_TESTS=1 pytest tests/unit/test_ingest.py -k live` | 2 passed (public HEAD, missing/private refused) |
+| `pytest tests/contract tests/regression tests/api/test_index_baseline.py` | 33 passed. Product index of `fastapi/full-stack-fastapi-template@b1125d8`: 4,642 edges = 4,538 verified + 36 observed + 59 unvalidated + 9 rejected; 12 rejected overall, 3 injected; adapter `45600280...`; validation `73db432b...`. History on that index: `done`, `complete=true`, 8,464 records |
+| `mypy`, `ruff` on the Python diff, `npm run check:api`, web `tsc` | clean |
+| Second public repo `pallets/itsdangerous@672971d66a2e` | index succeeded in one run. 674 CodeGraph edges (310 verified, 3 observed, 268 unvalidated, 46 missing_location, 47 rejected). History `done`, 1,988 records. Overview quotes the README heading "ItsDangerous" as interpretation, not as a verified purpose. Graph and explain both answered |
+
+## Open product limits (honest)
+
+- A relationship the extractor missed is a gap or an absence, not a claim that the link does not exist.
+- Co-change and hotspots are history patterns. They are not code dependencies and not causes.
+- Library-contract hops (react-hook-form, TanStack Query on the Task 002 chain) stay inferred unless an independent check says otherwise.
+- The persistence path on the Task 002 chain is a static path, not a runtime-observed database write.
+- Rejected CodeGraph imports and the three injected negatives stay rejected and are hidden from the default graph.
