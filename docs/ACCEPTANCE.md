@@ -1,108 +1,170 @@
 # Traces v1 acceptance (charter section 7)
 
-Owner: Traces Lab (QA, Integration, CI and Security seat). Living document, updated at each Lab checkpoint.
-Last update: 2026-10-23 13:45 IST (B-1 fix verified against the box web app, v1 limits), branch `ws/lab-acceptance` on top of `build/traces-v1` @ `b37eef2`.
+Owner: Traces Lab (QA, Integration, CI and Security seat).
+Final acceptance pass: 2026-10-23, 14:51 to 15:20 IST, on `build/traces-v1` @ `0f32d4d` (PRs #31, #33, #35 to #38). `ws/lab-acceptance` was fast-forwarded to `0f32d4d` before this pass.
 
 Labels used below:
 - **CI**: a real GitHub Actions run passed. Run id and commit are given.
-- **Local**: run on the Traces Lab box only (8 CPUs, Linux 6.12, CPython 3.14.8, Node 20.19.2). Not a CI result.
-- **Box app**: checked read-only against the running review app (`/workspace/traces-review/traces`, API 8731, web 5731). It ran build `35499bc` until 13:21 IST and `b37eef2` after it. From 13:21 to 13:35 IST the web server on 5731 did not proxy to 8731 (B-1, now fixed). Checks in that window used the box API through a web server built from the current head. Checks after 13:35 IST use 5731 directly.
+- **Local**: run on the Traces Lab box only (8 CPUs, Linux 6.12.94, CPython 3.14.8, Node 20.19.2, npm 11.21.0, uv 0.13.4). Not a CI result.
+- **Box app**: checked read-only against the running review app (`/workspace/traces-review/traces`).
+  - Verified at 14:51 IST:
+    - `git log -1` there is `0f32d4d`.
+    - API pid 2270658 (`traces serve --port 8731`) started at 14:45 IST, with cwd `/workspace/traces-review/traces`.
+    - Web pid 2270655 (vite on 5731) started at 14:45 IST, with `TRACES_API_URL=http://127.0.0.1:8731` in its environment.
+    - `/api/v1/meta` returns byte-identical responses through 5731 and 8731 (sha256 `78de1605...`).
+  - The store is the same file as before: `.traces-data/traces.sqlite3`.
+  - The one write, at Architect1's request: fsft@b1125d8 and itsdangerous@672971d were re-indexed through the box API at `0f32d4d` with `reindex: true`.
+    - Before, both had been indexed before migration 0003, with an empty `isolation` field.
+    - fsft: job `j_c43c3a1fc81142d9a19d`, 15:12 IST, 21 s. itsdangerous: job `j_415d7e33bd7a46aebe41`, 15:12 IST, 7 s. The only network use was the fetch of these two pinned SHAs.
+    - The API re-indexes the same snapshot row (`repo@sha`). The old jobs and runs are kept, and nothing was deleted by hand.
+    - Before and after counts, isolation values and hashes are in `.traces-data/acceptance/final/reindex/before.txt` and `after.txt`; see O-14 and O-15.
+  - Row counts in every table were identical before and after each set of walks: 3 repos, 2 snapshots, 21,792 claims, with 3 jobs before the re-index and 5 after.
 
-CI runs referenced:
-- `39716507167`: push, `build/traces-v1` @ `35499bc`, success, 9 of 9 jobs. unit 47 passed 2 skipped, api 47, contract 17, regression 15, e2e 54 passed 2 skipped.
-- `39914041785`: push, `ws/lab-acceptance` @ `6384c78`, success, 11 of 11 jobs. Adds security 122 passed 3 xfailed, history 163 passed 2 skipped (see G-9), explain 11, vitest 89.
-- `39916007885`: push, `ws/lab-acceptance` @ `17c4335`, success.
-- `39916651720`: push, `build/traces-v1` @ `e532644` (PR #24 and #25 merged), success, 11 of 11 jobs. unit 47 passed 2 skipped, explain 31, security 123 passed 5 xfailed, contract 17, regression 15, api 47, history 172 passed 0 skipped (any skip now fails the job), vitest 108, e2e 68 passed 6 skipped (synthetic seed; the fsft seed is in this checkpoint and has no GitHub run yet, G-1).
+CI run for this pass:
+- `39930532720`: push, `build/traces-v1` @ `0f32d4d`, success, 11 of 11 jobs, 14:45 to 14:52 IST. This is the first CI run on `0f32d4d`; PR run `39930539272` on the same commit is also success, 11 of 11.
+- Counts from its log:
+  - unit: 87 passed, 3 skipped (live GitHub checks need `TRACES_NETWORK_TESTS=1`)
+  - explain: 96
+  - api: 95
+  - contract: 17
+  - regression: 16
+  - security: 136 passed, 0 xfailed (`tests/security` plus `tests/e2e/*.py`)
+  - history: 176 passed, 0 skipped
+  - vitest: 125 in 16 files
+  - mypy: no issues in 43 files
+  - ruff: clean
+  - e2e on the real fsft@b1125d8 seed: Playwright 94 passed, 4 skipped; `real_snapshot.cjs` 21 of 21; `chat_g5.cjs` 13 of 13.
+- Earlier runs: 39716507167 (`35499bc`), 39914041785 (`6384c78`), 39916651720 (`e532644`), all success.
+
+Local counts at `0f32d4d`, all jobs PASS:
+- Command: `TRACES_API_PORT=18031 TRACES_WEB_PORT=15231 ci/run_local.sh`. Logs are in `.traces-data/ci-local/final-0f32d4d/` (gitignored).
+- Counts: same as CI except e2e timing.
+  - lint: clean
+  - types: mypy 43 files and tsc, clean
+  - unit: 87 passed, 3 skipped (network)
+  - explain: 96
+  - api: 95
+  - web-build: vitest 125 in 16 files, `check:api`, vite build
+  - target: pinned HEAD ok
+  - contract: 17
+  - regression: 16
+  - security: 136
+  - history: 176, 0 skipped
+  - e2e on the fsft seed: 94 passed, 4 skipped; real-snapshot 21 of 21; chat G-5 13 of 13
+- e2e on the synthetic seed: `TRACES_E2E_SEED=synthetic ci/run_local.sh e2e` gives 84 passed, 14 skipped. The skips are fsft-only content checks.
+- Python e2e suites, run alone (`uv run --frozen pytest -q tests/e2e/<file>`):
+  - `test_cochange_explain.py`: 4 passed, with a new O-4 assertion over every sentence that cites a co-change record. The same file fails 1 of 4 against the `e532644` engine, on the O-4 summary sentence, so it catches O-4.
+  - `test_express_patterns.py`: 4 passed, no xfail.
+  - `test_python_package_patterns.py`: 3 passed.
+- Perf bench `tests/perf/bench.py` at `0f32d4d`: see O-5 and [acceptance/PERF.md](acceptance/PERF.md).
+- Box app walks against web 5731 (read-only):
+  - `tests/e2e/demo_walk.cjs`: 16 of 16 after the box re-index (run at 15:16 IST), with updated steps 10, 11 and 13 and a new step 6b. Before the edits and the re-index, the first run was 14 of 15: step 11 failed on O-13. Step 13 failed once after the re-index on its old "47 rejected" text.
+  - `tests/e2e/real_snapshot.cjs`: 21 of 21, before and after the re-index.
+  - `tests/e2e/chat_g5.cjs`: 13 of 13, before and after the re-index, with exact-line manifest hashes (O-11). It found no key in `/tmp/box_api.log`, `/tmp/box_web.log` or the store.
+
+Scratch re-index at `0f32d4d`, offline, from local full-history clones:
+- Done with `IndexRun` and a local-path ref, the same way as `scripts/e2e_seed.py`; script `.traces-data/acceptance/final/index_local.py`.
+- Repos: pallets/itsdangerous@672971d, pallets/markupsafe@4e11127 and hagopj13/node-express-boilerplate@179ae84 (served on scratch port 18850).
+- Evidence is in `.traces-data/acceptance/final/` (gitignored).
 
 Detail: [acceptance/EXPRESS.md](acceptance/EXPRESS.md), [acceptance/PERF.md](acceptance/PERF.md), [acceptance/SECOND_REPO.md](acceptance/SECOND_REPO.md), [acceptance/DEMO_SCRIPT.md](acceptance/DEMO_SCRIPT.md), [../tests/security/README.md](../tests/security/README.md), [../ci/README.md](../ci/README.md).
 
-## 1. Section 7 checklist
+## 1. Section 7 checklist (final at `0f32d4d`)
 
 | # | Charter item | Proof | Status |
 | --- | --- | --- | --- |
-| 1 | Valid public GitHub URL, index status, pinned SHA, populated overview | CI: `tests/api` (run 39716507167, includes `test_index_baseline.py`, the product index of fsft@b1125d8). Local: `POST /repos` + `POST /index-jobs` for itsdangerous@672971d (6 s) and markupsafe@4e11127 (8.5 s) on a fresh store. Box app: demo steps 1 to 3 | **Pass** (CI for API; browser on real data local only, G-1) |
-| 2 | Interactive graph, focus, follow cross-file edges, open pinned source | Box app: demo steps 4, 5, 15 (`tests/e2e/demo_walk.cjs`, 15 of 15 local). CI: `web/e2e/graph.spec.ts` on the synthetic seed | **Pass** local on real data, incl. the fsft-seeded Playwright suite (70 passed, 4 skipped by design). CI on real data pending the push of this checkpoint (G-1) |
-| 3 | fsft@b1125d8: nine Task 002 links traceable, persistence static only, H1/H2 inferred | CI: `tests/regression/test_regression.py::test_nine_links_and_library_hops` (runs 39716507167, 39914041785). Box app: demo step 6 (10 steps, 2 inferred library steps, 1 gap, "Static persistence path") | **Pass** (CI) |
-| 4 | Nine wrong CodeGraph imports not verified; three injected negatives rejected; Task 002 16+8 still pass | CI: contract 17 passed (CT1 to CT16 plus count), regression 15 passed (RT1 to RT8, distribution 4,642 = 4,538/36/59/9, canonical hashes). Box app: demo step 7, 12 rejected = 9 imports + 3 injected | **Pass** (CI) |
-| 5 | View and explain a Git-backed architecture change with cited commits; co-change is not causality | CI: `tests/history` 172 passed 0 skipped (run 39916651720). Box app: demo steps 8 to 10 (milestone 9d703df "Move new-frontend to frontend", 96 renames confirmed with `git show -M50%`; co-change view says "not evidence of a code dependency"). Co-change explain after PR #24, local: `tests/e2e/test_cochange_explain.py` (a real worker-indexed repo; 4 passed on `e532644`, 3 of them fail on `17c4335` without #24), and a live run on a scratch server from `e532644` with fsft@b1125d8 indexed with history: 6 of 6 question/mode runs keep every cited co-change record (144 in the snapshot) in `history_patterns`, kind interpretation, with the caveat, never fact, never `code_structure` or `inference` | **Pass** for view and for the co-change safety rule; **partial** for explain relevance (F-7, F-8) |
-| 6 | No-key mode useful; provider mode refuses unsupported claims, citations, privacy controls | CI: `tests/explain` 31, `tests/security/test_no_key_and_caps.py`. Box app: demo steps 10, 11. BYOK chat with a stub provider, local: `tests/e2e/chat_g5.cjs` 13 of 13 against the box API (8731, read-only) through a web server built from the current head. It also passes 13 of 13 in the fsft-seeded e2e run, alongside `web/e2e/chat.spec.ts` | No-key **pass** (CI). Provider mode with a stub **pass** (local; see G-5). A live provider is **untested in v1** (no paid key) |
-| 7 | Second, different public repo indexed and explored; unknowns instead of invented links | Local and box app: itsdangerous@672971d (Python library) verified independently (identical 3,312 claim ids, Git spot-checks 30/30, 20/20, 30/30). Local scratch server: hagopj13/node-express-boilerplate@179ae84 (MIT, Express/CommonJS/Mongoose, 241 commits) ingested, indexed (5 s), overview, graph, trace, history and explain checked; 107/107 requires and 15/15 routes correct, commits 20/20, file changes 30/30, co-change 14/18 exact (4 explained, O-6). Both show purpose, persistence and runtime as unknown; nothing invented; all JS edges labelled inferred | **Partial**: both stacks run and stay honest, but JavaScript gets 0 verified (F-10), F-4/F-5 reject true Python claims, and a trace overclaims completeness (F-9) |
-| 8 | Errors, unsupported types, missing keys, index failures, rate limits, malicious paths, oversized repos fail safely and visibly | CI: `tests/security` 122 passed, 3 xfailed (run 39914041785). Covers 28 bad URLs, traversal, symlinks, caps, timeouts, 429, no-key, failed-job visibility | **Pass**. F-1 to F-3 fixed in `b37eef2` (local guards pass); F-6 reported fixed, not re-verified |
-| 9 | Desktop and mobile browser, touch navigation, evidence inspection | Local, real fsft snapshot: `web/e2e` at desktop and android-360 with axe, 70 passed 4 skipped by design (Ollama absent, desktop-only and phone-only cases); `tests/e2e/real_snapshot.cjs` 21 of 21 (nine fsft screens with real content, axe WCAG 2.2 AA on each at 1280 px and at 360 px touch, no sideways scroll, tap Open evidence in graph list and trace, bottom-bar navigation); same 21 of 21 against the box app. CI: same suites on the synthetic seed (run 39916651720, 68 passed) | **Pass** local on real data; CI on real data after the push (G-1) |
-| 10 | CI: unit, adapter/schema, regression, API, e2e browser; lint/types/build; no critical security risk; no unintended outbound calls; no secrets | CI run 39914041785: lint, types, unit, explain, vitest, build, contract, regression, api, history, security, e2e all green. Outbound: `tests/security/test_outbound.py` (worker clones only the target; app serves inside an empty `unshare -rn` namespace; audit hook sees no off-loopback connect). Secrets: `git log -p --all` scan for GitHub, OpenAI, AWS, Slack and private-key patterns found only the fake test token in `test_repo_urls.py` | **Pass** (CI). G-9 closed by run 39916651720 |
-| 11 | Docs: setup, architecture, licenses, coverage, limitations, reproducibility, rollback; screenshots; guided demo script | `docs/SETUP.md`, `docs/THIRD_PARTY_LICENSES.md`, `docs/TEST_MAPPING.md`, `docs/STATUS.md`, `docs/acceptance/WALKTHROUGH.md` (screenshots), `docs/acceptance/DEMO_SCRIPT.md` (checked 15 of 15 against the box app) | **Partial**: no architecture diagram and no rollback section found (G-6); STATUS.md e2e text stale (G-2) |
-| 12 | Final discrepancy table | Section 2 below | **In progress** |
+| 1 | Valid public GitHub URL, index status, pinned SHA, populated overview | **CI 39930532720**: `tests/api` 95 passed, including `test_index_baseline.py` (the product index of fsft@b1125d8) and the F-6 `sha_not_found` guards. Box app: demo steps 1 to 3 | **Pass** (CI) |
+| 2 | Interactive graph, focus, follow cross-file edges, open pinned source | **CI 39930532720**: e2e job on the real fsft seed, 94 passed, 4 skipped by design (Ollama absent; desktop-only and phone-only cases). Box app: demo steps 4, 5 and 15. The Routes, Components and Source pages render real data (G-3 closed) | **Pass** (CI) |
+| 3 | fsft@b1125d8: nine Task 002 links traceable, persistence static only, H1/H2 inferred | **CI 39930532720**: regression 16 passed (`test_nine_links_and_library_hops`). Box app: demo step 6 (10 steps, 2 inferred library steps, 1 gap, "Static persistence path") | **Pass** (CI) |
+| 4 | Nine wrong CodeGraph imports not verified; three injected negatives rejected; Task 002 16+8 still pass | **CI 39930532720**: contract 17 passed (CT1 to CT16 plus count), regression 16 passed. Box app: demo step 7 (12 rejected = 9 imports + 3 injected) | **Pass** (CI) |
+| 5 | View and explain a Git-backed architecture change with cited commits; co-change is not causality | **CI 39930532720**: history 176 passed, 0 skipped; `tests/e2e/test_cochange_explain.py` in the security job. Box app: demo steps 8 to 10. Step 10's answer is a summary, then the 96-file move `9d703df` ranked first, asserted in order (O-12 fixed). "Which files changed together with backend/app/crud.py?" cites crud.py and test_users.py, 5 of 26 (F-8 fixed). Every sentence citing a co-change carries the caveat (O-4 fixed) | **Pass** (CI) |
+| 6 | No-key mode useful; provider mode refuses unsupported claims, citations, privacy controls | **CI 39930532720**: explain 96, `tests/security/test_no_key_and_caps.py`, and `chat_g5.cjs` 13 of 13 with a stub provider in the e2e job. Box app: `chat_g5.cjs` 13 of 13 through 5731; demo steps 10 and 11 | **Pass** (CI) for no-key and the stub provider. Live provider untested (L-8). O-13 open (note) |
+| 7 | Second, different public repo indexed and explored; unknowns instead of invented links | Local re-index at `0f32d4d`. itsdangerous: 3,312 claims, 357 verified, **0 rejected** (was 47, F-4 and F-5), the same on the box app after its re-index (O-15). markupsafe: 3,232 claims, 233 verified, 0 rejected (was 2). Express: 3,671 claims, **107 verified, all imports**, 107 of 107 correct (F-10). The `register` trace is incomplete and lists `userService.createUser` and `tokenService.generateAuthTokens` as unresolved calls (F-9). `POST /register` explain cites the route (F-11). The src/itsdangerous layer is now `library`, with a reason (O-3). CI: `test_express_patterns.py` 4 and `test_python_package_patterns.py` 3 passed in the security job | **Pass** (local re-index, CI pattern tests). Limits L-2 to L-5 apply |
+| 8 | Errors, unsupported types, missing keys, index failures, rate limits, malicious paths, oversized repos fail safely and visibly | **CI 39930532720**: security 136 passed, 0 xfailed. It covers bad URLs, traversal, symlinks, non-ASCII and leading-dash names (F-1, F-2), caps, timeouts, 429, no-key, key not echoed (F-3), failed-job visibility, and a final clone-size check (O-1). F-6 fixed (API and worker paths, local repro) | **Pass** (CI) |
+| 9 | Desktop and mobile browser, touch navigation, evidence inspection | **CI 39930532720**: e2e job on the real fsft seed, desktop and android-360 with axe; `real_snapshot.cjs` 21 of 21 (nine fsft screens, axe WCAG 2.2 AA at 1280 px and 360 px, tap Open evidence, no sideways scroll). Box app: 21 of 21 | **Pass** (CI). axe covers automated rules only; no screen-reader pass |
+| 10 | CI: unit, adapter/schema, regression, API, e2e browser; lint/types/build; no critical security risk; no unintended outbound calls; no secrets | **CI 39930532720**: all 11 jobs green. Outbound: `tests/security/test_outbound.py`. Secrets: a `git log -p --all` scan (GitHub, OpenAI, Anthropic, AWS, Slack and private-key patterns) at `0f32d4d` finds only the fake `ghp_abcd...` test token in `tests/security/test_repo_urls.py` | **Pass** (CI) |
+| 11 | Docs: setup, architecture, licenses, coverage, limitations, reproducibility, rollback; screenshots; guided demo script | `docs/SETUP.md`, `docs/THIRD_PARTY_LICENSES.md`, `docs/TEST_MAPPING.md`, `docs/STATUS.md`, `docs/acceptance/WALKTHROUGH.md`, `docs/acceptance/DEMO_SCRIPT.md` (16 of 16 against the box app at 15:16 IST), limits in section 5 | **Partial**: no architecture diagram and no rollback section in `docs/` (G-6). `docs/STATUS.md` line 39 still calls the e2e job opt-in and a placeholder (G-2) |
+| 12 | Final discrepancy table | Section 2 | **Done** |
 
-## 2. Discrepancy table
+## 2. Discrepancy table (final at `0f32d4d`)
 
-| Capability | Claimed | Proven | Test | Gap |
+| Capability | Claimed | Proven | Test | Remaining |
 | --- | --- | --- | --- | --- |
-| Public URL ingest and pinning | Public GitHub only, anonymous, pinned SHA | CI + local + box app | `tests/api`, `tests/security/test_repo_urls.py`, `test_fetch_limits.py` | F-6: nonexistent SHA leaves a failed snapshot row and empty cache dir |
-| Sandboxed index (no network, no target code) | `unshare -rn`, credentials stripped, caps | CI + local | CT15, `test_outbound.py`, `test_no_key_and_caps.py` | O-1: clone size checked every 0.5 s, no final check after git exits |
+| Public URL ingest and pinning | Public GitHub only, anonymous, pinned SHA | CI + local + box app | `tests/api`, `tests/security/test_repo_urls.py`, `test_fetch_limits.py` | none (F-6, O-9 fixed) |
+| Sandboxed index (no network, no target code) | `unshare -rn`, credentials stripped, caps | CI + local | CT15, `test_outbound.py`, `test_no_key_and_caps.py`, `tests/unit/test_fetch_cleanup.py` | none (O-1 fixed) |
 | Evidence statuses on fsft | 4,642 = 4,538/36/59/9, 12 rejected | CI | contract, regression | none |
-| Evidence statuses on other Python code | Validators judge claims correctly | Not true on library code | `tests/e2e/test_python_package_patterns.py` (xfail) | F-4 relative imports rejected (46 of 47 itsdangerous rejections, 2 of 2 markupsafe); F-5 `@overload` call rejected |
-| Non-ASCII file names | Any public repo | Fails closed | `test_hostile_repo.py::test_non_ascii_path_indexes` (xfail) | F-1: whole index fails with `E_PATH` |
-| Source view | Any tracked path, traversal refused | Traversal refused; odd names readable | `test_hostile_repo.py` | F-2: names starting with `-` refused |
-| Overview, graph, trace, review | Real data, unknowns shown | Box app 15 of 15 demo steps; fsft-seeded Playwright local | `tests/e2e/demo_walk.cjs`, `tests/e2e/real_snapshot.cjs`, `web/e2e` | G-1 until CI runs the fsft seed; O-2 gap reason text when only a rejected edge exists |
-| Route, component and source pages | Route/API inventory screen (charter 4B) | API serves them; UI pages show "scheduled for the next UI checkpoint" | box app `F/routes`, `F/components` | G-3 |
-| History | Timeline, lifecycle, co-change, milestones, compare | CI + Git spot-checks on itsdangerous | `tests/history`, `SECOND_REPO.md` | Compare falls back to identity diff (STATUS.md, H3) |
-| No-key explain | Useful answers with citations | Grounded, but retrieval is keyword based | `tests/explain`, demo 10, 11 | F-7, F-8 |
-| Co-change in explain | A pattern, never a cause, fact or code structure (PR #24) | Local on a worker-indexed repo and live on fsft@b1125d8 with history | `tests/e2e/test_cochange_explain.py`, `.traces-data/acceptance/row5/check.py` (scratch) | F-8 relevance; O-4 |
-| Optional provider chat | Browser-side, consent, BYOK | Stub provider end to end (local): consent before send, decline sends nothing, sent prompt = server bundle, manifest hashes match what the stub received, rejected claims never sent, key only in the provider header and browser session storage | `tests/e2e/chat_g5.cjs`, `web/e2e/chat.spec.ts`, `web/src/features/chat/chat.test.tsx` | Live provider untested (no paid key); O-10, O-11 |
-| Second repo, different stack | Not overfit to FastAPI + React | Python library and an Express app run end to end (local) | `SECOND_REPO.md`, `EXPRESS.md`, `tests/e2e/test_python_package_patterns.py`, `tests/e2e/test_express_patterns.py` | F-10 no JavaScript validator and an ESM-only import check; O-8 persistence detection is FastAPI/SQL shaped; O-3 layer rule calls a library `backend` |
-| Trace completeness | "Complete" only when every step is recorded and nothing is missing | Holds on fsft; not on Express | `tests/e2e/test_express_patterns.py` (xfail) | F-9 |
-| Mobile and accessibility | Touch, 360 px, WCAG 2.2 AA | axe 0 violations on nine real fsft screens at 1280 and 360 px (local); CI on synthetic | `tests/e2e/real_snapshot.cjs`, `web/e2e` (android-360) | axe covers automated WCAG rules only; no screen-reader pass |
-| Performance | Not specified in numbers | Local baseline: index fsft 19.3 s, itsdangerous 4.9 s (median of 3, from local clones, no fetch); API p95 under 110 ms except graph 636 ms and trace 625 ms on fsft | `tests/perf/bench.py`, [acceptance/PERF.md](acceptance/PERF.md) | No targets in the charter; O-5 |
-| CI | All suites | Run 39916651720 green, history 0 skipped | `.github/workflows/ci.yml` | G-1 (fsft e2e not yet run on GitHub) |
+| Evidence statuses on other Python code | Validators judge claims correctly | Local re-index: 0 rejected on itsdangerous and markupsafe | `tests/e2e/test_python_package_patterns.py` | none (F-4, F-5 fixed; the box app re-indexed at `0f32d4d` shows 0 rejected, O-14) |
+| JavaScript evidence | Imports verified (D-030) | 107 of 107 Express imports verified and correct | `tests/e2e/test_express_patterns.py` | L-2: JS calls, references and instantiations stay unvalidated |
+| Non-ASCII and odd file names | Any public repo | CI | `test_hostile_repo.py` | none (F-1, F-2 fixed) |
+| Overview, graph, trace, review | Real data, unknowns shown | CI on the fsft seed; box app 16 of 16 | `demo_walk.cjs`, `real_snapshot.cjs`, `web/e2e` | L-6: graph truncation is reported, not avoided |
+| Trace completeness | "Complete" only when every step is recorded | API `complete: false` with unresolved-call gaps; UI says why | `test_express_patterns.py`, demo 6b, `web/e2e/trace.spec.ts` | none (F-9, O-2 fixed) |
+| Route, component and source pages | Route/API inventory screen (charter 4B) | Box app pages render real data | `web/e2e` inventory specs | L-3: Express `forEach` mounts not composed |
+| History | Timeline, lifecycle, co-change, milestones, compare | CI + Git spot-checks | `tests/history`, `SECOND_REPO.md`, `EXPRESS.md` | Compare falls back to an identity diff (STATUS.md, H3); O-6 fixed (lineage restart disclosed) |
+| No-key explain | Useful answers with citations | Box app, fsft | `tests/explain`, demo 10 and 11 | O-13 (runtime question drops the static path); L-5 |
+| Co-change in explain | A pattern, never a cause, fact or code structure | CI | `tests/e2e/test_cochange_explain.py`, `tests/explain` | none (F-8, O-4 fixed) |
+| Optional provider chat | Browser-side, consent, BYOK | CI and box app, stub provider | `chat_g5.cjs`, `web/e2e/chat.spec.ts` | L-7, L-8 |
+| Persistence detection | FastAPI/SQL path | fsft | regression | L-4: Mongoose not recognised |
+| Mobile and accessibility | Touch, 360 px, WCAG 2.2 AA | CI on the fsft seed | `real_snapshot.cjs`, `web/e2e` | No screen-reader pass |
+| Performance | Not specified in numbers | Local baseline at `0f32d4d` | `tests/perf/bench.py` | L-1 (O-5) |
+| CI | All suites | Run 39930532720 green on `0f32d4d`, e2e on the real fsft seed | `.github/workflows/ci.yml` | none |
 
-## 3. Findings
+## 3. Findings (final status at `0f32d4d`)
 
-Status at `build/traces-v1` @ `b37eef2` (PR #27 merged into `ws/lab-acceptance` as `3bad896`), local: F-1 to F-5 are **fixed**. Their former strict-xfail tests now pass as regression guards (security job: 134 passed, 2 xfailed, and the 2 are F-9 and F-10). F-6 is fixed in `721829f` and re-verified by Lab (local, scratch server). F-7 to F-11 and the notes are open.
-
-| Id | Severity | Owner | Summary | Repro |
+| Id | Severity | Owner | Summary | Final status and evidence |
 | --- | --- | --- | --- | --- |
-| F-1 | High | Traces (adapter / `traces.core.common` blob reader) | A non-ASCII tracked file name makes the adapter fail with `E_PATH`; the whole repository cannot be indexed. Likely `git ls-tree -r` without `-z` | `tests/security/test_hostile_repo.py::test_non_ascii_path_indexes` |
-| F-2 | Low | Traces (`evidence/views.safe_repo_path`) | Source view refuses names starting with `-` with a wrong message | `GET .../source?path=-rf.py` on the hostile fixture |
-| F-3 | Medium | Traces (`api/app.py` validation handler) | 422 envelope echoes rejected input, including a submitted key | `tests/security/test_no_key_and_caps.py::test_submitted_key_not_echoed` |
-| F-4 | High | Traces (`validators/python_ast.py` import check) | Relative imports are rejected (ignores `ImportFrom.level`) | `tests/e2e/test_python_package_patterns.py::test_relative_imports_not_rejected` |
-| F-5 | Medium | Traces (`validators/python_ast.py` binding resolution) | Calls into `@typing.overload` methods resolve to the first stub; correct edge rejected | `...::test_overload_call_to_implementation_not_rejected` |
-| F-6 | Low | Traces (API / ingest) | **Fixed at `b37eef2`, re-verified locally**. API: `POST index-jobs {"sha":"000...001"}` on pallets/markupsafe gives 422 `sha_not_found` ("no job was created"), with no job, no snapshot row at that SHA and no cache directory. Worker path (offline, local clone as the remote): the job fails `sha_not_found` with `snapshot_id` NULL, no snapshot row, no empty cache directory. Before the fix: a full clone, then a permanent failed snapshot row and an empty cache dir | `.traces-data/acceptance/f6/api_repro.txt`, `worker_repro.py` (scratch); O-9 |
-| F-7 | Medium | Traces UI (explain engine, D-023) | No-key explain matches keywords: "What does create_item depend on?" lists `create_random_item` and SDK imports instead of `create_item depends_on get_db`; "What changed in commit 9d703df25491?" answers with an unrelated persistence fact | `POST F/explain` on the box app with those questions |
-| F-8 | Medium | Traces (explain engine, history questions, PR #24) | History questions ignore the file they name. On fsft@b1125d8, "Which files changed together with backend/app/crud.py?" cites 8 co-change patterns, none involving crud.py, while the stored pair crud.py and backend/tests/api/routes/test_users.py (5 of 26 commits) is not cited. "What changes with backend/app/crud.py and backend/tests/api/routes/test_users.py?" is answered from the route inventory (23 route facts, no history) | Index fsft with history, `POST .../explain {"question": "Which files changed together with backend/app/crud.py?"}`; compare with `GET .../history/cochange?target=backend/app/crud.py` |
-| F-9 | Medium | Traces (views, `trace_view`) | A trace says "Complete: every step is backed by a recorded relationship" with 0 gaps, although the traced symbol has stored unresolved call references. Express `register` shows 3 steps and omits `userService.createUser` and `tokenService.generateAuthTokens` | `tests/e2e/test_express_patterns.py::test_trace_with_unresolved_calls_is_not_complete`; `GET .../trace?from=register` on node-express-boilerplate@179ae84 |
-| F-10 | High (for JavaScript repos) | Traces (validators) | No validator family for JavaScript (`/meta` lists python and typescript), so no JS claim can be verified: 0 of 712 static relationships on node-express-boilerplate, and the default graph is empty. The text import check expects `import\|from\|export`, so all 107 CommonJS `require` imports fail L3 although 107 of 107 are correct | `tests/e2e/test_express_patterns.py::test_true_commonjs_require_is_verified`; `EXPRESS.md` |
-| F-11 | Low | Traces (explain engine) | "What does POST /register do?" answers "This snapshot has no README or manifest records, so the project's stated purpose and dependencies are unknown", while the overview shows the README heading and the Express and Jest manifests, and the route is stored at `auth.route.js:9`. Same family as F-7 | `POST .../explain` on node-express-boilerplate@179ae84 |
-| B-1 | Medium (demo blocker) | Box app operator (Architect1) | **Fixed at 13:35 IST, verified by Lab at 13:36 IST.** The 5731 web server was restarted with `TRACES_API_URL=http://127.0.0.1:8731` (process environment checked). `/repos` lists the same 3 repos through 5731 and 8731, and `/meta` has the same sha256 through both. Against 5731: `demo_walk.cjs` 15 of 15, `real_snapshot.cjs` 21 of 21, `chat_g5.cjs` 13 of 13. Row counts in every box store table were the same before and after the runs. The first demo walk failed step 10 on a stale expected phrase, not on the proxy (O-12). Original problem: since the 13:21 IST restart, the box web server on 5731 proxies `/api` to `127.0.0.1:8000`, the `vite.config.ts` default (`TRACES_API_URL` not set), not to the box API on 8731. Before 13:27 IST every API call from the UI failed (`ECONNREFUSED 127.0.0.1:8000` in `/tmp/box_web.log`). After 13:27 the UI on 5731 shows another seat's transient e2e API (`/workspace/traces-ui`, port 8000, fsft only) instead of the box store | `curl 127.0.0.1:5731/api/v1/repos` lists 1 repo; `curl 127.0.0.1:8731/api/v1/repos` lists 3. Evidence for the fix: `.traces-data/acceptance/b1/` |
-| O-1 | Note | Traces (ingest) | No final clone-size check after git exits | code read, `ingest/fetch.py::_clone_capped` |
-| O-2 | Note | Traces (views) | Trace gap reason says "no outgoing static relationship" when the only one is rejected and hidden | itsdangerous trace from `TimestampSigner::validate` |
-| O-3 | Note | Traces (components) | Layer rule labels a library's `src/<pkg>` as `backend` | itsdangerous overview |
-| O-4 | Note | Traces (explain engine) | A summary sentence ("Taken together, the closest matching evidence (1 co changed with, 3 commit modifies, ...) sits in 2 files") cites a co-change record next to code records without the pattern caveat. Kind is interpretation, never fact; seen on the small worker-indexed repo, not on fsft | `tests/e2e/test_cochange_explain.py` fixture, question "What changes with alpha.py and beta.py?" |
-| O-6 | Note | Traces (history) | Co-change counts a path from its latest add after a delete and re-add (`user.service.js`: 6 revisions counted, 14 commits touch the path). The sentence says "commits that touched either of these files" | `EXPRESS.md`, `cochange_recount.py` |
-| O-7 | Note | Traces (routes) | Express mounts computed by `forEach` over an array are not composed, so routes show `/register` instead of `/v1/auth/register` with no flag that the path is relative. Middleware mounts (`app.use('/v1/auth', authLimiter)`) are recorded as UNKNOWN-method routes. Literal mounts compose correctly | `EXPRESS.md` |
-| O-8 | Note | Traces (views, persistence path) | Persistence detection does not recognise Mongoose (`User.create`); trace and explain say "No persistence path is recorded" (honest, not invented) | `EXPRESS.md` |
-| O-9 | Note | Traces (API / ingest) | **Routed to the API lane for cleanup.** The F-6 fix is forward-only. The box store still has the pre-fix leftovers: markupsafe snapshot `0000000000000000000000000000000000000001` in state failed, and its empty cache directory. Stores created before `b37eef2` need a one-off cleanup | `GET /api/v1/repos/github.com__pallets__markupsafe/snapshots` on the box app |
-| O-10 | Note, v1 limit | Traces UI (chat key store) | **Listed under v1 limits (section 5).** By design, the provider key sits in plain text in the browser's sessionStorage ("kept for this browser session only"), or in localStorage with "Remember on this device" and a warning. It never reaches the Traces API, its logs, its store or the sent record (checked) | `tests/e2e/chat_g5.cjs` settings step |
-| O-11 | Note | Traces UI | **Routed to UI.** Each outbound manifest row hashes the fenced statement only. The `(label, where)` prefix of each evidence line is sent too, but it is not hashed (file and lines are listed) | `chat_g5.cjs` `checkManifest` |
-| O-12 | Note | Traces (explain) | The no-key answer to "When was new-frontend moved to frontend?" changed wording at `b37eef2`: it now reads "Commit 9d703df25491 moved 96 files from new-frontend/ to frontend/". That correct move comes third, after two moves inside `new-frontend/` that do not answer the question. The demo walk expectation was stale and is updated (Lab-owned test) | `POST .../snapshots/b1125d8.../explain`, same body through 5731 and 8731 |
-| O-5 | Note | Traces (views) | `graph` and `trace` take about 0.55 s p50 on fsft, ten times the next slowest read endpoint | `tests/perf/bench.py` |
+| F-1 | High | Traces (adapter) | A non-ASCII tracked file name failed the whole index with `E_PATH` | **Fixed**. `test_hostile_repo.py::test_non_ascii_path_indexes` passes in CI 39930532720 (no xfail) |
+| F-2 | Low | Traces (views) | Source view refused names starting with `-` | **Fixed** (D-028). `test_hostile_repo.py` passes in CI 39930532720 |
+| F-3 | Medium | Traces (API) | 422 envelope echoed rejected input, including a submitted key | **Fixed**. `test_no_key_and_caps.py::test_submitted_key_not_echoed` passes in CI 39930532720; `chat_g5.cjs` finds no key in API responses or logs |
+| F-4 | High | Traces (Python validator) | Relative imports were rejected | **Fixed**. `test_relative_imports_not_rejected` passes in CI. Local re-index at `0f32d4d`: itsdangerous 0 rejected (was 46 imports + 1 call), markupsafe 0 (was 2) |
+| F-5 | Medium | Traces (Python validator) | Calls into `@typing.overload` methods were rejected | **Fixed**. `test_overload_call_to_implementation_not_rejected` passes in CI; the itsdangerous call rejection is gone on re-index |
+| F-6 | Low | Traces (API / ingest) | Nonexistent SHA left a failed snapshot row and an empty cache folder | **Fixed**. `tests/api/test_index_jobs.py` (422 `sha_not_found`, no job, no row) in CI. Worker path re-run at `0f32d4d`: job failed `sha_not_found`, `snapshot_id` NULL, no snapshot row, no cache folder (`.traces-data/acceptance/final/f6_worker.txt`) |
+| F-7 | Medium | Traces UI (explain engine) | No-key explain matched keywords | **Fixed**. Box app: "What does create_item depend on?" gives `create_item depends on get_db` and `get_current_user`, uses Item, returns ItemPublic and the persistence path, all verified. "What changed in commit 9d703df25491?" cites that commit's records (343 items, first 8 listed) |
+| F-8 | Medium | Traces (explain, history) | History questions ignored the file they named | **Fixed**. Box app: "Which files changed together with backend/app/crud.py?" and the two-file question both answer crud.py and test_users.py, 5 of 26, as a pattern with the caveat |
+| F-9 | Medium | Traces (views, trace) | A trace called itself complete while calls were unresolved | **Fixed**. Express re-index: the `register` trace has `complete: false`, `incomplete_reasons` "gaps: 1" and "3 step(s) rest on relationships that are not verified or observed", and a gap listing `userService.createUser` and `tokenService.generateAuthTokens`. fsft `read_items` on the box app shows "Incomplete: this trace has 1 step with calls the trace cannot follow" (demo 6b). `test_express_patterns.py` passes without xfail in CI |
+| F-10 | High (JS) | Traces (validators) | No JavaScript validator; 0 of 107 correct `require` imports verified | **Fixed for imports** (D-030). `/meta` lists `javascript: typescript@6.0.3 parser, imports only (D-030)`. Express re-index: 107 verified, all imports. JS calls stay unvalidated (L-2) |
+| F-11 | Low | Traces (explain) | `POST /register` answered "no README or manifest records" | **Fixed**. Express re-index: the answer cites the route at `src/routes/v1/auth.route.js:9`, its reference to `register`, and the manifest history. It says runtime behaviour is not established and shows the README heading and frameworks as interpretations (L-5) |
+| B-1 | Medium | Box app operator (Architect1) | Box web 5731 proxied to port 8000, not 8731 | **Fixed**. At 14:51 IST the 5731 process environment has `TRACES_API_URL=http://127.0.0.1:8731`, and `/meta` is identical through both ports. All three walks pass through 5731 |
+| O-1 | Note | Traces (ingest) | No final clone-size check after git exits | **Fixed**. `ingest/fetch.py` checks once more after git exits; `tests/unit/test_fetch_cleanup.py` in CI |
+| O-2 | Note | Traces (views) | Gap reason said "no outgoing static relationship" when the only one was rejected | **Fixed**. Box app, itsdangerous `TimestampSigner::validate`: "1 outgoing static relationship(s) from this step are hidden (1 rejected); send include_rejected=true to see rejected ones", with `hidden_rejected: 1` |
+| O-3 | Note | Traces (components) | A library's `src/<pkg>` was labelled `backend` | **Fixed**. itsdangerous re-index: `src/itsdangerous` layer `library`, with the rule `library-v1:no-app-entrypoint` and a reason. The box app shows `library` after its re-index (O-14) |
+| O-4 | Note | Traces (explain) | A summary sentence cited a co-change record without the caveat | **Fixed**. The new assertion in `test_cochange_explain.py` (every citing sentence carries the caveat) passes at `0f32d4d` and fails on the `e532644` engine with the original "Taken together ..." sentence |
+| O-5 | Note | Traces (views) | `graph` and `trace` are about ten times slower than the other read endpoints on fsft | **Limit L-1**. Re-run at `0f32d4d`: graph p50 581 ms, p95 674 ms (was 543, 636); trace create_item p50 797 ms, p95 938 ms (was 541, 625). Trace is about 47 % slower than at `e532644`, probably the F-9 unresolved-call gaps; still under 1 s at p95 |
+| O-6 | Note | Traces (history) | Co-change counted a path from its latest re-add without saying so | **Fixed** (D-H15). Express re-index: the sentence adds "History for src/services/user.service.js restarts after 1 delete and re-add gap in the analysed range; commits before the last re-add are not counted for this path" |
+| O-7 | Note | Traces (routes) | Express `forEach` mounts are not composed | **Limit L-3**. Express re-index: routes still show `POST /register`, not `/v1/auth/register`. Middleware mounts are now flagged `mount` (`USE /v1`, `USE /v1/auth`) |
+| O-8 | Note | Traces (views, persistence) | Mongoose persistence not recognised | **Limit L-4**. Express re-index: "Does register write to the database?" answers "No persistence path is recorded in this snapshot." (unknown, not invented) |
+| O-9 | Note | Traces (API / ingest) | Pre-fix F-6 leftovers in the box store | **Fixed** (startup cleanup, `95eb2c5`). Box store, read-only, at 14:56 IST: no markupsafe snapshot row (0 rows with SHA `0000000000...`), no `.cache/targets/github.com__pallets__markupsafe/` folder, `GET .../markupsafe/snapshots` returns `[]`. The failed job stays visible with `snapshot_id` NULL |
+| O-10 | Note | Traces UI | Provider key in plain text in browser storage | **Limit L-7** (by design) |
+| O-11 | Note | Traces UI | Manifest rows hashed the statement only, not the `(label, where)` prefix | **Fixed** (#37, `eba1dee`). `chat_g5.cjs` now checks the sha256 and length of each exact line sent; 13 of 13 in CI 39930532720 and on the box app |
+| O-12 | Note | Traces (explain) | The 96-file move came third | **Fixed** (#36). Box app: the summary first, then `9d703df` 96 files, then the 7-file and 4-file moves. `demo_walk.cjs` step 10 asserts the order |
+| O-13 | Note (new) | Traces UI (explain engine) | Since `81d7d93` (F-7 intents), "Does create_item write to the database at runtime?" returns only "Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown." At `b37eef2` it also cited the verified fact "create_item has a statically established persistence path through get_db". The test `test_runtime_questions_are_only_unknown` makes this intended, but the answer no longer points to the static evidence a reader can check | **Open**. Bisected on a copy of the box store: `b37eef2` gives both sentences; `81d7d93`, `e22965b`, `d307555` and `0f32d4d` give only the unknown. `.traces-data/acceptance/final/explain_Does_cre.json` |
+| O-14 | Note (new) | Box app operator (Architect1) | The box store's fsft and itsdangerous evidence was indexed before `b37eef2` and before migration 0003. `isolation` was empty, and itsdangerous showed the 47 F-4/F-5 rejections and the `backend` layer | **Fixed** by the box re-index at `0f32d4d` (15:12 IST). Both snapshots have `isolation: unshare` (`unisolated: false` in the API). fsft: 4,642 edges = 4,538/36/59/9, 12 rejected (3 injected), validation canonical hash `73db432be3babab4`, adapter `45600280cb496a67`, 18,480 claims with every status count unchanged, history complete with 8,464 records. itsdangerous: 0 rejected, layer `library`. Demo step 13 now asserts no rejected claims |
+| O-15 | Note (new, mismatch) | Architect1 (expectation), Traces validators (cause) | Architect1 expected the itsdangerous counts to be unchanged by the re-index. Totals are unchanged: 3,312 claims (1,062 nodes, 1,906 relationships, 344 unresolved references), 674 CodeGraph edges, and the adapter hash `7c06d935eb8547db`. Statuses changed: verified 310 to 357, observed 2,577 to 2,669, rejected 93 to 0, missing_location 46 to 0, unvalidated 286 (same). Edge statuses: verified 310 to 357, observed 3 to 49, rejected 47 to 0, missing_location 46 to 0, unvalidated 268 (same). The validation hash changed from `8c4679dae34692ae` to `1a2b4bd07800c775` | **Open for Architect1 to accept**. Nothing was adjusted. The new counts equal Lab's independent offline re-index at `0f32d4d` (`.traces-data/acceptance/final/pylib/statuses.txt`: 357 verified, 2,669 observed, 286 unvalidated, 0 rejected). The change is what the F-4 and F-5 fixes predict: 46 relative imports and 1 overload call no longer rejected. Lab reads this as the fixes landing, not a regression |
 
-## 4. Gaps (open)
+## 4. Gaps
 
-| Id | Owner | Gap | Plan |
+| Id | Owner | Gap | Status |
 | --- | --- | --- | --- |
-| G-1 | Traces Lab | CI e2e seeded a synthetic 4-file repo. **Fixed in checkpoint 4, pending a GitHub run**: the e2e job now needs `target`, restores the cached full-history clone and runs `scripts/e2e_seed.py --seed fsft`, then `tests/e2e/real_snapshot.cjs`. Local: 70 passed 4 skipped, 21 of 21. `TRACES_E2E_SEED=synthetic` keeps the fast seed | Close when the first GitHub run of the pushed commit passes |
-| G-2 | Architect | `docs/STATUS.md` line 39 still says the e2e job is opt-in and a placeholder (checked at `e532644`); CI runs it on every push | Architect1 updates STATUS.md |
-| G-3 | Traces UI | Routes, Components and Source pages are placeholders in the UI | UI checkpoint |
-| G-4 | Traces Lab | **Closed (local)**: Express app hagopj13/node-express-boilerplate@179ae84 (MIT) run end to end on a scratch server; findings F-9, F-10, F-11, O-6 to O-8 | none |
-| G-5 | Traces UI | **Closed (local) with a stub provider**. On the box app, read-only, through the box API first and then through the box web app on 5731 after the B-1 fix: `tests/e2e/chat_g5.cjs` passes 13 of 13 (consent dialog before any send; Cancel and Escape send nothing and record nothing; the stub receives exactly the server prompt; all claim ids, statement hashes, instructions and question match the outbound manifest; a rejected claim injected into the bundle is stripped before consent and send; 12 bundles asked with each stored rejected statement contain 0 rejected ids; the key is in the provider `Authorization` header only, with no cookie or referer, and never in Traces requests, responses, console, `/tmp/box_api.log`, the store or the sent record; forged and ungrounded answers are flagged). Wired into the CI e2e job (fsft seed). **A live provider is untested in v1: no paid key**, and no local Ollama on the box | Live provider when a key or Ollama is approved |
-| G-6 | Architect | No architecture diagram or rollback section found in `docs/` | Architect |
-| G-7 | Traces Lab | **Closed (local)**: baseline in [acceptance/PERF.md](acceptance/PERF.md). Not a CI measurement; GitHub-hosted runners vary too much for latency gates | Re-run `tests/perf/bench.py` at release |
-| G-8 | Traces Lab | **Closed locally**: axe (WCAG 2.2 AA tags) and 360 px touch on the real fsft snapshot, 0 violations, 21 of 21. In CI with G-1 | Close with G-1 |
-| G-9 | Traces Lab | **Closed (CI)**: run 39916651720 (`e532644`) history 172 passed, 0 skipped, with the any-skip guard | none |
+| G-1 | Traces Lab | CI e2e on the real fsft seed | **Closed (CI)**: run 39930532720, e2e job seed fsft, 94 passed, 4 skipped, real-snapshot 21 of 21 |
+| G-2 | Architect | `docs/STATUS.md` line 39 says the e2e job is opt-in and a placeholder | **Open** at `0f32d4d`. Architect1 updates STATUS.md |
+| G-3 | Traces UI | Routes, Components and Source pages were placeholders | **Closed**: the box app renders real routes, components and source (`ac8e191`) |
+| G-4 | Traces Lab | Second stack | **Closed (local)**: Express re-indexed at `0f32d4d` (row 7) |
+| G-5 | Traces UI | Provider chat end to end | **Closed (CI) with a stub provider**: `chat_g5.cjs` 13 of 13 in run 39930532720 and on the box app. Live provider: L-8 |
+| G-6 | Architect | No architecture diagram or rollback section in `docs/` | **Open** at `0f32d4d` |
+| G-7 | Traces Lab | Performance baseline | **Closed (local)**: re-run at `0f32d4d` in [acceptance/PERF.md](acceptance/PERF.md) |
+| G-8 | Traces Lab | axe and 360 px on real data | **Closed (CI)**: run 39930532720 |
+| G-9 | Traces Lab | History skips | **Closed (CI)**: 176 passed, 0 skipped in run 39930532720 |
 
-## 5. v1 limits (by design)
+## 5. v1 limits
 
-| Id | Owner | Limit | Note |
+These are the only open items accepted as limits, as named by Architect1. Anything that still fails or does not match is a finding in section 3 (O-13, O-15) or a gap in section 4 (G-2, G-6).
+
+| Id | Owner | Limit | Evidence at `0f32d4d` |
 | --- | --- | --- | --- |
-| L-1 (O-10) | Traces UI | The BYOK provider key is stored in plain text in the browser's sessionStorage, or in localStorage when "Remember on this device" is ticked (with a warning) | The key never reaches the Traces API, its logs, its store or the sent record (`chat_g5.cjs`) |
-| L-2 | Traces UI | Live-provider chat is untested in v1: no paid key, no local Ollama on the box | Only the stub provider path is verified (G-5) |
+| L-1 (O-5) | Traces (views) | `graph` and `trace` are the slowest read endpoints on fsft | graph p50 581 ms, p95 674 ms; trace p50 797 ms, p95 938 ms; local, one bench run, [acceptance/PERF.md](acceptance/PERF.md) |
+| L-2 (D-030) | Traces (validators) | JavaScript validation covers imports only; calls, references, instantiations and named import bindings are deferred to v1.1 and are never verified | Express: 153 calls, 21 instantiates and 37 references unvalidated; 107 imports verified |
+| L-3 (O-7) | Traces (routes) | Express routers mounted with `forEach` over an array are not composed into full paths | Express: `POST /register` instead of `/v1/auth/register` |
+| L-4 (O-8) | Traces (views, persistence) | Mongoose persistence is not recognised | Express: "No persistence path is recorded in this snapshot." |
+| L-5 | Traces (explain) | README headings and framework names from manifests are shown as uncited interpretations | Express `POST /register`: README and manifest sentences have 0 citations and say they are documentation or named libraries, not verified facts |
+| L-6 (D-028, review F4) | Traces (graph) | The graph truncates at `limit` and reports what it cut (`truncated_counts` by status); it does not page | D-028 |
+| L-7 (O-10) | Traces UI | The BYOK key is kept in plain text in sessionStorage, or localStorage with "Remember on this device" (with a warning) | It never reaches the Traces API, logs, store or sent record (`chat_g5.cjs`, CI and box app) |
+| L-8 | Traces UI | Live-provider chat is untested in v1: no paid key, no local Ollama | Only the stub provider path is verified (G-5) |

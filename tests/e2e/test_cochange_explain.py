@@ -130,3 +130,6 @@ def test_cochange_explain_is_a_pattern_with_caveat_never_fact_or_code_structure(
     for a in own:
         assert a["kind"] == "interpretation", a
         assert CAVEAT in a["text"], a["text"]
+    # O-4: any sentence that cites a co-change record, summaries mixing it with code records included, carries the caveat.
+    for a in citing:
+        assert CAVEAT in a["text"], a["text"]

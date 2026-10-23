@@ -4,6 +4,14 @@ Local run on the Traces Lab box, not CI. Run on 2026-10-23 at 13:11 IST, on a sc
 
 Re-run after merging `build/traces-v1` @ `b37eef2` (fixes for F-1 to F-6) as `3bad896`, on a fresh store from the cached clone. Results were identical: 3,671 claims, 0 verified, and the same counts. The trace from `register` is still complete with 3 edges. The `POST /register` explain answer is unchanged. `/meta` validators are still python and typescript.
 
+Re-index at `0f32d4d` (final acceptance pass, 2026-10-23 at 14:55 IST). This was offline, from the cached full-history clone, into a fresh scratch store (`.traces-data/acceptance/final/express/`), and served on scratch port 18850. It took 5.3 s and produced 3,671 claims. Results:
+- 107 verified, all `imports`, and 107 of 107 correct (F-10 fixed for imports, D-030). Calls (153), instantiates (21) and references (37) stay unvalidated (limit L-2).
+- The `register` trace has `complete: false` and a gap that lists `userService.createUser` and `tokenService.generateAuthTokens` as unresolved calls (F-9 fixed).
+- The `POST /register` explain answer cites the route and the manifest history (F-11 fixed).
+- Co-change on `user.service.js` says the path's history restarts after a delete and re-add (O-6 fixed).
+- Express `forEach` mounts are still not composed (L-3), and Mongoose is still not recognised (L-4).
+- Final statuses are in [../ACCEPTANCE.md](../ACCEPTANCE.md).
+
 ## Target
 
 | | |

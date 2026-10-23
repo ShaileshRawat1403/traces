@@ -15,7 +15,7 @@ from collections import Counter, deque
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from traces.explain.intents import SUGGESTIONS, classify
+from traces.explain.intents import PERSIST, SUGGESTIONS, classify
 from traces.explain.records import ClaimView, endpoint_path, short_symbol, view, words_of
 
 MAX_MATCHES = 8
@@ -393,9 +393,17 @@ def build_answer(
             for c in sorted(deps, key=lambda c: (DEPENDENCY_KINDS.index(c.kind), c.claim_id))[:3]:
                 answer.append(_fact(f"Manifest history: {c.statement or _rel_sentence(c)}", tag(c), [cite(c)]))
 
-    # Runtime questions are always unknown, and nothing else is said: static evidence cannot answer them.
+    # Runtime questions are always unknown: static evidence cannot answer them. A runtime question about persistence
+    # also cites the verified or observed static persistence paths (of the symbol it names, if any) as static facts,
+    # next to the unknown, never as a runtime claim (O-13).
     if intent.name == "runtime":
-        return [_fact(RUNTIME_UNKNOWN, "unknown")], [], rejected
+        out = [_fact(RUNTIME_UNKNOWN, "unknown")]
+        if PERSIST.search(question):
+            rt_paths = sorted((c for c in usable if c.kind == "persistence_path" and c.grounded), key=_order)
+            rt_words = set(re.findall(r"[\w.]+", question.lower()))
+            rt_named = [c for c in rt_paths if short_symbol(c.from_symbol).lower() in rt_words]
+            out += [_fact(_rel_sentence(c), "fact", [cite(c)]) for c in (rt_named or rt_paths)[:MAX_MATCHES]]
+        return out, sorted(cited.values(), key=lambda c: c.claim_id), rejected
 
     # 1. Claims the user pinned (request schema): explained whatever the question says.
     for fid in focus:

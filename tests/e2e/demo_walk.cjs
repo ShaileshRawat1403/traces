@@ -50,6 +50,14 @@ async function see(p, texts) {
       'STEP 1. Items shows AddItem.', 'react-hook-form is not installed', 'operation POST /api/v1/items/ (items-create_item)', 'STEP 10. create_item depends on get_db.', 'Static persistence path']);
     await p.screenshot({ path: SHOTS + '/06-trace.png' });
   });
+  await step('6b symbol trace: unresolved calls are a gap and the trace says why it is incomplete (F-9, #38)', async () => {
+    await go(F + '/trace?from=read_items'); await see(p, ['From read_items: 3 steps', '1 gaps',
+      'Incomplete: this trace has 1 step with calls the trace cannot follow. A gap is not evidence that a call does or does not happen.',
+      'API reasons: gaps: 1', 'Gap: calls the trace cannot follow', 'Unresolved calls:',
+      'The extractor recorded these calls by name only and did not resolve them to a declaration, so the trace cannot follow them.']);
+    if (await p.getByText('Complete: every step is backed by a recorded relationship').count()) throw new Error('trace with unresolved calls says Complete');
+    await p.screenshot({ path: SHOTS + '/06b-trace-unresolved.png' });
+  });
   await step('7 review: 12 rejected claims incl. the wrong CodeGraph imports and injected negative', async () => {
     await go(F + '/review'); await see(p, ['12 matching claims', "imports 'app' at backend/app/api/routes/login.py:8", 'create_item']);
     await p.screenshot({ path: SHOTS + '/07-review.png' });
@@ -69,19 +77,33 @@ async function see(p, texts) {
     await p.getByRole('button', { name: 'Explain (no key needed)' }).click();
     await see(p, expect);
     await p.screenshot({ path: SHOTS + '/' + shot });
+    return p.locator('main').innerText();
+  };
+  // Order check: each phrase must appear after the previous one in the rendered answer.
+  const inOrder = (text, phrases) => {
+    let at = -1;
+    for (const ph of phrases) {
+      const i = text.indexOf(ph, at + 1);
+      if (i < 0 || i <= at) throw new Error(`out of order or missing: ${ph}`);
+      at = i;
+    }
   };
   await step('10 ask (no key): rename question answered from history records', async () => {
-    await ask('When was new-frontend moved to frontend?', ['Commit 9d703df25491 moved 96 files from new-frontend/ to frontend/'], '10-ask-history.png');
+    const moves = ['History patterns: 3 recorded directory moves involve new-frontend or frontend, ranked by files moved, then top-level directory renames first.',
+      'Commit 9d703df25491 moved 96 files from new-frontend/ to frontend/', 'Commit b470f59ce296 moved 7 files', 'Commit e44777f91904 moved 4 files'];
+    const text = await ask('When was new-frontend moved to frontend?', moves, '10-ask-history.png');
+    inOrder(text, moves); // summary first, then the 96-file move ranked first (O-12)
   });
   await step('11 ask (no key): runtime question marked unknown', async () => {
-    await ask('Does create_item write to the database at runtime?', ['Static evidence cannot show runtime behavior', 'statically established persistence path through get_db'], '11-ask-runtime.png');
+    await ask('Does create_item write to the database at runtime?', ['Static evidence cannot show runtime behavior, so how this behaves when the code runs is unknown.'], '11-ask-runtime.png');
   });
   await step('12 itsdangerous overview: unknown purpose and entry points', async () => {
     await go(I); await see(p, ['@672971d', 'No route nodes or routes_to claims are stored', 'not proof the software has no HTTP routes', 'src/itsdangerous']);
     await p.screenshot({ path: SHOTS + '/12-itsd-overview.png' });
   });
-  await step('13 itsdangerous graph: 47 rejected hidden', async () => {
-    await go(I + '/graph'); await see(p, ['Rejected claims are never drawn.', '47 rejected']);
+  await step('13 itsdangerous graph: 0 rejected after the F-4/F-5 re-index, unvalidated hidden', async () => {
+    await go(I + '/graph'); await see(p, ['Rejected claims are never drawn.', 'Hidden by current filters: 268 (268 inferred (unvalidated)).']);
+    if (await p.getByText(/\d+ rejected/).count()) throw new Error('itsdangerous graph still reports rejected claims');
     await p.screenshot({ path: SHOTS + '/13-itsd-graph.png' });
   });
   // phone
