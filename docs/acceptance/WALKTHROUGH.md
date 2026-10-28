@@ -36,7 +36,7 @@ Desktop shots are 1280×860. Phone shots are 390×844.
 
 - Static analysis only. No runtime behavior has been observed.
 - A call into a library that cannot be checked stays inferred. It is not promoted to verified.
-- The default graph is capped. The template's relationship page says it is truncated. Show more recorded relationships raises that page from 300 to 800, then to 2000. 2000 is the API cap, not the whole repository. The opening picture is every stored component, in layer columns, with counts from that page only. A phone opens one layer so the names stay readable.
+- The opening picture is the page. Components sit in layer bands. A curve beside a column is a relationship inside that layer, and the number on it is a count from this page, not a new claim. A line between columns crosses layers. Show more recorded relationships raises that page from 300 to 800, then to 2000. 2000 is the API cap, not the whole repository. A phone opens one layer so the names stay readable.
 - An expanded component with many symbols opens as files. Select a file to see the lines recorded from it, then open the file to see the symbols. List still has every relationship. That is a view limit, not a smaller graph.
 - History is Git evidence for the indexed commit. It does not invent an architecture for commits that were not indexed, and co-change is not a call graph.
 - Component groups come from a stored path rule. They are not a runtime boundary.

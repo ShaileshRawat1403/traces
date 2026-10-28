@@ -20,12 +20,21 @@ function SnapshotCounts() {
   const by = (s.stats as { by_status?: Record<string, number> }).by_status ?? {};
   const shown = Object.entries(by).filter(([st]) => !presentStatus({ status: st, label: LABEL_FOR[st] }, "default").hidden);
   const rejected = by.rejected ?? 0;
+  const total = shown.reduce((sum, [, n]) => sum + n, 0) || 1;
+  const bar: Record<string, string> = { verified: "#8fd9cf", observed: "#b7c4ce", unvalidated: "#e2b16a", missing_location: "#e2b16a" };
   return (
     <div className="mb-6 border-t border-white/10 pt-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-medium tracking-[-0.02em]">Evidence in this snapshot</h2>
         <p className="text-xs text-muted">Schema {s.evidence_schema}</p>
       </div>
+      {shown.length ? (
+        <div className="mb-3 flex h-2.5 overflow-hidden rounded-full bg-white/10" role="img" aria-label={`Evidence mix: ${shown.map(([st, n]) => `${LABEL_FOR[st] ?? st} ${n}`).join(", ")}`}>
+          {shown.map(([st, n]) => (
+            <span key={st} style={{ width: `${(n / total) * 100}%`, background: bar[st] ?? "#c4b4ea" }} />
+          ))}
+        </div>
+      ) : null}
       <ul className="flex flex-wrap gap-2" data-testid="snapshot-counts">
         {shown.map(([st, n]) => (
           <li key={st} className="inline-flex items-baseline gap-2">

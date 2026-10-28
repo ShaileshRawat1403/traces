@@ -460,7 +460,7 @@ export default function GraphPage() {
         <ErrorState error={graph.error} what="The architecture graph" />
       ) : (
         <>
-          <div className="grid items-start gap-3 lg:grid-cols-[1fr_18rem]">
+          <div className="flex flex-col gap-4">
             <div className="min-w-0">
               {graph.data.nodes.length === 0 ? (
                 <Empty title="Nothing matches these filters">Try including inferred relationships or clearing the search.</Empty>
@@ -574,7 +574,7 @@ export default function GraphPage() {
                 )
               ) : null}
               {!state.focus ? (
-                <p className="text-xs text-ink-2">Lines between neighboring columns are on the map. A line counts relationships on this page. The weakest status in the pair sets the line. Select a component to read every link that touches it, including ones that skip a column. A missing line is not proof that nothing connects.</p>
+                <p className="text-xs text-ink-2">A curve beside a column is a relationship inside that layer. A line between columns crosses layers. Thickness is how many relationships this page recorded. The color is the weakest status in the pair. Select a component to read every link that touches it, including ones that skip a column. A missing line is not proof that nothing connects.</p>
               ) : (
                 <p className="text-xs text-muted">{useFiles ? "Files first. Select a file to emphasize the lines recorded from it. Enter opens its symbols. A line is a count, not a new claim." : "Select a symbol to label its lines. List shows every relationship."}</p>
               )}

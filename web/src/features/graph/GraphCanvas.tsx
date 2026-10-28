@@ -47,26 +47,27 @@ function positionsFor(model: { data: ElementData }[], layout: "map" | "neighborh
   return layout === "map" ? columnLayout(nodes, edges) : depthLayout(nodes, edges);
 }
 
-/** Orthogonal route that stays in the gaps. A line that would cross another column uses the channel under the row. */
-function elbow(a: { x: number; y: number }, b: { x: number; y: number }, lane: number, busY: number) {
+/** A route that stays readable. Same-layer links bow out beside the column. Cross-layer links stay in the gaps. */
+function route(a: { x: number; y: number }, b: { x: number; y: number }, lane: number, busY: number) {
   const sameCol = Math.abs(a.x - b.x) < 48;
   if (sameCol) {
-    const dir = b.y >= a.y ? 1 : -1;
-    const yLeave = a.y + dir * 28;
-    const yEnter = b.y - dir * 28;
-    const x = Math.min(a.x, b.x) - 108 + lane;
-    return `M ${a.x - 86} ${yLeave} H ${x} V ${yEnter} H ${b.x - 86}`;
+    const down = b.y >= a.y;
+    const y1 = a.y + (down ? 18 : -18);
+    const y2 = b.y + (down ? -18 : 18);
+    const bow = Math.min(70, 26 + Math.abs(b.y - a.y) * 0.1) + Math.abs(lane);
+    const x = Math.max(a.x, b.x) + 96 + bow;
+    return { d: `M ${a.x + 84} ${y1} C ${x} ${y1}, ${x} ${y2}, ${b.x + 84} ${y2}`, lx: x - 6, ly: (y1 + y2) / 2 };
   }
   const dir = b.x >= a.x ? 1 : -1;
   const x1 = a.x + dir * 88;
   const x2 = b.x - dir * 88;
   if (Math.abs(a.x - b.x) > 300) {
     const y = busY + lane;
-    return `M ${x1} ${a.y} V ${y} H ${x2} V ${b.y}`;
+    return { d: `M ${x1} ${a.y} V ${y} H ${x2} V ${b.y}`, lx: (x1 + x2) / 2, ly: y - 8 };
   }
-  if (Math.abs(a.y - b.y) < 6 && Math.abs(lane) < 1) return `M ${x1} ${a.y} H ${x2}`;
+  if (Math.abs(a.y - b.y) < 6 && Math.abs(lane) < 1) return { d: `M ${x1} ${a.y} H ${x2}`, lx: (x1 + x2) / 2, ly: a.y - 8 };
   const mid = (a.x + b.x) / 2 + lane;
-  return `M ${x1} ${a.y} H ${mid} V ${b.y} H ${x2}`;
+  return { d: `M ${x1} ${a.y} H ${mid} V ${b.y} H ${x2}`, lx: mid, ly: (a.y + b.y) / 2 };
 }
 
 export interface GraphCanvasProps {
@@ -97,10 +98,10 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
   const frame = useMemo(() => {
     const pts = nodes.map((n) => pos[n.data.id]).filter((p): p is { x: number; y: number } => !!p);
     if (pts.length === 0) return { minX: 0, minY: 0, w: 320, h: 180 };
-    const minX = Math.min(...pts.map((p) => p.x)) - 148;
-    const minY = Math.min(...pts.map((p) => p.y)) - 78;
-    const maxX = Math.max(...pts.map((p) => p.x)) + 120;
-    const maxY = Math.max(...pts.map((p) => p.y)) + 96;
+    const minX = Math.min(...pts.map((p) => p.x)) - 36;
+    const minY = Math.min(...pts.map((p) => p.y)) - 72;
+    const maxX = Math.max(...pts.map((p) => p.x)) + 250;
+    const maxY = Math.max(...pts.map((p) => p.y)) + 110;
     return { minX, minY, w: Math.max(280, maxX - minX), h: Math.max(180, maxY - minY) };
   }, [nodes, pos]);
   const at = (id: string | undefined) => {
@@ -133,14 +134,22 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
     }
     return bottom + 26;
   }, [nodes, pos, frame]);
-  const headers = useMemo(() => {
-    const cols = new Map<string, { x: number; y: number; layer: string }>();
+  const bands = useMemo(() => {
+    const cols = new Map<string, { x: number; top: number; bottom: number; layer: string }>();
     for (const n of nodes) {
-      const p = at(n.data.id);
-      if (!p || !n.data.layer) continue;
-      const key = `${Math.round(p.x / 8)}:${n.data.layer}`;
+      const p0 = pos[n.data.id];
+      if (!p0) continue;
+      const p = { x: p0.x - frame.minX, y: p0.y - frame.minY };
+      const box = nodeBox(n.data);
+      const key = `${Math.round(p.x / 8)}:${n.data.layer ?? "other"}`;
+      const top = p.y - box.h / 2;
+      const bottom = p.y + box.h / 2;
       const cur = cols.get(key);
-      if (!cur || p.y < cur.y) cols.set(key, { x: p.x, y: p.y, layer: n.data.layer });
+      if (!cur) cols.set(key, { x: p.x, top, bottom, layer: n.data.layer ?? "other" });
+      else {
+        cur.top = Math.min(cur.top, top);
+        cur.bottom = Math.max(cur.bottom, bottom);
+      }
     }
     return [...cols.values()];
   }, [nodes, pos, frame]);
@@ -240,8 +249,6 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
     }
   };
 
-  const showLabels = false;
-
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -296,10 +303,14 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
               <path d="M 0 1.2 L 8 5 L 0 8.8 z" fill="context-stroke" />
             </marker>
           </defs>
-          {headers.map((h) => (
-            <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="11" fontFamily={SANS} fontWeight={500} letterSpacing="0.6">
-              {layerTitle(h.layer)}
-            </text>
+          {bands.map((b) => (
+            <g key={`${b.layer}-${b.x}`}>
+              <rect x={b.x - 96} y={b.top - 28} width={192} height={b.bottom - b.top + 44} rx="18" fill={layerColor(b.layer)} opacity="0.08" />
+              <rect x={b.x - 96} y={b.top - 28} width={192} height="2" rx="1" fill={layerColor(b.layer)} />
+              <text x={b.x - 84} y={b.top - 36} textAnchor="start" fill={layerColor(b.layer)} fontSize="12" fontFamily={SANS} fontWeight={600} letterSpacing="0.4">
+                {layerTitle(b.layer)}
+              </text>
+            </g>
           ))}
           {visibleEdges.map((e) => {
             const a = at(e.data.source);
@@ -309,25 +320,31 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
             const dim = !!linked && !hot;
             const color = TONE[e.data.tone ?? "verified"] ?? TONE.verified;
             const dash = e.data.line === "dashed" ? "6 4" : e.data.line === "dotted" ? "2 3" : undefined;
-            const midX = (a.x + b.x) / 2;
-            const midY = (a.y + b.y) / 2;
+            const drawn = route(a, b, lanes.get(e.data.id) ?? 0, busY);
+            const near = Math.abs(a.x - b.x) <= 280;
+            const showLabel = hot || (near && visibleEdges.length <= 16);
+            const text = clip(e.data.label, 18);
+            const plate = Math.max(28, text.length * 6.6 + 10);
             return (
-              <g key={e.data.id} opacity={dim ? 0.12 : 0.92}>
+              <g key={e.data.id} opacity={dim ? 0.16 : 1}>
                 <path
-                  d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)}
+                  d={drawn.d}
                   fill="none"
                   stroke={hot ? "#e7edf5" : color}
-                  strokeWidth={hot ? 2.4 : Math.min(1.8, 0.75 + (e.data.weight ?? 1.5) * 0.28)}
+                  strokeWidth={hot ? 2.6 : Math.min(3.4, 1.2 + (e.data.weight ?? 1.5) * 0.4)}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeDasharray={dash}
                   markerEnd={`url(#${marker}-arrow)`}
                 />
-                <path d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)} fill="none" stroke="transparent" strokeWidth={14} className="cursor-pointer" onClick={() => (e.data.id.startsWith("rollup::") ? onSelect(e.data.source ?? null) : onEdge(e.data.id))} />
-                {showLabels || hot ? (
-                  <text x={midX} y={midY - 6} textAnchor="middle" fill="#c5ccd8" fontSize="11" fontFamily={SANS}>
-                    {clip(e.data.label, 28)}
-                  </text>
+                <path d={drawn.d} fill="none" stroke="transparent" strokeWidth={16} className="cursor-pointer" onClick={() => (e.data.id.startsWith("rollup::") ? onSelect(e.data.source ?? null) : onEdge(e.data.id))} />
+                {showLabel ? (
+                  <g>
+                    <rect x={drawn.lx - plate / 2} y={drawn.ly - 9} width={plate} height={16} rx="4" fill="#090c13" opacity="0.92" />
+                    <text x={drawn.lx} y={drawn.ly + 3} textAnchor="middle" fill="#eef1f6" fontSize="11" fontFamily={SANS}>
+                      {text}
+                    </text>
+                  </g>
                 ) : null}
               </g>
             );
@@ -339,24 +356,23 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
             const [l1, l2] = nodeLines(n.data);
             const on = selected === n.data.id;
             const dim = !!linked && !linked.has(n.data.id);
-            const railH = Math.min(box.h - 16, l2 ? 26 : 16);
             return (
               <g
                 key={n.data.id}
                 data-node-id={n.data.id}
                 transform={`translate(${p.x - box.w / 2} ${p.y - box.h / 2})`}
-                opacity={dim ? 0.28 : 1}
+                opacity={dim ? 0.34 : 1}
                 className="cursor-pointer"
                 onClick={() => onSelect(n.data.id)}
                 onDoubleClick={() => onExpand(n.data.id)}
               >
-                <rect width={box.w} height={box.h} rx="8" fill={on ? "rgba(255,255,255,0.05)" : "transparent"} stroke={on ? "#eef1f6" : "transparent"} strokeWidth="1.25" />
-                <rect x="1" y={(box.h - railH) / 2} width="2" height={railH} rx="1" fill={layerColor(n.data.layer)} />
-                <text x={12} y={l2 ? 22 : 26} textAnchor="start" fill="#f4f7fb" fontSize="14" fontFamily={SANS} fontWeight={500}>
+                <rect width={box.w} height={box.h} rx="10" fill={on ? "#171d28" : "#10141c"} stroke={on ? "#eef1f6" : "rgba(255,255,255,0.14)"} strokeWidth={on ? 1.5 : 1} />
+                <rect x="0" y="8" width="3" height={box.h - 16} rx="1.5" fill={layerColor(n.data.layer)} />
+                <text x={14} y={l2 ? 22 : 30} textAnchor="start" fill="#f4f7fb" fontSize="14" fontFamily={SANS} fontWeight={500}>
                   {l1}
                 </text>
                 {l2 ? (
-                  <text x={12} y={37} textAnchor="start" fill="#8e97a8" fontSize="11" fontFamily={SANS}>
+                  <text x={14} y={38} textAnchor="start" fill="#8e97a8" fontSize="11" fontFamily={SANS}>
                     {l2}
                   </text>
                 ) : null}
@@ -388,27 +404,37 @@ export function RecordedLinks({
   onPick: (id: string) => void;
 }) {
   const ranked = [...rolls].sort((a, b) => linkRank(b.data.label) - linkRank(a.data.label) || a.data.id.localeCompare(b.data.id)).slice(0, 6);
+  const max = Math.max(1, ...ranked.map((e) => linkRank(e.data.label)));
   if (ranked.length === 0) {
     return <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">No relationship on this page connects two components. That is not proof that nothing connects.</p>;
   }
   return (
     <div aria-label="Strongest recorded links">
-      <h3 className="text-sm font-medium tracking-[-0.02em] text-ink">Strongest links</h3>
-      <ul className="mt-2 flex flex-col">
-        {ranked.map((e) => (
-          <li key={e.data.id} className="border-t border-line first:border-t-0">
-            <button type="button" onClick={() => e.data.source && onPick(e.data.source)} className="tap flex w-full items-baseline justify-between gap-3 rounded-md px-1 text-left text-sm hover:bg-sunken">
-              <span className="min-w-0 break-words">
-                <span className="font-medium text-ink">{nameOf(e.data.source)}</span>
-                <span className="text-muted"> to </span>
-                <span className="text-ink-2">{nameOf(e.data.target)}</span>
-              </span>
-              <span className="shrink-0 font-mono text-[11px] text-muted">{e.data.label}</span>
-            </button>
-          </li>
-        ))}
+      <h3 className="text-sm font-medium tracking-[-0.02em] text-ink">Strongest links on this page</h3>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {ranked.map((e) => {
+          const n = linkRank(e.data.label);
+          const tone = TONE[e.data.tone ?? "verified"] ?? TONE.verified;
+          return (
+            <li key={e.data.id}>
+              <button type="button" onClick={() => e.data.source && onPick(e.data.source)} className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:border-white/25">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-ink">{nameOf(e.data.source)}</span>
+                  <span className="my-1.5 block h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+                    <span className="block h-1.5 rounded-full" style={{ width: `${Math.max(12, (n / max) * 100)}%`, background: tone }} />
+                  </span>
+                  <span className="block truncate text-[13px] text-ink-2">{nameOf(e.data.target)}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-mono text-lg tabular-nums leading-none text-ink">{n || e.data.label}</span>
+                  <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-muted">recorded</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
-      <p className="mt-3 text-xs leading-relaxed text-muted">A count of recorded relationships, not a new claim. Select a component to read every link that touches it.</p>
+      <p className="mt-3 text-xs leading-relaxed text-muted">The bar is how many relationships this page recorded between those two components. It is not a new claim. Select a component to read every link that touches it.</p>
     </div>
   );
 }

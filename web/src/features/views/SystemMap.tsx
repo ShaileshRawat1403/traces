@@ -57,7 +57,7 @@ export function SystemMap() {
 
   return (
     <section className="mb-4" aria-label="Architecture map">
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="flex flex-col gap-4">
         <div className="min-w-0">
           {phoneList ? (
             <div className="mb-2 max-w-full overflow-x-auto">

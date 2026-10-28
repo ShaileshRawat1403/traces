@@ -42,19 +42,20 @@ export function Home() {
   const serverError = register.error instanceof ApiError ? register.error : null;
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-5 py-14 focus:outline-none sm:py-20">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-5 py-14 focus:outline-none sm:py-16">
       <PageHeader title="Repositories">Add a public GitHub repository. You land on it next. Indexing is a separate step, and nothing is fetched until you start it.</PageHeader>
 
-      <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-3" aria-label="How Traces treats a repository">
-        {NOTES.map((n) => (
-          <div key={n.title}>
-            <dt className="text-[13px] font-medium tracking-[-0.02em] text-ink">{n.title}</dt>
-            <dd className="mt-1 text-[13px] leading-snug text-muted">{n.body}</dd>
-          </div>
+      <ol className="mt-2 grid gap-3 sm:grid-cols-3" aria-label="How Traces treats a repository">
+        {NOTES.map((n, i) => (
+          <li key={n.title} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+            <span className="font-mono text-[11px] text-verified">0{i + 1}</span>
+            <p className="mt-2 text-[15px] font-medium tracking-[-0.02em]">{n.title}</p>
+            <p className="mt-1 text-[13px] leading-snug text-muted">{n.body}</p>
+          </li>
         ))}
-      </dl>
+      </ol>
 
-      <form onSubmit={submit} noValidate className="mt-12 border-t border-white/10 pt-8" aria-label="Add a repository">
+      <form onSubmit={submit} noValidate className="mt-10 max-w-2xl" aria-label="Add a repository">
         <label id={`${inputId}-label`} htmlFor={inputId} className="block text-sm font-medium tracking-[-0.01em]">
           Public GitHub repository URL
         </label>
@@ -111,10 +112,11 @@ export function Home() {
               <li key={r.id} className="border-b border-white/8">
                 <Link
                   to={`/r/${encodeURIComponent(r.id)}`}
-                  className="group flex items-baseline justify-between gap-4 py-4 text-ink no-underline hover:no-underline"
+                  className="group flex items-center gap-4 border-b border-white/8 py-4 text-ink no-underline hover:no-underline"
                 >
-                  <span className="min-w-0">
-                    <span className="block text-[17px] font-medium tracking-[-0.03em]">
+                  <span className="h-10 w-1 shrink-0 rounded-full bg-verified" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[18px] font-medium tracking-[-0.03em]">
                       {r.owner}/{r.name}
                     </span>
                     <span className="mt-0.5 block text-[13px] text-muted">
