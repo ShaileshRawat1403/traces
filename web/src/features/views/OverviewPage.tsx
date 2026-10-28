@@ -3,7 +3,7 @@ import { api } from "../../api/client";
 import { useSnapshot } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { presentStatus } from "../../status/status";
-import { Card, ErrorState, Loading } from "../../ui/States";
+import { ErrorState, Loading } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { EndpointView } from "./EndpointView";
 import { OverviewView } from "./OverviewView";
@@ -21,14 +21,14 @@ function SnapshotCounts() {
   const shown = Object.entries(by).filter(([st]) => !presentStatus({ status: st, label: LABEL_FOR[st] }, "default").hidden);
   const rejected = by.rejected ?? 0;
   return (
-    <Card className="mb-4">
+    <div className="mb-6 border-t border-white/10 pt-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-semibold">Evidence in this snapshot</h2>
+        <h2 className="text-sm font-medium tracking-[-0.02em]">Evidence in this snapshot</h2>
         <p className="text-xs text-muted">Schema {s.evidence_schema}</p>
       </div>
       <ul className="flex flex-wrap gap-2" data-testid="snapshot-counts">
         {shown.map(([st, n]) => (
-          <li key={st} className="inline-flex items-center gap-2 rounded-md border border-line bg-canvas px-3 py-1.5">
+          <li key={st} className="inline-flex items-baseline gap-2">
             <StatusChip status={st} label={LABEL_FOR[st] ?? null} />
             <span className="text-lg font-semibold tabular-nums tracking-tight">{n.toLocaleString("en-US")}</span>
           </li>
@@ -40,7 +40,7 @@ function SnapshotCounts() {
           <Link to={`${snapshotBase(repoId, sha)}/review`}>reviewer view</Link> to see them.
         </p>
       ) : null}
-    </Card>
+    </div>
   );
 }
 
@@ -49,8 +49,8 @@ export function OverviewPage() {
   const base = snapshotBase(repoId, sha);
   return (
     <>
-      <header className="mb-2">
-        <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
+      <header className="mb-3">
+        <h1 className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Overview</h1>
       </header>
       <SystemMap />
       <EndpointView

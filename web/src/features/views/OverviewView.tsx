@@ -16,18 +16,18 @@ function SystemStrip({ data, base }: { data: Overview; base: string }) {
     { to: `${base}/ask`, label: "Ask", hint: "Answer from stored evidence" },
   ];
   return (
-    <section className="rounded-lg border border-line bg-surface p-4" aria-label="System at a glance">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="border-t border-white/10 pt-5" aria-label="System at a glance">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-semibold">See the system</h2>
-          <p className="mt-1 max-w-xl text-sm text-muted">{LAYER_HELP}</p>
+          <h2 className="text-sm font-medium tracking-[-0.02em]">See the system</h2>
+          <p className="mt-1 max-w-xl text-[13px] text-muted">{LAYER_HELP}</p>
         </div>
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {jumps.map((j) => (
             <li key={j.to}>
-              <Link to={j.to} className="tap inline-flex flex-col justify-center rounded-md border border-line-strong bg-canvas px-3 py-1 text-ink no-underline hover:border-accent">
-                <span className="text-sm font-semibold">{j.label}</span>
-                <span className="text-xs font-normal text-muted">{j.hint}</span>
+              <Link to={j.to} className="inline-flex items-baseline gap-2 text-sm text-ink no-underline hover:no-underline" title={j.hint}>
+                <span className="font-medium tracking-[-0.02em]">{j.label}</span>
+                <span className="hidden text-[12px] text-muted md:inline">{j.hint}</span>
               </Link>
             </li>
           ))}
@@ -85,7 +85,7 @@ function NumberList({ title, data, unit }: { title: string; data: Record<string,
                 {k}
               </span>
               <span className="h-2 rounded bg-sunken" aria-hidden="true">
-                <span className="block h-2 rounded bg-accent/70" style={{ width: `${(n / max) * 100}%` }} />
+                <span className="block h-1.5 rounded-full bg-ink/80" style={{ width: `${(n / max) * 100}%` }} />
               </span>
               <span className="tabular-nums text-ink-2">
                 {n.toLocaleString("en-US")}
@@ -114,13 +114,13 @@ export function OverviewView({ data, base }: { data: Overview; base: string }) {
         <Lead title="Entry points" facts={data.entry_points} base={base} empty="No entry points reported." />
         <Lead title="Where to start" facts={data.start_here} base={base} empty="No starting points reported." />
       </div>
-      <Tabs.Root defaultValue="business" className="rounded-lg border border-line bg-surface">
-        <Tabs.List aria-label="Overview layers" className="flex border-b border-line">
+      <Tabs.Root defaultValue="business" className="border-t border-white/10">
+        <Tabs.List aria-label="Overview layers" className="flex">
           {LAYERS.map((l) => (
             <Tabs.Trigger
               key={l.key}
               value={l.key}
-              className="tap min-w-0 flex-1 border-b-2 border-transparent px-1 text-sm text-ink-2 data-[state=active]:border-accent data-[state=active]:font-semibold data-[state=active]:text-accent"
+              className="min-h-11 min-w-0 flex-1 border-b border-transparent px-1 text-sm text-muted data-[state=active]:border-ink data-[state=active]:font-medium data-[state=active]:text-ink"
             >
               {l.title}
               <span className="ml-1 hidden text-xs text-muted sm:inline">({data[l.key].length})</span>
@@ -128,7 +128,7 @@ export function OverviewView({ data, base }: { data: Overview; base: string }) {
           ))}
         </Tabs.List>
         {LAYERS.map((l) => (
-          <Tabs.Content key={l.key} value={l.key} className="p-4 focus-visible:outline-offset-[-3px]">
+          <Tabs.Content key={l.key} value={l.key} className="py-4 focus-visible:outline-offset-[-3px]">
             <p className="mb-3 text-sm text-muted">{l.help}</p>
             <FactGroups facts={data[l.key]} base={base} emptyText={`No ${l.title.toLowerCase()} facts reported for this snapshot.`} />
             {l.key === "implementation" ? (

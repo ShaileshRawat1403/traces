@@ -58,26 +58,28 @@ export function SystemMap() {
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0">
           {phoneList ? (
-            <div role="group" aria-label="Layer in view" className="mb-2 flex gap-1 overflow-x-auto">
+            <div className="mb-2 max-w-full overflow-x-auto">
+              <div role="group" aria-label="Layer in view" className="seg">
               {layersOnMap.map((l) => (
-                <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className={`tap shrink-0 rounded-md border px-3 text-sm capitalize ${effectiveLayer === l ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className="capitalize">
                   {l}
                 </button>
               ))}
+              </div>
             </div>
           ) : null}
           {many && !phoneList ? (
-            <div role="group" aria-label="How much of the map to show" className="mb-2 flex gap-1">
-              <button type="button" aria-pressed={scope === "core"} onClick={() => setScope("core")} className={`tap rounded-md border px-3 text-sm ${scope === "core" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+            <div role="group" aria-label="How much of the map to show" className="seg mb-2">
+              <button type="button" aria-pressed={scope === "core"} onClick={() => setScope("core")}>
                 Core layers
               </button>
-              <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={`tap rounded-md border px-3 text-sm ${scope === "all" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+              <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>
                 All layers
               </button>
             </div>
           ) : null}
           {phoneList && effectiveLayer ? (
-            <ul className="grid gap-2" aria-label={`${effectiveLayer} components`}>
+            <ul className="border-t border-white/10" aria-label={`${effectiveLayer} components`}>
               {shown.filter((e) => !e.data.source).map((n) => {
                 const links = diagram.filter((e) => e.data.source && (e.data.source === n.data.id || e.data.target === n.data.id));
                 return (
@@ -86,11 +88,12 @@ export function SystemMap() {
                       type="button"
                       aria-pressed={selected === n.data.id}
                       onClick={() => setSelected(selected === n.data.id ? null : n.data.id)}
-                      className="min-h-11 w-full rounded-xl border bg-surface px-3 py-2 text-left text-ink"
-                      style={{ borderColor: selected === n.data.id ? "#e4c27a" : layerColor(n.data.layer) }}
+                      className={`flex min-h-11 w-full items-start gap-3 border-b border-white/8 px-1 py-3 text-left text-ink ${selected === n.data.id ? "bg-white/[0.04]" : ""}`}
                     >
-                      <span className="block text-sm font-semibold">{n.data.label}</span>
-                      <span className="mt-1 block text-xs text-muted">
+                      <span className="mt-1 h-7 w-0.5 shrink-0 rounded-full" style={{ background: layerColor(n.data.layer) }} aria-hidden="true" />
+                      <span className="min-w-0">
+                      <span className="block text-[15px] font-medium tracking-[-0.02em]">{n.data.label}</span>
+                      <span className="mt-0.5 block text-xs text-muted">
                         {links.length
                           ? links
                               .slice(0, 3)
@@ -102,6 +105,7 @@ export function SystemMap() {
                               })
                               .join(" · ")
                           : "No line on this page leaves this component."}
+                      </span>
                       </span>
                     </button>
                   </li>
@@ -151,7 +155,7 @@ function MapInspector({
 }) {
   const comp = components.find((c) => c.id === node.id);
   return (
-    <div className="mt-2 rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected component">
+    <div className="mt-2 border-t border-white/10 pt-3" aria-label="Selected component">
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="font-semibold">{node.label}</h3>
         <span className="text-xs capitalize text-muted">{node.layer}</span>
@@ -176,7 +180,7 @@ function MapInspector({
         <p className="mt-2 text-sm text-ink-2">No relationship on this page leaves this component. That is not proof that nothing connects.</p>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
-        <Link to={`${base}/graph?focus=${encodeURIComponent(node.id)}`} className="tap inline-flex items-center rounded-md bg-accent px-3 text-sm font-medium text-accent-ink no-underline">
+        <Link to={`${base}/graph?focus=${encodeURIComponent(node.id)}`} className="tap inline-flex items-center rounded-md bg-ink px-3 text-sm font-medium text-canvas no-underline hover:no-underline">
           Open on the graph
         </Link>
         <Link to={`${base}/trace`} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">

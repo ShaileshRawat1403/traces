@@ -56,15 +56,15 @@ function Filters({ state: urlState, onChange: commit }: { state: GraphState; onC
   const toggle = <T extends string>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const [rel, setRel] = useState(state.rel.join(", "));
   return (
-    <details className="rounded-lg border border-line bg-surface" data-testid="graph-filters">
-      <summary className="tap flex cursor-pointer items-center px-3 text-sm font-medium">
+    <details data-testid="graph-filters">
+      <summary className="flex h-8 cursor-pointer items-center rounded-md px-2 text-[13px] text-muted hover:text-ink">
         Filters
-        <span className="ml-2 text-xs font-normal text-muted">
+        <span className="ml-2 text-[11px] font-normal">
           {state.status.length} statuses{state.layer.length ? `, ${state.layer.length} layers` : ""}
           {state.rel.length ? `, ${state.rel.length} kinds` : ""}
         </span>
       </summary>
-      <div className="grid gap-4 border-t border-line p-3 sm:grid-cols-3">
+      <div className="mt-2 grid gap-4 border-t border-white/10 py-3 sm:grid-cols-3">
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Evidence status</legend>
           {STATUS_FILTERS.map((s) => (
@@ -169,7 +169,7 @@ function SelectionPanel({
   for (const e of mine) byKind.set(e.kind, (byKind.get(e.kind) ?? 0) + 1);
   const focused = state.focus === selected;
   return (
-    <section className="rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected node" data-testid="selection-panel">
+    <section className="border-t border-white/10 pt-3" aria-label="Selected node" data-testid="selection-panel">
       <div className="flex flex-wrap items-baseline gap-2">
         <h2 className="break-all font-semibold">{node.label}</h2>
         <span className="text-xs text-muted">
@@ -248,7 +248,7 @@ function SelectionPanel({
 function FilePanel({ node, onOpen, onClear }: { node: ElementData | undefined; onOpen: () => void; onClear: () => void }) {
   if (!node) return null;
   return (
-    <section className="rounded-lg border border-accent/40 bg-surface p-3" aria-label="Selected file">
+    <section className="border-t border-white/10 pt-3" aria-label="Selected file">
       <h2 className="break-all font-semibold">{node.label}</h2>
       <p className="break-all font-mono text-xs text-ink-2">{node.file}</p>
       <p className="mt-1 text-sm text-ink-2">{node.count ?? 0} symbols in this file. Lines to other files count recorded relationships. They are not new claims.</p>
@@ -418,23 +418,23 @@ export default function GraphPage() {
   return (
     <>
       <div className="mb-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-        <h1 className="text-lg font-semibold tracking-tight">Architecture</h1>
+        <h1 className="text-sm font-medium tracking-[-0.02em] text-ink-2">Architecture</h1>
         <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 gap-2">
             <label htmlFor={searchId} className="sr-only">
               Search nodes
             </label>
-            <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="tap min-w-0 flex-1 rounded-md border border-line-strong px-3" />
-            <Button type="submit" className="shrink-0">Search</Button>
+            <input id={searchId} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components and symbols" className="h-8 min-w-0 flex-1 rounded-md border border-white/10 bg-transparent px-3 text-sm" />
+            <button type="submit" className="h-8 rounded-md px-2 text-sm text-ink-2 hover:text-ink">Search</button>
           </form>
-          <div role="group" aria-label="View as" className="inline-flex shrink-0 rounded-md border border-line-strong">
+          <div role="group" aria-label="View as" className="seg shrink-0">
             {(["graph", "list", "cards"] as const).map((m) => (
-              <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)} className={`tap px-3 text-sm ${mode === m ? "bg-accent text-accent-ink" : "bg-surface"}`}>
+              <button key={m} type="button" aria-pressed={mode === m} onClick={() => setParam("view", m === "graph" ? null : m)}>
                 {m === "graph" ? "Graph" : m === "list" ? "List" : "Cards"}
               </button>
             ))}
           </div>
+          <Filters state={state} onChange={setState} />
       </div>
-      <Filters state={state} onChange={setState} />
       {state.focus ? (
         <p className="mb-2 flex flex-wrap items-center gap-2 text-sm" data-testid="focus-bar">
           Focused on <code className="break-all">{graph.data ? nodeName(graph.data.nodes, state.focus) : splitSymbol(state.focus).name}</code> at depth {state.depth}
@@ -460,23 +460,25 @@ export default function GraphPage() {
                   {!state.focus ? (
                     <div className="mb-2 flex flex-col gap-2">
                       {narrow && mapNodes.length > 8 ? (
-                        <div role="group" aria-label="Layer in view" className="flex gap-1 overflow-x-auto">
-                          <button type="button" aria-pressed={effectiveLayer === null} onClick={() => setLayerPick("all")} className={`tap shrink-0 rounded-md border px-3 text-sm ${effectiveLayer === null ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                        <div className="max-w-full overflow-x-auto">
+                        <div role="group" aria-label="Layer in view" className="seg">
+                          <button type="button" aria-pressed={effectiveLayer === null} onClick={() => setLayerPick("all")}>
                             All layers
                           </button>
                           {layersOnMap.map((l) => (
-                            <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className={`tap shrink-0 rounded-md border px-3 text-sm capitalize ${effectiveLayer === l ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                            <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className="capitalize">
                               {l}
                             </button>
                           ))}
                         </div>
+                        </div>
                       ) : null}
                       {!narrow && mapNodes.length > 12 ? (
-                        <div role="group" aria-label="How much of the map to show" className="flex gap-1">
-                          <button type="button" aria-pressed={scope === "core"} onClick={() => setScope("core")} className={`tap rounded-md border px-3 text-sm ${scope === "core" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                        <div role="group" aria-label="How much of the map to show" className="seg">
+                          <button type="button" aria-pressed={scope === "core"} onClick={() => setScope("core")}>
                             Core layers
                           </button>
-                          <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={`tap rounded-md border px-3 text-sm ${scope === "all" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+                          <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>
                             All layers
                           </button>
                         </div>
@@ -486,7 +488,7 @@ export default function GraphPage() {
                     </div>
                   ) : null}
                   {narrow && effectiveLayer ? (
-                    <ul className="grid gap-2" aria-label={`${effectiveLayer} components`}>
+                    <ul className="border-t border-white/10" aria-label={`${effectiveLayer} components`}>
                       {shown.filter((e) => !e.data.source).map((n) => {
                         const links = drawn.filter((e) => e.data.source && (e.data.source === n.data.id || e.data.target === n.data.id));
                         return (
@@ -495,11 +497,12 @@ export default function GraphPage() {
                               type="button"
                               aria-pressed={selected === n.data.id}
                               onClick={() => choose(selected === n.data.id ? null : n.data.id)}
-                              className="min-h-11 w-full rounded-xl border bg-surface px-3 py-2 text-left text-ink"
-                              style={{ borderColor: selected === n.data.id ? "#e4c27a" : layerColor(n.data.layer) }}
+                              className={`flex min-h-11 w-full items-start gap-3 border-b border-white/8 px-1 py-3 text-left text-ink ${selected === n.data.id ? "bg-white/[0.04]" : ""}`}
                             >
-                              <span className="block text-sm font-semibold">{n.data.label}</span>
-                              <span className="mt-1 block text-xs text-muted">
+                              <span className="mt-1 h-7 w-0.5 shrink-0 rounded-full" style={{ background: layerColor(n.data.layer) }} aria-hidden="true" />
+                              <span className="min-w-0">
+                              <span className="block text-[15px] font-medium tracking-[-0.02em]">{n.data.label}</span>
+                              <span className="mt-0.5 block text-xs text-muted">
                                 {links.length
                                   ? links
                                       .slice(0, 3)
@@ -511,6 +514,7 @@ export default function GraphPage() {
                                       })
                                       .join(" · ")
                                   : "No line on this page leaves this component."}
+                              </span>
                               </span>
                             </button>
                           </li>

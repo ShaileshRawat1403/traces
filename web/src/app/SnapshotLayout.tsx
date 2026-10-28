@@ -22,8 +22,8 @@ function SideLink({ base, item }: { base: string; item: NavItem }) {
       to={item.to ? `${base}/${item.to}` : base}
       end={item.to === ""}
       className={({ isActive }) =>
-        `tap flex items-center gap-2 rounded-md px-3 text-sm no-underline hover:bg-sunken hover:no-underline ${
-          isActive ? "bg-accent-soft font-semibold text-accent" : "text-ink-2"
+        `inline-flex h-9 items-center gap-2 border-b px-2 text-sm no-underline hover:no-underline ${
+          isActive ? "border-ink font-medium text-ink" : "border-transparent text-muted hover:text-ink"
         }`
       }
     >
@@ -38,7 +38,7 @@ function ShaChip({ sha }: { sha: string }) {
   return (
     <button
       type="button"
-      className="tap inline-flex items-center gap-1 rounded-md border border-line bg-sunken px-2 font-mono text-xs text-ink-2"
+      className="inline-flex h-8 items-center gap-1 rounded-md px-1.5 font-mono text-xs text-muted hover:text-ink"
       onClick={() => {
         void navigator.clipboard?.writeText(sha).then(() => setCopied(true));
         window.setTimeout(() => setCopied(false), 1500);
@@ -112,31 +112,31 @@ export function SnapshotLayout() {
           </span>
         ) : null}
       </div>
-      <nav aria-label="Snapshot sections" className="mb-2 hidden gap-1 overflow-x-auto md:flex">
+      <nav aria-label="Snapshot sections" className="mb-3 hidden gap-1 overflow-x-auto border-b border-white/8 md:flex">
         {SNAPSHOT_NAV.map((n) => (
           <SideLink key={n.to} base={base} item={n} />
         ))}
       </nav>
       <main id="main" tabIndex={-1} className="min-w-0 focus:outline-none">
-        <p className="mb-3 border-l-2 border-accent/70 pl-3 text-xs leading-relaxed text-ink-2" data-testid="static-disclaimer">
-          {STATIC_DISCLAIMER}
-        </p>
-        <p className="mb-2 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>
+        <div className="mb-3 flex flex-col gap-0.5 text-[13px] leading-relaxed text-muted sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-6">
+          <p data-testid="static-disclaimer">{STATIC_DISCLAIMER}</p>
+          <p>Rejected claims stay hidden until you open Review.</p>
+        </div>
         <Outlet />
       </main>
-      <nav aria-label="Snapshot sections, bottom bar" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface md:hidden">
+      <nav aria-label="Snapshot sections, bottom bar" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-white/10 bg-canvas/95 backdrop-blur-md md:hidden">
         {SNAPSHOT_NAV.filter((n) => n.primary).map((n) => (
           <NavLink
             key={n.to}
             to={n.to ? `${base}/${n.to}` : base}
             end={n.to === ""}
             className={({ isActive }) =>
-              `tap flex flex-1 flex-col items-center justify-center text-xs no-underline hover:no-underline ${isActive ? "font-semibold text-accent" : "text-ink-2"}`
+              `tap flex flex-1 flex-col items-center justify-center text-[11px] tracking-[-0.01em] no-underline hover:no-underline ${isActive ? "font-medium text-ink" : "text-muted"}`
             }
           >
             {({ isActive }) => (
               <>
-                <span aria-hidden="true" className={`mb-1 h-1 w-6 rounded ${isActive ? "bg-accent" : "bg-transparent"}`} />
+                <span aria-hidden="true" className={`mb-1 h-px w-5 ${isActive ? "bg-ink" : "bg-transparent"}`} />
                 {n.label}
               </>
             )}

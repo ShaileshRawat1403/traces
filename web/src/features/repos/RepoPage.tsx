@@ -103,20 +103,20 @@ export function RepoPage() {
           ) : snaps.data.length === 0 ? (
             <Empty title="No snapshots yet">Index the repository to create one.</Empty>
           ) : (
-            <ul className="flex flex-col gap-2" data-testid="snapshot-list">
+            <ul className="mt-1" data-testid="snapshot-list">
               {snaps.data.map((s) => {
                 const by = (s.stats as { by_status?: Record<string, number> }).by_status;
                 return (
-                  <li key={s.id}>
+                  <li key={s.id} className="border-b border-white/8">
                     <Link
                       to={snapshotBase(repoId, s.sha)}
-                      className="tap panel flex flex-col px-4 py-3 text-ink no-underline hover:border-accent hover:no-underline"
+                      className="flex flex-col py-3.5 text-ink no-underline hover:no-underline"
                     >
                       <span className="flex items-baseline justify-between gap-3">
                         <span className="font-mono text-sm">@{s.sha.slice(0, 12)}</span>
-                        <span className="rounded-sm bg-sunken px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-accent">{s.state}</span>
+                        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{s.state}</span>
                       </span>
-                      <span className="mt-1 text-sm text-muted">
+                      <span className="mt-1 text-[13px] text-muted">
                         {s.evidence_schema}
                         {by ? ` · ${Object.values(by).reduce((a, b) => a + b, 0).toLocaleString("en-US")} records` : ""}
                       </span>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Button } from "../../ui/States";
 import { nextInDirection, columnLayout, depthLayout, type Direction, type ElementData } from "./graphModel";
 import { layerColor } from "../layers";
 
@@ -11,6 +10,13 @@ const TONE: Record<string, string> = {
 };
 
 const KEY_DIR: Record<string, Direction> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+
+const SANS = "Inter Tight, ui-sans-serif, sans-serif";
+
+function layerTitle(layer: string) {
+  if (layer === "api") return "API";
+  return layer.charAt(0).toUpperCase() + layer.slice(1);
+}
 
 function clip(s: string, n: number) {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
@@ -238,36 +244,39 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Graph view controls">
-        <Button onClick={() => zoom(1.25)} aria-label="Zoom in">
-          +
-        </Button>
-        <Button onClick={() => zoom(0.8)} aria-label="Zoom out">
-          −
-        </Button>
-        <Button
-          onClick={() => {
-            userScaled.current = false;
-            setScale(fit());
-            stageRef.current?.scrollTo({ left: 0, top: 0 });
-          }}
-        >
-          Fit
-        </Button>
-        <span className="text-xs text-muted">Arrows move, Enter expands, Esc clears</span>
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="seg" role="toolbar" aria-label="Graph view controls">
+          <button type="button" onClick={() => zoom(1.25)} aria-label="Zoom in" className="min-w-8">
+            +
+          </button>
+          <button type="button" onClick={() => zoom(0.8)} aria-label="Zoom out" className="min-w-8">
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              userScaled.current = false;
+              setScale(fit());
+              stageRef.current?.scrollTo({ left: 0, top: 0 });
+            }}
+          >
+            Fit
+          </button>
+        </div>
         {longer > 0 ? (
-          <div role="group" aria-label="Which recorded lines to draw" className="flex gap-1">
-            <button type="button" aria-pressed={linkScope === "near"} onClick={() => setLinkScope("near")} className={`tap rounded-md border px-3 text-sm ${linkScope === "near" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+          <div role="group" aria-label="Which recorded lines to draw" className="seg">
+            <button type="button" aria-pressed={linkScope === "near"} onClick={() => setLinkScope("near")}>
               Neighboring columns
             </button>
-            <button type="button" aria-pressed={linkScope === "all"} onClick={() => setLinkScope("all")} className={`tap rounded-md border px-3 text-sm ${linkScope === "all" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+            <button type="button" aria-pressed={linkScope === "all"} onClick={() => setLinkScope("all")}>
               All recorded lines
             </button>
           </div>
         ) : null}
+        <span className="text-[12px] text-muted">Arrows move, Enter expands, Esc clears</span>
       </div>
       {longer > 0 && linkScope === "near" ? (
-        <p className="mb-2 text-xs text-ink-2">
+        <p className="mb-2 max-w-3xl text-[12px] leading-relaxed text-muted">
           {longer} longer {longer === 1 ? "link is" : "links are"} not drawn across other columns. Select a component to see its own, or choose All recorded lines. A missing line is not proof that nothing connects.
         </p>
       ) : null}
@@ -278,7 +287,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
         aria-roledescription="graph"
         aria-label="Architecture graph. Use arrow keys to move between nodes, Enter to expand, Escape to clear. The list and cards views show the same data."
         onKeyDown={onKeyDown}
-        className="stage w-full max-w-full overflow-auto rounded-2xl border border-white/10"
+        className="stage w-full max-w-full overflow-auto rounded-2xl border border-white/[0.06]"
         data-testid="graph-canvas"
       >
         <svg width={Math.ceil(frame.w * scale)} height={Math.ceil(frame.h * scale)} viewBox={`0 0 ${frame.w} ${frame.h}`} role="group" aria-label="Nodes and recorded relationships in this view">
@@ -287,20 +296,9 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
               <path d="M 0 1.2 L 8 5 L 0 8.8 z" fill="context-stroke" />
             </marker>
           </defs>
-          {headers.map((h) => {
-            const members = nodes.flatMap((n) => {
-              const p = at(n.data.id);
-              if (!p || n.data.layer !== h.layer || Math.abs(p.x - h.x) > 8) return [];
-              return [p.y];
-            });
-            if (members.length === 0) return null;
-            const top = Math.min(...members) - 56;
-            const height = Math.max(...members) + 36 - top;
-            return <rect key={`band-${h.layer}-${h.x}`} x={h.x - 96} y={top} width={192} height={height} rx="16" fill="#141822" />;
-          })}
           {headers.map((h) => (
-            <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="11" fontFamily="Outfit, sans-serif" fontWeight={600} letterSpacing="1.6">
-              {(h.layer.charAt(0).toUpperCase() + h.layer.slice(1)).toUpperCase()}
+            <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="11" fontFamily={SANS} fontWeight={500} letterSpacing="0.6">
+              {layerTitle(h.layer)}
             </text>
           ))}
           {visibleEdges.map((e) => {
@@ -318,14 +316,16 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
                 <path
                   d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)}
                   fill="none"
-                  stroke={hot ? "#e4c27a" : color}
-                  strokeWidth={hot ? 2.75 : Math.min(2.2, 0.9 + (e.data.weight ?? 1.5) * 0.35)}
+                  stroke={hot ? "#e7edf5" : color}
+                  strokeWidth={hot ? 2.4 : Math.min(1.8, 0.75 + (e.data.weight ?? 1.5) * 0.28)}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   strokeDasharray={dash}
                   markerEnd={`url(#${marker}-arrow)`}
                 />
                 <path d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)} fill="none" stroke="transparent" strokeWidth={14} className="cursor-pointer" onClick={() => (e.data.id.startsWith("rollup::") ? onSelect(e.data.source ?? null) : onEdge(e.data.id))} />
                 {showLabels || hot ? (
-                  <text x={midX} y={midY - 6} textAnchor="middle" fill="#f4f1ea" fontSize="11" fontFamily="Outfit, sans-serif">
+                  <text x={midX} y={midY - 6} textAnchor="middle" fill="#c5ccd8" fontSize="11" fontFamily={SANS}>
                     {clip(e.data.label, 28)}
                   </text>
                 ) : null}
@@ -339,24 +339,24 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
             const [l1, l2] = nodeLines(n.data);
             const on = selected === n.data.id;
             const dim = !!linked && !linked.has(n.data.id);
-            const stroke = on ? "#e4c27a" : "rgba(244,241,234,0.14)";
+            const railH = Math.min(box.h - 16, l2 ? 26 : 16);
             return (
               <g
                 key={n.data.id}
                 data-node-id={n.data.id}
                 transform={`translate(${p.x - box.w / 2} ${p.y - box.h / 2})`}
-                opacity={dim ? 0.34 : 1}
+                opacity={dim ? 0.28 : 1}
                 className="cursor-pointer"
                 onClick={() => onSelect(n.data.id)}
                 onDoubleClick={() => onExpand(n.data.id)}
               >
-                <rect width={box.w} height={box.h} rx="11" fill="#161b26" stroke={stroke} strokeWidth={on ? 1.75 : 1} />
-                <rect x="0.5" y="8" width="3" height={box.h - 16} rx="1.5" fill={layerColor(n.data.layer)} />
-                <text x={box.w / 2} y={l2 ? box.h / 2 - 5 : box.h / 2 + 4} textAnchor="middle" fill="#f7f4ee" fontSize="13" fontFamily="Outfit, sans-serif" fontWeight={500}>
+                <rect width={box.w} height={box.h} rx="8" fill={on ? "rgba(255,255,255,0.05)" : "transparent"} stroke={on ? "#eef1f6" : "transparent"} strokeWidth="1.25" />
+                <rect x="1" y={(box.h - railH) / 2} width="2" height={railH} rx="1" fill={layerColor(n.data.layer)} />
+                <text x={12} y={l2 ? 22 : 26} textAnchor="start" fill="#f4f7fb" fontSize="14" fontFamily={SANS} fontWeight={500}>
                   {l1}
                 </text>
                 {l2 ? (
-                  <text x={box.w / 2} y={box.h / 2 + 12} textAnchor="middle" fill="#b7b2a8" fontSize="11" fontFamily="Outfit, sans-serif">
+                  <text x={12} y={37} textAnchor="start" fill="#8e97a8" fontSize="11" fontFamily={SANS}>
                     {l2}
                   </text>
                 ) : null}
@@ -393,7 +393,7 @@ export function RecordedLinks({
   }
   return (
     <div aria-label="Strongest recorded links">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Strongest links</h3>
+      <h3 className="text-sm font-medium tracking-[-0.02em] text-ink">Strongest links</h3>
       <ul className="mt-2 flex flex-col">
         {ranked.map((e) => (
           <li key={e.data.id} className="border-t border-line first:border-t-0">

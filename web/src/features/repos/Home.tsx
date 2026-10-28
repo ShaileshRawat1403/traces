@@ -40,26 +40,26 @@ export function Home() {
   const serverError = register.error instanceof ApiError ? register.error : null;
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-8 focus:outline-none sm:py-12">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-5 py-14 focus:outline-none sm:py-20">
       <PageHeader title="Repositories">Public repositories, one commit at a time. Every view is backed by stored evidence. A gap stays a gap.</PageHeader>
 
-      <ul className="mb-6 grid gap-2 sm:grid-cols-3" aria-label="How Traces treats a repository">
+      <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-3" aria-label="How Traces treats a repository">
         {NOTES.map((n) => (
-          <li key={n.title} className="rounded-lg border border-line bg-surface px-3 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent">{n.title}</p>
-            <p className="mt-1 text-sm leading-snug text-ink-2">{n.body}</p>
-          </li>
+          <div key={n.title}>
+            <dt className="text-[13px] font-medium tracking-[-0.02em] text-ink">{n.title}</dt>
+            <dd className="mt-1 text-[13px] leading-snug text-muted">{n.body}</dd>
+          </div>
         ))}
-      </ul>
+      </dl>
 
-      <form onSubmit={submit} noValidate className="rounded-lg border border-line bg-surface p-4" aria-label="Add a repository">
-        <label id={`${inputId}-label`} htmlFor={inputId} className="block font-medium">
+      <form onSubmit={submit} noValidate className="mt-12 border-t border-white/10 pt-8" aria-label="Add a repository">
+        <label id={`${inputId}-label`} htmlFor={inputId} className="block text-sm font-medium tracking-[-0.01em]">
           Public GitHub repository URL
         </label>
-        <p id={hintId} className="text-sm text-muted">
+        <p id={hintId} className="mt-1 text-[13px] text-muted">
           Only https://github.com/owner/repo is accepted. Registering does not fetch or run anything.
         </p>
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             id={inputId}
             type="url"
@@ -72,7 +72,7 @@ export function Home() {
             placeholder="https://github.com/owner/repo"
             aria-describedby={`${hintId}${localInvalid || serverError ? ` ${errId}` : ""}`}
             aria-invalid={localInvalid || !!serverError}
-            className="tap min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 text-base"
+            className="h-11 min-w-0 flex-1 rounded-md border border-white/10 bg-white/[0.03] px-3 text-[15px]"
           />
           <Button type="submit" variant="primary" disabled={register.isPending}>
             {register.isPending ? "Adding" : "Add repository"}
@@ -93,8 +93,8 @@ export function Home() {
         ) : null}
       </form>
 
-      <section className="mt-6" aria-labelledby="repo-list-h">
-        <h2 id="repo-list-h" className="mb-2 text-lg font-semibold">
+      <section className="mt-12" aria-labelledby="repo-list-h">
+        <h2 id="repo-list-h" className="text-sm font-medium tracking-[-0.02em] text-ink-2">
           Registered
         </h2>
         {repos.isPending ? (
@@ -104,22 +104,22 @@ export function Home() {
         ) : repos.data.length === 0 ? (
           <Empty title="No repositories yet">Add a public GitHub URL above.</Empty>
         ) : (
-          <ul className="flex flex-col gap-2" data-testid="repo-list">
+          <ul className="mt-2" data-testid="repo-list">
             {repos.data.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="border-b border-white/8">
                 <Link
                   to={`/r/${encodeURIComponent(r.id)}`}
-                  className="tap flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-ink no-underline hover:border-accent hover:no-underline"
+                  className="group flex items-baseline justify-between gap-4 py-4 text-ink no-underline hover:no-underline"
                 >
                   <span className="min-w-0">
-                    <span className="block font-medium">
+                    <span className="block text-[17px] font-medium tracking-[-0.03em]">
                       {r.owner}/{r.name}
                     </span>
-                    <span className="block text-sm text-muted">
+                    <span className="mt-0.5 block text-[13px] text-muted">
                       {r.latest_discovered_sha ? `${r.visibility} · latest seen @${r.latest_discovered_sha.slice(0, 7)}` : `${r.visibility} · open to see snapshots`}
                     </span>
                   </span>
-                  <span aria-hidden="true" className="text-accent">
+                  <span aria-hidden="true" className="text-[13px] text-muted transition-colors group-hover:text-ink">
                     Open
                   </span>
                 </Link>

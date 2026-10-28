@@ -57,9 +57,9 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <header className="mb-5">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      {children ? <div className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-ink-2">{children}</div> : null}
+    <header className="mb-8">
+      <h1 className="text-[2rem] font-medium leading-none tracking-[-0.045em]">{title}</h1>
+      {children ? <div className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-2">{children}</div> : null}
     </header>
   );
 }
@@ -76,10 +76,10 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" }) {
   const v =
     variant === "primary"
-      ? "bg-accent text-accent-ink border-transparent hover:brightness-105 disabled:border-line disabled:bg-line disabled:text-muted"
-      : "bg-transparent text-ink border-line-strong hover:bg-sunken";
+      ? "bg-ink text-canvas border-transparent hover:bg-white disabled:border-transparent disabled:bg-white/10 disabled:text-muted"
+      : "bg-transparent text-ink-2 border-white/10 hover:bg-white/5 hover:text-ink";
   return (
-    <button className={`tap inline-flex items-center justify-center rounded-lg border px-3 text-sm font-medium tracking-tight disabled:cursor-not-allowed ${v} ${className}`} {...rest}>
+    <button className={`tap inline-flex items-center justify-center rounded-md border px-3 text-sm font-medium tracking-[-0.01em] disabled:cursor-not-allowed ${v} ${className}`} {...rest}>
       {children}
     </button>
   );
