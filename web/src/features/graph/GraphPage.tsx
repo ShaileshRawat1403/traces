@@ -495,11 +495,11 @@ export default function GraphPage() {
                               type="button"
                               aria-pressed={selected === n.data.id}
                               onClick={() => choose(selected === n.data.id ? null : n.data.id)}
-                              className="min-h-11 w-full rounded-lg border-2 bg-[#1b3330] px-3 py-2 text-left text-[#f4faf7]"
-                              style={{ borderColor: selected === n.data.id ? "#7eb6ff" : layerColor(n.data.layer) }}
+                              className="min-h-11 w-full rounded-xl border bg-surface px-3 py-2 text-left text-ink"
+                              style={{ borderColor: selected === n.data.id ? "#e4c27a" : layerColor(n.data.layer) }}
                             >
                               <span className="block text-sm font-semibold">{n.data.label}</span>
-                              <span className="mt-1 block text-xs text-[#c5d2cb]">
+                              <span className="mt-1 block text-xs text-muted">
                                 {links.length
                                   ? links
                                       .slice(0, 3)

@@ -76,10 +76,10 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" }) {
   const v =
     variant === "primary"
-      ? "bg-accent text-accent-ink border-accent hover:bg-accent/90 disabled:border-line disabled:bg-line disabled:text-muted"
-      : "bg-surface text-ink border-line-strong hover:bg-sunken";
+      ? "bg-accent text-accent-ink border-transparent hover:brightness-105 disabled:border-line disabled:bg-line disabled:text-muted"
+      : "bg-transparent text-ink border-line-strong hover:bg-sunken";
   return (
-    <button className={`tap inline-flex items-center justify-center rounded-md border px-3 text-sm font-medium disabled:cursor-not-allowed ${v} ${className}`} {...rest}>
+    <button className={`tap inline-flex items-center justify-center rounded-lg border px-3 text-sm font-medium tracking-tight disabled:cursor-not-allowed ${v} ${className}`} {...rest}>
       {children}
     </button>
   );

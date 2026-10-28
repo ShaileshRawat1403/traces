@@ -99,7 +99,7 @@ export function SnapshotLayout() {
   const snap = useSnapshot(repoId, sha);
   const repoName = repoId.split("__").slice(1).join("/") || repoId;
   return (
-    <div className="mx-auto flex max-w-[90rem] flex-col px-3 py-3 md:px-4">
+    <div className="mx-auto flex max-w-[88rem] flex-col px-4 py-4 md:px-6">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
         <Link to={`/r/${encodeURIComponent(repoId)}`} className="font-medium">
           {repoName}
@@ -118,7 +118,7 @@ export function SnapshotLayout() {
         ))}
       </nav>
       <main id="main" tabIndex={-1} className="min-w-0 focus:outline-none">
-        <p className="mb-1 rounded-md border border-line bg-sunken px-3 py-1.5 text-xs text-ink-2" data-testid="static-disclaimer">
+        <p className="mb-3 border-l-2 border-accent/70 pl-3 text-xs leading-relaxed text-ink-2" data-testid="static-disclaimer">
           {STATIC_DISCLAIMER}
         </p>
         <p className="mb-2 text-xs text-muted">Rejected claims stay hidden until you open Review.</p>

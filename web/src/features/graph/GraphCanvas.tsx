@@ -278,7 +278,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
         aria-roledescription="graph"
         aria-label="Architecture graph. Use arrow keys to move between nodes, Enter to expand, Escape to clear. The list and cards views show the same data."
         onKeyDown={onKeyDown}
-        className="stage w-full max-w-full overflow-auto rounded-lg border border-line bg-[#070b0a]"
+        className="stage w-full max-w-full overflow-auto rounded-2xl border border-white/10"
         data-testid="graph-canvas"
       >
         <svg width={Math.ceil(frame.w * scale)} height={Math.ceil(frame.h * scale)} viewBox={`0 0 ${frame.w} ${frame.h}`} role="group" aria-label="Nodes and recorded relationships in this view">
@@ -296,11 +296,11 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
             if (members.length === 0) return null;
             const top = Math.min(...members) - 56;
             const height = Math.max(...members) + 36 - top;
-            return <rect key={`band-${h.layer}-${h.x}`} x={h.x - 96} y={top} width={192} height={height} rx="12" fill="#10211e" />;
+            return <rect key={`band-${h.layer}-${h.x}`} x={h.x - 96} y={top} width={192} height={height} rx="16" fill="#141822" />;
           })}
           {headers.map((h) => (
-            <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="12" fontFamily="IBM Plex Sans, sans-serif" fontWeight={600}>
-              {h.layer.charAt(0).toUpperCase() + h.layer.slice(1)}
+            <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="11" fontFamily="Outfit, sans-serif" fontWeight={600} letterSpacing="1.6">
+              {(h.layer.charAt(0).toUpperCase() + h.layer.slice(1)).toUpperCase()}
             </text>
           ))}
           {visibleEdges.map((e) => {
@@ -318,14 +318,14 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
                 <path
                   d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)}
                   fill="none"
-                  stroke={hot ? "#7eb6ff" : color}
+                  stroke={hot ? "#e4c27a" : color}
                   strokeWidth={hot ? 2.75 : Math.min(2.2, 0.9 + (e.data.weight ?? 1.5) * 0.35)}
                   strokeDasharray={dash}
                   markerEnd={`url(#${marker}-arrow)`}
                 />
                 <path d={elbow(a, b, lanes.get(e.data.id) ?? 0, busY)} fill="none" stroke="transparent" strokeWidth={14} className="cursor-pointer" onClick={() => (e.data.id.startsWith("rollup::") ? onSelect(e.data.source ?? null) : onEdge(e.data.id))} />
                 {showLabels || hot ? (
-                  <text x={midX} y={midY - 6} textAnchor="middle" fill="#e7f2ef" fontSize="11" fontFamily="IBM Plex Sans, sans-serif">
+                  <text x={midX} y={midY - 6} textAnchor="middle" fill="#f4f1ea" fontSize="11" fontFamily="Outfit, sans-serif">
                     {clip(e.data.label, 28)}
                   </text>
                 ) : null}
@@ -339,24 +339,24 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
             const [l1, l2] = nodeLines(n.data);
             const on = selected === n.data.id;
             const dim = !!linked && !linked.has(n.data.id);
-            const stroke = on ? "#7eb6ff" : layerColor(n.data.layer);
+            const stroke = on ? "#e4c27a" : "rgba(244,241,234,0.14)";
             return (
               <g
                 key={n.data.id}
                 data-node-id={n.data.id}
                 transform={`translate(${p.x - box.w / 2} ${p.y - box.h / 2})`}
-                opacity={dim ? 0.38 : 1}
+                opacity={dim ? 0.34 : 1}
                 className="cursor-pointer"
                 onClick={() => onSelect(n.data.id)}
                 onDoubleClick={() => onExpand(n.data.id)}
               >
-                <rect width={box.w} height={box.h} rx="8" fill="#1b3330" stroke={stroke} strokeWidth={on ? 3 : 2} />
-                <rect width="5" height={box.h} rx="2" fill={layerColor(n.data.layer)} />
-                <text x={box.w / 2} y={l2 ? box.h / 2 - 6 : box.h / 2 + 4} textAnchor="middle" fill="#f4faf7" fontSize="12" fontFamily="IBM Plex Sans, sans-serif" fontWeight={600}>
+                <rect width={box.w} height={box.h} rx="11" fill="#161b26" stroke={stroke} strokeWidth={on ? 1.75 : 1} />
+                <rect x="0.5" y="8" width="3" height={box.h - 16} rx="1.5" fill={layerColor(n.data.layer)} />
+                <text x={box.w / 2} y={l2 ? box.h / 2 - 5 : box.h / 2 + 4} textAnchor="middle" fill="#f7f4ee" fontSize="13" fontFamily="Outfit, sans-serif" fontWeight={500}>
                   {l1}
                 </text>
                 {l2 ? (
-                  <text x={box.w / 2} y={box.h / 2 + 12} textAnchor="middle" fill="#c5d2cb" fontSize="11" fontFamily="IBM Plex Sans, sans-serif">
+                  <text x={box.w / 2} y={box.h / 2 + 12} textAnchor="middle" fill="#b7b2a8" fontSize="11" fontFamily="Outfit, sans-serif">
                     {l2}
                   </text>
                 ) : null}
@@ -392,20 +392,23 @@ export function RecordedLinks({
     return <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">No relationship on this page connects two components. That is not proof that nothing connects.</p>;
   }
   return (
-    <div className="rounded-lg border border-line bg-surface p-3" aria-label="Strongest recorded links">
-      <h3 className="text-sm font-semibold">Strongest links on this page</h3>
-      <ul className="mt-2 flex flex-col gap-1">
+    <div aria-label="Strongest recorded links">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Strongest links</h3>
+      <ul className="mt-2 flex flex-col">
         {ranked.map((e) => (
-          <li key={e.data.id}>
-            <button type="button" onClick={() => e.data.source && onPick(e.data.source)} className="tap w-full break-words rounded-md border border-line bg-canvas px-2 text-left text-sm">
-              <span className="font-medium">{nameOf(e.data.source)}</span>
-              <span className="text-muted"> {e.data.label} to </span>
-              <span className="font-medium">{nameOf(e.data.target)}</span>
+          <li key={e.data.id} className="border-t border-line first:border-t-0">
+            <button type="button" onClick={() => e.data.source && onPick(e.data.source)} className="tap flex w-full items-baseline justify-between gap-3 rounded-md px-1 text-left text-sm hover:bg-sunken">
+              <span className="min-w-0 break-words">
+                <span className="font-medium text-ink">{nameOf(e.data.source)}</span>
+                <span className="text-muted"> to </span>
+                <span className="text-ink-2">{nameOf(e.data.target)}</span>
+              </span>
+              <span className="shrink-0 font-mono text-[11px] text-muted">{e.data.label}</span>
             </button>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-ink-2">A count of recorded relationships, not a new claim. Select a component to read every link that touches it.</p>
+      <p className="mt-3 text-xs leading-relaxed text-muted">A count of recorded relationships, not a new claim. Select a component to read every link that touches it.</p>
     </div>
   );
 }
