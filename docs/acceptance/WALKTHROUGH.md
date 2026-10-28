@@ -10,7 +10,7 @@ tags: [acceptance, screenshots]
 
 These screens are the running app, talking to the local API and the indexed store. They are not mocks and not design comps. The previous screens of the same views are in [before/](before/).
 
-Start at the home page. Paste a public GitHub URL. Traces indexes that commit, then the snapshot opens. The two repositories in these shots were indexed that way:
+Start at the home page. Paste a public GitHub URL. That opens the repository. Index the commit, then open the ready snapshot. The two repositories in these shots were indexed that way:
 
 | Repository | URL | Commit |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ Desktop shots are 1280×860. Phone shots are 390×844.
 5. **Trace.** On a wide screen the FastAPI template path is one horizontal flow, and the selected step opens underneath it. On a phone the same steps stack. A solid step is verified or observed. A dotted step is an inferred library call. A dashed step is a gap. The selected step is the panel: the items page renders AddItem, a gap stays where no edge reaches `form.handleSubmit`, two library steps stay inferred, the generated client matches `POST /api/v1/items/`, and `create_item` depends on `get_db`. The same symbols have a verified static persistence path (validate, stage, commit, reload). Nothing was executed, and no database was contacted. The rejected CRUD claim is not a step. [Desktop](trace-desktop.png) · [Phone](trace-phone.png)
 6. **Evidence.** The `contains` claim from `Serializer` to `__init__`, with the pinned source lines. [Desktop](evidence-desktop.png) · [Phone](evidence-phone.png)
 7. **History.** The timeline is a spine of commits, not a stack of cards and not a proof of architecture. Co-change is drawn as two paths that changed together. That is a Git pattern, not a call. Criteria stay one click away, printed as stored. [Desktop](history-desktop.png) · [Phone](history-phone.png)
-8. **Ask.** "What does Serializer depend on?" with no model and no key. The answer comes first. Each grounded sentence points at the file, and those files open on the graph. Interpretation and unknown stay marked. The category list stays closed until you open it. [Desktop](ask-desktop.png) · [Phone](ask-phone.png)
+8. **Ask.** The page lists questions this snapshot can answer, including one stored route when the inventory has one. You can still type your own. "What does Serializer depend on?" needs no model and no key. The answer comes first. Each grounded sentence points at the file, and those files open on the graph. Interpretation and unknown stay marked. The category list stays closed until you open it. [Desktop](ask-desktop.png) · [Phone](ask-phone.png)
 
 ## What this is not
 

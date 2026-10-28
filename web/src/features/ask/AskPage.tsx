@@ -1,12 +1,14 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
+import { keys } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { Button, ErrorState, PageHeader } from "../../ui/States";
 import { ChatPanel } from "../chat/ChatPanel";
 import { ExplainView } from "./ExplainView";
+import { starterQuestions } from "./starters";
 
 const TAB = "tap shrink-0 border-b-2 border-transparent px-3 text-sm data-[state=active]:border-accent data-[state=active]:font-semibold";
 
@@ -52,6 +54,8 @@ function ExplainPanel({ repoId, sha }: { repoId: string; sha: string }) {
   const seeded = sp.get("q") ?? "";
   const [question, setQuestion] = useState(seeded);
   const qid = useId();
+  const routes = useQuery({ queryKey: keys.view("routes", repoId, sha), queryFn: () => api.routes(repoId, sha) });
+  const questions = starterQuestions(sha, routes.data ?? []);
   const ask = useMutation({
     mutationFn: (v: { question: string; mode: "no_llm" | "prepare_bundle" }) => api.explain(repoId, sha, { question: v.question, mode: v.mode, focus_claim_ids: [] }),
   });
@@ -61,6 +65,10 @@ function ExplainPanel({ repoId, sha }: { repoId: string; sha: string }) {
     ran.current = true;
     ask.mutate({ question: seeded.trim(), mode: "no_llm" });
   }, [seeded, ask]);
+  const run = (q: string) => {
+    setQuestion(q);
+    ask.mutate({ question: q, mode: "no_llm" });
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (question.trim()) ask.mutate({ question: question.trim(), mode: "no_llm" });
@@ -68,11 +76,23 @@ function ExplainPanel({ repoId, sha }: { repoId: string; sha: string }) {
   const preview = () => question.trim() && ask.mutate({ question: question.trim(), mode: "prepare_bundle" });
   return (
     <>
-      <form onSubmit={submit} className="mb-4 flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
+      <section className="mb-4" aria-label="Questions this snapshot can answer">
+        <p className="text-sm text-ink-2">These match questions the explainer can answer from stored evidence. Pick one, or write your own. No model is called.</p>
+        <ul className="mt-2 flex flex-col">
+          {questions.map((q) => (
+            <li key={q} className="border-b border-white/8">
+              <button type="button" onClick={() => run(q)} disabled={ask.isPending} className="min-h-11 w-full py-2.5 text-left text-sm text-ink disabled:text-muted">
+                {q}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <form onSubmit={submit} className="mb-4 flex flex-col gap-2" aria-label="Ask a question">
         <label htmlFor={qid} className="text-sm font-medium">
           Question about this snapshot
         </label>
-        <textarea id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-line-strong p-2" placeholder="For example: What does a function depend on? What calls it? Trace from one symbol to another." />
+        <textarea id={qid} value={question} maxLength={2000} rows={3} onChange={(e) => setQuestion(e.target.value)} className="rounded-md border border-white/10 bg-white/[0.03] p-2" placeholder="For example: What does a function depend on? What calls it? Trace from one symbol to another." />
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" variant="primary" disabled={!question.trim() || ask.isPending}>
             {ask.isPending ? "Asking" : "Explain (no key needed)"}

@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { useHead, useRepo, useSnapshots } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
-import { Button, Card, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
 
 function HeadStatus({ repoId }: { repoId: string }) {
   const head = useHead(repoId);
@@ -70,17 +70,58 @@ export function RepoPage() {
         </PageHeader>
       )}
 
-      <div className="grid gap-4">
-        <Card>
-          <h2 className="mb-2 font-semibold">Freshness</h2>
-          <HeadStatus repoId={repoId} />
-        </Card>
+      <div className="grid gap-8">
+        <section aria-labelledby="snap-h">
+          <h2 id="snap-h" className="text-sm font-medium tracking-[-0.02em] text-ink-2">
+            Snapshots
+          </h2>
+          <p className="mt-1 max-w-xl text-sm text-ink-2">A snapshot is this repository at one commit. Open a ready one to see the architecture, follow a path, and ask from the stored evidence.</p>
+          {snaps.isPending ? (
+            <Loading label="Loading snapshots" />
+          ) : snaps.isError ? (
+            <ErrorState error={snaps.error} what="Snapshots" />
+          ) : snaps.data.length === 0 ? (
+            <Empty title="No snapshots yet">Index the repository to create one. Indexing does not run the repository's own code.</Empty>
+          ) : (
+            <ul className="mt-2" data-testid="snapshot-list">
+              {snaps.data.map((s) => {
+                const by = (s.stats as { by_status?: Record<string, number> }).by_status;
+                const records = by ? Object.values(by).reduce((a, b) => a + b, 0) : null;
+                return (
+                  <li key={s.id} className="border-b border-white/8">
+                    <Link to={snapshotBase(repoId, s.sha)} className="flex flex-col py-3.5 text-ink no-underline hover:no-underline">
+                      <span className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-sm">@{s.sha.slice(0, 12)}</span>
+                        <span className="text-[13px] text-muted">{s.state === "ready" ? "Open" : s.state}</span>
+                      </span>
+                      <span className="mt-1 text-[13px] text-muted">
+                        {s.state}
+                        {" · "}
+                        {s.evidence_schema}
+                        {records !== null ? ` · ${records.toLocaleString("en-US")} records` : ""}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
-        <Card>
-          <h2 className="mb-2 font-semibold">Index</h2>
-          <p className="text-sm text-ink-2">Indexing fetches the repository at a pinned commit and runs the extractor and validators in an isolated sandbox. The repository's own code is never run.</p>
+        <section aria-labelledby="index-h">
+          <h2 id="index-h" className="text-sm font-medium tracking-[-0.02em] text-ink-2">
+            Index
+          </h2>
+          <p className="mt-1 max-w-xl text-sm text-ink-2">
+            {snaps.data?.some((s) => s.state === "ready")
+              ? "Index the latest commit when the default branch has moved. A snapshot you already have stays pinned to its commit."
+              : "Indexing reads the repository at one commit and stores the evidence. The repository's own code is never run."}
+          </p>
           <div className="mt-3">
-            <Button variant="primary" onClick={() => start.mutate()} disabled={start.isPending}>
+            <HeadStatus repoId={repoId} />
+          </div>
+          <div className="mt-3">
+            <Button variant={snaps.data?.some((s) => s.state === "ready") ? "secondary" : "primary"} onClick={() => start.mutate()} disabled={start.isPending}>
               {start.isPending ? "Starting" : "Index latest commit"}
             </Button>
           </div>
@@ -89,43 +130,10 @@ export function RepoPage() {
               <ErrorState error={start.error} what="Indexing" />
             </div>
           ) : null}
-          <OpenJob />
-        </Card>
-
-        <section aria-labelledby="snap-h">
-          <h2 id="snap-h" className="mb-2 text-lg font-semibold">
-            Snapshots
-          </h2>
-          {snaps.isPending ? (
-            <Loading label="Loading snapshots" />
-          ) : snaps.isError ? (
-            <ErrorState error={snaps.error} what="Snapshots" />
-          ) : snaps.data.length === 0 ? (
-            <Empty title="No snapshots yet">Index the repository to create one.</Empty>
-          ) : (
-            <ul className="mt-1" data-testid="snapshot-list">
-              {snaps.data.map((s) => {
-                const by = (s.stats as { by_status?: Record<string, number> }).by_status;
-                return (
-                  <li key={s.id} className="border-b border-white/8">
-                    <Link
-                      to={snapshotBase(repoId, s.sha)}
-                      className="flex flex-col py-3.5 text-ink no-underline hover:no-underline"
-                    >
-                      <span className="flex items-baseline justify-between gap-3">
-                        <span className="font-mono text-sm">@{s.sha.slice(0, 12)}</span>
-                        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">{s.state}</span>
-                      </span>
-                      <span className="mt-1 text-[13px] text-muted">
-                        {s.evidence_schema}
-                        {by ? ` · ${Object.values(by).reduce((a, b) => a + b, 0).toLocaleString("en-US")} records` : ""}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm text-muted">Already have a job id?</summary>
+            <OpenJob />
+          </details>
         </section>
       </div>
     </main>

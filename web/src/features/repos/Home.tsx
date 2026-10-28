@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError, api } from "../../api/client";
 import { keys, useRepos } from "../../api/queries";
 import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
@@ -21,12 +21,14 @@ export function Home() {
   const inputId = useId();
   const hintId = useId();
   const errId = useId();
+  const nav = useNavigate();
   const register = useMutation({
     mutationFn: (u: string) => api.registerRepo(u),
-    onSuccess: () => {
+    onSuccess: (repo) => {
       setUrl("");
       setTouched(false);
       void qc.invalidateQueries({ queryKey: keys.repos });
+      nav(`/r/${encodeURIComponent(repo.id)}`);
     },
   });
   const trimmed = url.trim();
@@ -41,7 +43,7 @@ export function Home() {
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-5 py-14 focus:outline-none sm:py-20">
-      <PageHeader title="Repositories">Public repositories, one commit at a time. Every view is backed by stored evidence. A gap stays a gap.</PageHeader>
+      <PageHeader title="Repositories">Add a public GitHub repository. You land on it next. Indexing is a separate step, and nothing is fetched until you start it.</PageHeader>
 
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-3" aria-label="How Traces treats a repository">
         {NOTES.map((n) => (

@@ -96,11 +96,27 @@ export function RoutesView({ items, base, onEvidence, hidden }: { items: RouteIt
                   </Link>
                 </p>
                 {r.claim_id ? (
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
                     <Button onClick={() => onEvidence(r.claim_id!)} aria-label={`Open evidence for ${r.method === "UNKNOWN" ? "" : `${r.method} `}${r.path}`}>
                       Open evidence
                     </Button>
+                    {r.method !== "UNKNOWN" && r.method !== "USE" && r.path.startsWith("/") ? (
+                      <Link to={`${base}/ask?q=${encodeURIComponent(`What does ${r.method} ${r.path} do?`)}`} className="text-sm">
+                        Ask about this route
+                      </Link>
+                    ) : null}
+                    {r.handler_symbol ? (
+                      <Link to={`${base}/trace?from=${encodeURIComponent(r.handler_symbol)}`} className="text-sm">
+                        Trace the handler
+                      </Link>
+                    ) : null}
                   </div>
+                ) : r.handler_symbol ? (
+                  <p className="mt-2">
+                    <Link to={`${base}/trace?from=${encodeURIComponent(r.handler_symbol)}`} className="text-sm">
+                      Trace the handler
+                    </Link>
+                  </p>
                 ) : null}
               </li>
             );

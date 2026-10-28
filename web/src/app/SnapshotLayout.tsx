@@ -106,6 +106,10 @@ export function SnapshotLayout() {
         </Link>
         <ShaChip sha={sha} />
         {snap.data ? <span className="text-muted">Snapshot {snap.data.state}</span> : null}
+        <a href={`/api/v1/repos/${encodeURIComponent(repoId)}/snapshots/${encodeURIComponent(sha)}/export`} className="inline-flex min-h-8 items-center text-muted">
+          Download evidence
+          <span className="sr-only"> as one JSONL record per line for this snapshot</span>
+        </a>
         {snap.isError ? (
           <span className="text-rejected" role="status">
             {snap.error instanceof ApiError && snap.error.status === 404 ? "Snapshot not found" : "Snapshot details unavailable"}
