@@ -19,6 +19,21 @@ function HeadStatus({ repoId }: { repoId: string }) {
   );
 }
 
+function CompareNewest({ repoId, snaps }: { repoId: string; snaps: { sha: string; state: string; indexed_at?: string | null; created_at: string }[] }) {
+  const ready = snaps.filter((s) => s.state === "ready").sort((a, b) => (b.indexed_at ?? b.created_at).localeCompare(a.indexed_at ?? a.created_at));
+  if (ready.length < 2) return null;
+  const head = ready[0]!;
+  const older = ready[1]!;
+  return (
+    <p className="mt-3 text-sm">
+      <Link to={`${snapshotBase(repoId, head.sha)}/history?tab=compare&base=${older.sha}&head=${head.sha}`}>
+        Compare @{head.sha.slice(0, 7)} with @{older.sha.slice(0, 7)}
+      </Link>
+      <span className="mt-1 block text-[13px] text-muted">Records stored as added or removed between these commits. This is not a description of what the code does.</span>
+    </p>
+  );
+}
+
 function OpenJob() {
   const nav = useNavigate();
   const [id, setId] = useState("");
@@ -106,6 +121,7 @@ export function RepoPage() {
               })}
             </ul>
           )}
+          {snaps.data && snaps.data.filter((s) => s.state === "ready").length >= 2 ? <CompareNewest repoId={repoId} snaps={snaps.data} /> : null}
         </section>
 
         <section aria-labelledby="index-h">

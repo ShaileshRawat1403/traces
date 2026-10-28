@@ -5,7 +5,7 @@ import { api, type Component } from "../../api/client";
 import { snapshotBase } from "../../app/nav";
 import { Button } from "../../ui/States";
 import { GraphCanvas, RecordedLinks } from "../graph/GraphCanvas";
-import { componentRollup, graphQuery, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
+import { componentRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
 import { CODE_LAYERS, LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
 
@@ -14,7 +14,8 @@ export function SystemMap() {
   const { repoId = "", sha = "" } = useParams();
   const navigate = useNavigate();
   const base = snapshotBase(repoId, sha);
-  const query = graphQuery(readGraphState(new URLSearchParams()));
+  const [limit, setLimit] = useState(300);
+  const query = graphQuery({ ...readGraphState(new URLSearchParams()), limit });
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const graph = useQuery({ queryKey: ["graph", repoId, sha, query], queryFn: () => api.graph(repoId, sha, query) });
   const [selected, setSelected] = useState<string | null>(null);
@@ -127,7 +128,16 @@ export function SystemMap() {
             }}
           />
           )}
-          {graph.data?.truncated ? <p className="mt-2 text-xs text-ink-2">This page of relationships is truncated at {graph.data.limit}. Counts use only that page.</p> : null}
+          {graph.data?.truncated ? (
+            <div className="mt-2 flex flex-col items-start gap-2">
+              <p className="text-xs text-ink-2">This page of relationships is truncated at {graph.data.limit}. Counts use only that page.</p>
+              {nextGraphLimit(limit) ? (
+                <Button onClick={() => setLimit(nextGraphLimit(limit)!)}>Show more recorded relationships</Button>
+              ) : (
+                <p className="text-xs text-muted">This page stops at {graph.data.limit} relationships, the API cap. Relationships beyond it are not in this view.</p>
+              )}
+            </div>
+          ) : null}
         </div>
         {selectedNode ? (
           <MapInspector node={selectedNode.data} components={components} rolls={rolls} base={base} onClear={() => setSelected(null)} onPick={setSelected} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENT_IDS, componentsSample, graphComponentsSample, graphSymbolsSample } from "../../testing/samples";
-import { componentForFile, componentRollup, columnLayout, countsFor, depthLayout, drawableEdges, fileRollup, graphQuery, nextInDirection, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState } from "./graphModel";
+import { componentForFile, componentRollup, columnLayout, countsFor, depthLayout, drawableEdges, fileRollup, graphQuery, nextGraphLimit, nextInDirection, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState } from "./graphModel";
 
 describe("graph URL state and query", () => {
   it("defaults to verified and observed, depth 1, no focus", () => {
@@ -30,6 +30,13 @@ describe("graph URL state and query", () => {
     const q = new URLSearchParams(graphQuery(s).slice(1));
     expect(q.getAll("layer")).toEqual(["frontend", "api"]);
     expect(q.get("depth")).toBe("3");
+  });
+  it("raises the page cap without passing the API maximum", () => {
+    expect(nextGraphLimit(300)).toBe(800);
+    expect(nextGraphLimit(800)).toBe(2000);
+    expect(nextGraphLimit(2000)).toBeNull();
+    expect(readGraphState(new URLSearchParams("limit=9000")).limit).toBe(2000);
+    expect(graphQuery(readGraphState(new URLSearchParams("limit=800")))).toContain("limit=800");
   });
   it("clamps depth to the contract range", () => {
     expect(readGraphState(new URLSearchParams("depth=9")).depth).toBe(4);

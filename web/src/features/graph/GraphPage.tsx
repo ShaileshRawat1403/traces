@@ -12,7 +12,7 @@ import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas, RecordedLinks } from "./GraphCanvas";
 import { CODE_LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
-import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
+import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
@@ -566,6 +566,13 @@ export default function GraphPage() {
                 {graph.data.nodes.length} nodes, {drawableEdges(graph.data).edges.length} relationships
                 {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
               </p>
+              {graph.data.truncated ? (
+                nextGraphLimit(state.limit) ? (
+                  <Button onClick={() => setState({ ...state, limit: nextGraphLimit(state.limit)! })}>Show more recorded relationships</Button>
+                ) : (
+                  <p className="text-xs text-ink-2">This page stops at {graph.data.limit} relationships, the API cap. Relationships beyond it are not in this view.</p>
+                )
+              ) : null}
               {!state.focus ? (
                 <p className="text-xs text-ink-2">Lines between neighboring columns are on the map. A line counts relationships on this page. The weakest status in the pair sets the line. Select a component to read every link that touches it, including ones that skip a column. A missing line is not proof that nothing connects.</p>
               ) : (

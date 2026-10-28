@@ -33,6 +33,20 @@ export interface GraphState {
 
 const clampDepth = (n: number) => (Number.isFinite(n) ? Math.min(4, Math.max(0, Math.trunc(n))) : 1);
 
+/** Page sizes the graph API accepts. 2000 is the contract cap, not the whole repository. */
+export const GRAPH_LIMITS = [300, 800, 2000] as const;
+
+export function clampLimit(raw: string | null): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 300;
+  return Math.min(2000, Math.max(1, Math.trunc(n)));
+}
+
+/** The next larger page, or null when this page is already at the API cap. */
+export function nextGraphLimit(limit: number): number | null {
+  return GRAPH_LIMITS.find((n) => n > limit) ?? null;
+}
+
 export function readGraphState(sp: URLSearchParams): GraphState {
   const st = sp.getAll("status").filter((s): s is StatusFilter => (STATUS_FILTERS as readonly string[]).includes(s));
   return {
@@ -42,7 +56,7 @@ export function readGraphState(sp: URLSearchParams): GraphState {
     rel: sp.getAll("rel"),
     status: sp.has("status") || sp.has("status_set") ? st : [...DEFAULT_STATUS],
     q: sp.get("q") ?? "",
-    limit: Number(sp.get("limit")) || 300,
+    limit: clampLimit(sp.get("limit")),
   };
 }
 

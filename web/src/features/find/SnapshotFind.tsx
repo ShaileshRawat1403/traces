@@ -24,6 +24,17 @@ export function SnapshotFind() {
     [q, components.data, routes.data, base],
   );
   useEffect(() => setActive(0), [q]);
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      document.getElementById(inputId)?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inputId]);
   const go = (href: string) => {
     setQ("");
     setOpen(false);
