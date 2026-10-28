@@ -9,6 +9,7 @@ import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { LAYERS, LAYER_COLOR } from "../layers";
+import { askHref } from "../ask/recordedQuestion";
 import { useParam } from "./useDrawer";
 
 const PATHS_SHOWN = 40;
@@ -121,6 +122,11 @@ export function ComponentsView({ items, base }: { items: Component[]; base: stri
                   <p className="mt-2 text-xs text-muted">No claims touch this component.</p>
                 )}
                 {counts.rejected ? <p className="mt-1 text-xs text-muted">{counts.rejected} rejected claims hidden.</p> : null}
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <Link to={`${base}/graph?focus=${encodeURIComponent(c.id)}`}>On the map</Link>
+                  <Link to={`${base}/history?component=${encodeURIComponent(c.id)}`}>History</Link>
+                  {askHref(base, c.paths) ? <Link to={askHref(base, c.paths)!}>What changed with a file</Link> : null}
+                </div>
                 <details className="mt-2 text-sm">
                   <summary className="tap flex cursor-pointer items-center">Files ({c.paths.length})</summary>
                   <ul className="mt-1 flex flex-col gap-1">

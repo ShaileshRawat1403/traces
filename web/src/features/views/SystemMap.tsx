@@ -7,6 +7,7 @@ import { Button } from "../../ui/States";
 import { GraphCanvas, RecordedLinks } from "../graph/GraphCanvas";
 import { componentRollup, graphQuery, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
 import { CODE_LAYERS, LAYERS, isLayer, layerColor } from "../layers";
+import { askHref } from "../ask/recordedQuestion";
 
 /** The opening picture: stored components, and counts of recorded relationships between them. */
 export function SystemMap() {
@@ -189,9 +190,11 @@ function MapInspector({
         <Link to={`${base}/history?component=${encodeURIComponent(node.id)}`} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
           History
         </Link>
-        <Link to={`${base}/ask?q=${encodeURIComponent(`What is recorded about ${node.label}?`)}`} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
-          Ask
-        </Link>
+        {askHref(base, comp?.paths ?? []) ? (
+          <Link to={askHref(base, comp?.paths ?? [])!} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
+            Ask
+          </Link>
+        ) : null}
         <Button onClick={onClear}>Clear</Button>
       </div>
     </div>

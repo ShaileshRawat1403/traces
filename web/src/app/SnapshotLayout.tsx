@@ -5,6 +5,7 @@ import { ApiError } from "../api/client";
 import { useCapability, useSnapshot } from "../api/queries";
 import { STATIC_DISCLAIMER } from "../status/status";
 import { SNAPSHOT_NAV, shortSha, snapshotBase, type NavItem } from "./nav";
+import { SnapshotFind } from "../features/find/SnapshotFind";
 
 function PendingDot({ capability }: { capability?: string }) {
   const cap = useCapability(capability ?? "");
@@ -100,7 +101,7 @@ export function SnapshotLayout() {
   const repoName = repoId.split("__").slice(1).join("/") || repoId;
   return (
     <div className="mx-auto flex max-w-[88rem] flex-col px-4 py-4 md:px-6">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <Link to={`/r/${encodeURIComponent(repoId)}`} className="font-medium">
           {repoName}
         </Link>
@@ -115,6 +116,7 @@ export function SnapshotLayout() {
             {snap.error instanceof ApiError && snap.error.status === 404 ? "Snapshot not found" : "Snapshot details unavailable"}
           </span>
         ) : null}
+        <SnapshotFind />
       </div>
       <nav aria-label="Snapshot sections" className="mb-3 hidden gap-1 overflow-x-auto border-b border-white/8 md:flex">
         {SNAPSHOT_NAV.map((n) => (

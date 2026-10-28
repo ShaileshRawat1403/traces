@@ -11,6 +11,7 @@ import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas, RecordedLinks } from "./GraphCanvas";
 import { CODE_LAYERS, isLayer, layerColor } from "../layers";
+import { askHref } from "../ask/recordedQuestion";
 import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
@@ -199,7 +200,10 @@ function SelectionPanel({
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
         <Link to={node.entity === "component" ? `${base}/trace` : `${base}/trace?from=${encodeURIComponent(node.id)}`}>Follow a recorded flow</Link>
         <Link to={node.entity === "component" ? `${base}/history?component=${encodeURIComponent(node.id)}` : node.file ? `${base}/history?path=${encodeURIComponent(node.file)}` : `${base}/history`}>History</Link>
-        <Link to={`${base}/ask?q=${encodeURIComponent(`What is recorded about ${node.label}?`)}`}>Ask about this</Link>
+        {node.file ? <Link to={`${base}/source?path=${encodeURIComponent(node.file)}`}>Open source</Link> : null}
+        {askHref(base, node.entity === "symbol" ? [node.id, node.label] : [node.file ?? "", node.label]) ? (
+          <Link to={askHref(base, node.entity === "symbol" ? [node.id, node.label] : [node.file ?? "", node.label])!}>Ask</Link>
+        ) : null}
       </div>
       <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
       {byKind.size > 0 ? (
@@ -245,7 +249,7 @@ function SelectionPanel({
   );
 }
 
-function FilePanel({ node, onOpen, onClear }: { node: ElementData | undefined; onOpen: () => void; onClear: () => void }) {
+function FilePanel({ node, base, onOpen, onClear }: { node: ElementData | undefined; base: string; onOpen: () => void; onClear: () => void }) {
   if (!node) return null;
   return (
     <section className="border-t border-white/10 pt-3" aria-label="Selected file">
@@ -256,6 +260,11 @@ function FilePanel({ node, onOpen, onClear }: { node: ElementData | undefined; o
         <Button variant="primary" onClick={onOpen}>
           Open symbols
         </Button>
+        {node.file ? (
+          <Link to={`${base}/source?path=${encodeURIComponent(node.file)}`} className="tap inline-flex items-center rounded-md border border-white/10 px-3 text-sm text-ink no-underline">
+            Open source
+          </Link>
+        ) : null}
         <Button onClick={onClear}>Clear selection</Button>
       </div>
     </section>
@@ -563,7 +572,7 @@ export default function GraphPage() {
                 <p className="text-xs text-muted">{useFiles ? "Files first. Select a file to emphasize the lines recorded from it. Enter opens its symbols. A line is a count, not a new claim." : "Select a symbol to label its lines. List shows every relationship."}</p>
               )}
               {selected && selected.startsWith("file::") ? (
-                <FilePanel node={drawn.find((e) => e.data.id === selected)?.data} onOpen={() => setOpenedFile(selected.slice("file::".length))} onClear={() => choose(null)} />
+                <FilePanel node={drawn.find((e) => e.data.id === selected)?.data} base={snapshotBase(repoId, sha)} onOpen={() => setOpenedFile(selected.slice("file::".length))} onClear={() => choose(null)} />
               ) : selected && (graph.data.nodes.some((n) => n.id === selected) || components.some((c) => c.id === selected)) ? (
                 <SelectionPanel data={graph.data} components={components} selected={selected} state={state} base={snapshotBase(repoId, sha)} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
               ) : !state.focus ? (
