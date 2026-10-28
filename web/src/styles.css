@@ -398,8 +398,9 @@
 }
 
 .stage {
-  height: min(68vh, 40rem);
-  min-height: 16rem;
+  height: auto;
+  max-height: min(68vh, 40rem);
+  min-height: 12rem;
   overflow: auto;
 }
 

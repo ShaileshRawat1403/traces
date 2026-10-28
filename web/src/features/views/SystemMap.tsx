@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type Component } from "../../api/client";
 import { snapshotBase } from "../../app/nav";
 import { Button } from "../../ui/States";
-import { GraphCanvas } from "../graph/GraphCanvas";
+import { GraphCanvas, RecordedLinks } from "../graph/GraphCanvas";
 import { componentRollup, graphQuery, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
 import { CODE_LAYERS, LAYERS, isLayer, layerColor } from "../layers";
 
@@ -50,25 +50,13 @@ export function SystemMap() {
   if (comps.isPending || graph.isPending) return <p className="mb-3 text-sm text-muted">Loading the architecture.</p>;
   if (!nodes.length) return null;
   const selectedNode = shown.find((n) => n.data.id === selected);
-  const rolls = selected && graph.data ? componentRollup(graph.data, components).filter((e) => e.data.source === selected || e.data.target === selected) : [];
-  const layers = LAYERS.filter((l) => shown.some((n) => !n.data.source && n.data.layer === l));
+  const allRolls = graph.data ? componentRollup(graph.data, components) : [];
+  const rolls = selected ? allRolls.filter((e) => e.data.source === selected || e.data.target === selected) : [];
 
   return (
     <section className="mb-4" aria-label="Architecture map">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold">Architecture</h2>
-        <p className="text-xs text-muted">A line is a count of recorded relationships. The weakest status in the pair sets the line.</p>
-      </div>
       <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0">
-          <ul className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers">
-            {layers.map((l) => (
-              <li key={l} className="inline-flex items-center gap-1 capitalize">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: layerColor(l) }} aria-hidden="true" />
-                {l}
-              </li>
-            ))}
-          </ul>
           {phoneList ? (
             <div role="group" aria-label="Layer in view" className="mb-2 flex gap-1 overflow-x-auto">
               {layersOnMap.map((l) => (
@@ -137,9 +125,9 @@ export function SystemMap() {
           {graph.data?.truncated ? <p className="mt-2 text-xs text-ink-2">This page of relationships is truncated at {graph.data.limit}. Counts use only that page.</p> : null}
         </div>
         {selectedNode ? (
-          <MapInspector node={selectedNode.data} components={components} rolls={rolls} base={base} onClear={() => setSelected(null)} />
+          <MapInspector node={selectedNode.data} components={components} rolls={rolls} base={base} onClear={() => setSelected(null)} onPick={setSelected} />
         ) : (
-          <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a component to see what it connects to. Enter opens it on the graph. A missing line is not proof that nothing connects.</p>
+          <RecordedLinks rolls={allRolls} nameOf={(id) => components.find((c) => c.id === id)?.name ?? id ?? ""} onPick={setSelected} />
         )}
       </div>
     </section>
@@ -152,12 +140,14 @@ function MapInspector({
   rolls,
   base,
   onClear,
+  onPick,
 }: {
   node: ElementData;
   components: readonly Component[];
   rolls: { data: ElementData }[];
   base: string;
   onClear: () => void;
+  onPick: (id: string) => void;
 }) {
   const comp = components.find((c) => c.id === node.id);
   return (
@@ -171,11 +161,13 @@ function MapInspector({
         <ul className="mt-2 flex flex-col gap-1 text-sm">
           {rolls.map((e) => {
             const otherId = e.data.source === node.id ? e.data.target : e.data.source;
-            const other = components.find((c) => c.id === otherId)?.name ?? otherId;
+            const other = components.find((c) => c.id === otherId)?.name ?? otherId ?? "";
             const dir = e.data.source === node.id ? "to" : "from";
             return (
               <li key={e.data.id}>
-                <span className="font-medium">{e.data.label}</span> <span className="text-muted">{dir}</span> {other}
+                <button type="button" onClick={() => otherId && onPick(otherId)} className="text-left hover:underline">
+                  <span className="font-medium">{e.data.label}</span> <span className="text-muted">{dir}</span> {other}
+                </button>
               </li>
             );
           })}

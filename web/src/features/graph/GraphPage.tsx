@@ -9,7 +9,7 @@ import { HiddenCounts } from "../../ui/HiddenCounts";
 import { Button, Empty, ErrorState, Loading } from "../../ui/States";
 import { LineSample, StatusChip } from "../../ui/StatusChip";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
-import { GraphCanvas } from "./GraphCanvas";
+import { GraphCanvas, RecordedLinks } from "./GraphCanvas";
 import { CODE_LAYERS, isLayer, layerColor } from "../layers";
 import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
@@ -481,14 +481,6 @@ export default function GraphPage() {
                           </button>
                         </div>
                       ) : null}
-                      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="Layers on the map">
-                        {(effectiveLayer ? [effectiveLayer] : coreOn ? layersOnMap.filter((l) => coreLayer(l)) : layersOnMap).map((l) => (
-                          <li key={l} className="inline-flex items-center gap-1 capitalize">
-                            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: layerColor(l) }} aria-hidden="true" />
-                            {l}
-                          </li>
-                        ))}
-                      </ul>
                       {effectiveLayer ? <p className="text-xs text-ink-2">One layer is open so the names stay readable. Select a component to list lines that leave it.</p> : null}
                       {coreOn ? <p className="text-xs text-ink-2">Code layers are in the frame. All layers adds infra, docs, and tests.</p> : null}
                     </div>
@@ -562,7 +554,7 @@ export default function GraphPage() {
                 {graph.data.truncated ? `, truncated at ${graph.data.limit}` : ""}
               </p>
               {!state.focus ? (
-                <p className="text-xs text-ink-2">Every component in this view is in the frame. A line counts relationships on this page. The weakest status in the pair sets the line. Select a component to read those lines. A missing line is not proof that nothing connects.</p>
+                <p className="text-xs text-ink-2">Lines between neighboring columns are on the map. A line counts relationships on this page. The weakest status in the pair sets the line. Select a component to read every link that touches it, including ones that skip a column. A missing line is not proof that nothing connects.</p>
               ) : (
                 <p className="text-xs text-muted">{useFiles ? "Files first. Select a file to emphasize the lines recorded from it. Enter opens its symbols. A line is a count, not a new claim." : "Select a symbol to label its lines. List shows every relationship."}</p>
               )}
@@ -570,6 +562,15 @@ export default function GraphPage() {
                 <FilePanel node={drawn.find((e) => e.data.id === selected)?.data} onOpen={() => setOpenedFile(selected.slice("file::".length))} onClear={() => choose(null)} />
               ) : selected && (graph.data.nodes.some((n) => n.id === selected) || components.some((c) => c.id === selected)) ? (
                 <SelectionPanel data={graph.data} components={components} selected={selected} state={state} base={snapshotBase(repoId, sha)} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
+              ) : !state.focus ? (
+                <RecordedLinks
+                  rolls={componentRollup(graph.data, components).filter((e) => {
+                    const ids = new Set(pictured.filter((n) => !n.data.source).map((n) => n.data.id));
+                    return !!e.data.source && !!e.data.target && ids.has(e.data.source) && ids.has(e.data.target);
+                  })}
+                  nameOf={(id) => components.find((c) => c.id === id)?.name ?? id ?? ""}
+                  onPick={choose}
+                />
               ) : (
                 <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">Select a node to see its relationships and open their evidence.</p>
               )}

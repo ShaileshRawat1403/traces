@@ -3,7 +3,7 @@ import { api } from "../../api/client";
 import { useSnapshot } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { presentStatus } from "../../status/status";
-import { Card, ErrorState, Loading, PageHeader } from "../../ui/States";
+import { Card, ErrorState, Loading } from "../../ui/States";
 import { StatusChip } from "../../ui/StatusChip";
 import { EndpointView } from "./EndpointView";
 import { OverviewView } from "./OverviewView";
@@ -49,7 +49,9 @@ export function OverviewPage() {
   const base = snapshotBase(repoId, sha);
   return (
     <>
-      <PageHeader title="Overview">The stored architecture. Select a component to see what it connects to.</PageHeader>
+      <header className="mb-2">
+        <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
+      </header>
       <SystemMap />
       <EndpointView
         name="overview"

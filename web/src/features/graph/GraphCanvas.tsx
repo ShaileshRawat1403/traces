@@ -150,13 +150,32 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
     return ids;
   }, [edges, selected]);
 
+  const [linkScope, setLinkScope] = useState<"near" | "all">("near");
+  const multiLayer = useMemo(() => new Set(nodes.map((n) => n.data.layer).filter(Boolean)).size > 1, [nodes]);
+  const neighboring = useCallback(
+    (e: { data: ElementData }) => {
+      const a = pos[e.data.source!];
+      const b = pos[e.data.target!];
+      if (!a || !b) return false;
+      return Math.abs(a.x - b.x) <= 280;
+    },
+    [pos],
+  );
+  const holdLong = layout === "map" && multiLayer && linkScope === "near";
+  const visibleEdges = useMemo(() => {
+    if (!holdLong) return edges;
+    return edges.filter((e) => neighboring(e) || (!!selected && (e.data.source === selected || e.data.target === selected)));
+  }, [edges, holdLong, neighboring, selected]);
+  const longer = useMemo(() => (layout === "map" && multiLayer ? edges.filter((e) => !neighboring(e)).length : 0), [edges, layout, multiLayer, neighboring]);
+
   const userScaled = useRef(false);
   const fit = useCallback(() => {
     const el = stageRef.current;
     if (!el || el.clientWidth < 40) return 1;
-    const availH = el.clientHeight > 80 ? el.clientHeight - 8 : 520;
-    const z = Math.min(1.15, (el.clientWidth - 8) / frame.w, availH / frame.h);
-    return Math.max(0.22, z);
+    const top = el.getBoundingClientRect().top;
+    const visible = Math.max(240, window.innerHeight - Math.max(top, 0) - 12);
+    const z = Math.min(1.15, (el.clientWidth - 8) / frame.w, visible / frame.h);
+    return Math.max(0.42, z);
   }, [frame.w, frame.h]);
 
   useEffect(() => {
@@ -236,7 +255,22 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
           Fit
         </Button>
         <span className="text-xs text-muted">Arrows move, Enter expands, Esc clears</span>
+        {longer > 0 ? (
+          <div role="group" aria-label="Which recorded lines to draw" className="flex gap-1">
+            <button type="button" aria-pressed={linkScope === "near"} onClick={() => setLinkScope("near")} className={`tap rounded-md border px-3 text-sm ${linkScope === "near" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+              Neighboring columns
+            </button>
+            <button type="button" aria-pressed={linkScope === "all"} onClick={() => setLinkScope("all")} className={`tap rounded-md border px-3 text-sm ${linkScope === "all" ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface"}`}>
+              All recorded lines
+            </button>
+          </div>
+        ) : null}
       </div>
+      {longer > 0 && linkScope === "near" ? (
+        <p className="mb-2 text-xs text-ink-2">
+          {longer} longer {longer === 1 ? "link is" : "links are"} not drawn across other columns. Select a component to see its own, or choose All recorded lines. A missing line is not proof that nothing connects.
+        </p>
+      ) : null}
       <div
         ref={stageRef}
         tabIndex={0}
@@ -253,12 +287,23 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
               <path d="M 0 1.2 L 8 5 L 0 8.8 z" fill="context-stroke" />
             </marker>
           </defs>
+          {headers.map((h) => {
+            const members = nodes.flatMap((n) => {
+              const p = at(n.data.id);
+              if (!p || n.data.layer !== h.layer || Math.abs(p.x - h.x) > 8) return [];
+              return [p.y];
+            });
+            if (members.length === 0) return null;
+            const top = Math.min(...members) - 56;
+            const height = Math.max(...members) + 36 - top;
+            return <rect key={`band-${h.layer}-${h.x}`} x={h.x - 96} y={top} width={192} height={height} rx="12" fill="#10211e" />;
+          })}
           {headers.map((h) => (
             <text key={`${h.layer}-${h.x}`} x={h.x} y={h.y - 40} textAnchor="middle" fill={layerColor(h.layer)} fontSize="12" fontFamily="IBM Plex Sans, sans-serif" fontWeight={600}>
               {h.layer.charAt(0).toUpperCase() + h.layer.slice(1)}
             </text>
           ))}
-          {edges.map((e) => {
+          {visibleEdges.map((e) => {
             const a = at(e.data.source);
             const b = at(e.data.target);
             if (!a || !b) return null;
@@ -323,6 +368,44 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
       <p className="sr-only" aria-live="polite" data-testid="graph-announce">
         {announce}
       </p>
+    </div>
+  );
+}
+
+function linkRank(label: string) {
+  const n = Number.parseInt(label, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** The busiest recorded links on this page. Selecting one highlights its source. Counts are not new claims. */
+export function RecordedLinks({
+  rolls,
+  nameOf,
+  onPick,
+}: {
+  rolls: readonly { data: ElementData }[];
+  nameOf: (id: string | undefined) => string;
+  onPick: (id: string) => void;
+}) {
+  const ranked = [...rolls].sort((a, b) => linkRank(b.data.label) - linkRank(a.data.label) || a.data.id.localeCompare(b.data.id)).slice(0, 6);
+  if (ranked.length === 0) {
+    return <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">No relationship on this page connects two components. That is not proof that nothing connects.</p>;
+  }
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3" aria-label="Strongest recorded links">
+      <h3 className="text-sm font-semibold">Strongest links on this page</h3>
+      <ul className="mt-2 flex flex-col gap-1">
+        {ranked.map((e) => (
+          <li key={e.data.id}>
+            <button type="button" onClick={() => e.data.source && onPick(e.data.source)} className="tap w-full break-words rounded-md border border-line bg-canvas px-2 text-left text-sm">
+              <span className="font-medium">{nameOf(e.data.source)}</span>
+              <span className="text-muted"> {e.data.label} to </span>
+              <span className="font-medium">{nameOf(e.data.target)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-ink-2">A count of recorded relationships, not a new claim. Select a component to read every link that touches it.</p>
     </div>
   );
 }
