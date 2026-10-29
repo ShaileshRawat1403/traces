@@ -8,6 +8,8 @@ import { GraphCanvas, RecordedLinks } from "../graph/GraphCanvas";
 import { componentRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
 import { CODE_LAYERS, LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
+import { useSubject } from "../subject/useSubject";
+import { withAt } from "../subject/subject";
 
 /** The opening picture: stored components, and counts of recorded relationships between them. */
 export function SystemMap() {
@@ -19,6 +21,11 @@ export function SystemMap() {
   const comps = useQuery({ queryKey: ["view", "components", repoId, sha], queryFn: () => api.components(repoId, sha) });
   const graph = useQuery({ queryKey: ["graph", repoId, sha, query], queryFn: () => api.graph(repoId, sha, query) });
   const [selected, setSelected] = useState<string | null>(null);
+  const { subject, setSubject } = useSubject();
+  const subjectId = subject?.kind === "component" ? subject.id : null;
+  useEffect(() => {
+    if (subjectId) setSelected(subjectId);
+  }, [subjectId]);
   const [scope, setScope] = useState<"core" | "all">("core");
   const [narrow, setNarrow] = useState(false);
   const [layerPick, setLayerPick] = useState<string | null>(null);
@@ -32,6 +39,15 @@ export function SystemMap() {
   const components = comps.data ?? [];
   const diagram = useMemo(() => (graph.data ? openingDiagram(components, graph.data) : []), [graph.data, components]);
   const nodes = diagram.filter((e) => !e.data.source);
+  const pick = (id: string | null) => {
+    setSelected(id);
+    if (!id) {
+      setSubject(null);
+      return;
+    }
+    const node = nodes.find((n) => n.data.id === id);
+    setSubject({ kind: "component", id, label: node?.data.label ?? id });
+  };
   const core = (layer: string | undefined) => isLayer(layer) && CODE_LAYERS[layer];
   const many = nodes.length > 12 && nodes.some((n) => core(n.data.layer));
   const layersOnMap = LAYERS.filter((l) => nodes.some((n) => n.data.layer === l));
@@ -89,7 +105,7 @@ export function SystemMap() {
                     <button
                       type="button"
                       aria-pressed={selected === n.data.id}
-                      onClick={() => setSelected(selected === n.data.id ? null : n.data.id)}
+                      onClick={() => pick(selected === n.data.id ? null : n.data.id)}
                       className={`flex min-h-11 w-full items-start gap-3 border-b border-white/8 px-1 py-3 text-left text-ink ${selected === n.data.id ? "bg-white/[0.04]" : ""}`}
                     >
                       <span className="mt-1 h-7 w-0.5 shrink-0 rounded-full" style={{ background: layerColor(n.data.layer) }} aria-hidden="true" />
@@ -119,8 +135,13 @@ export function SystemMap() {
             elements={shown}
             layout="map"
             selected={selected}
-            onSelect={setSelected}
-            onExpand={(id) => navigate(`${base}/graph?focus=${encodeURIComponent(id)}`)}
+            onSelect={pick}
+            onExpand={(id) => {
+              const node = nodes.find((n) => n.data.id === id);
+              const next = { kind: "component" as const, id, label: node?.data.label ?? id };
+              setSubject(next);
+              navigate(withAt(`${base}/graph?focus=${encodeURIComponent(id)}`, next));
+            }}
             onEdge={() => undefined}
             describe={(id) => {
               const n = nodes.find((x) => x.data.id === id)?.data;
@@ -140,9 +161,9 @@ export function SystemMap() {
           ) : null}
         </div>
         {selectedNode ? (
-          <MapInspector node={selectedNode.data} components={components} rolls={rolls} base={base} onClear={() => setSelected(null)} onPick={setSelected} />
+          <MapInspector node={selectedNode.data} components={components} rolls={rolls} base={base} onClear={() => pick(null)} onPick={pick} />
         ) : (
-          <RecordedLinks rolls={allRolls} nameOf={(id) => components.find((c) => c.id === id)?.name ?? id ?? ""} onPick={setSelected} />
+          <RecordedLinks rolls={allRolls} nameOf={(id) => components.find((c) => c.id === id)?.name ?? id ?? ""} onPick={pick} />
         )}
       </div>
     </section>
@@ -165,6 +186,8 @@ function MapInspector({
   onPick: (id: string) => void;
 }) {
   const comp = components.find((c) => c.id === node.id);
+  const { subject } = useSubject();
+  const to = (href: string) => withAt(href, subject);
   return (
     <div className="mt-2 border-t border-white/10 pt-3" aria-label="Selected component">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -191,17 +214,17 @@ function MapInspector({
         <p className="mt-2 text-sm text-ink-2">No relationship on this page leaves this component. That is not proof that nothing connects.</p>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
-        <Link to={`${base}/graph?focus=${encodeURIComponent(node.id)}`} className="tap inline-flex items-center rounded-md bg-ink px-3 text-sm font-medium text-canvas no-underline hover:no-underline">
+        <Link to={to(`${base}/graph?focus=${encodeURIComponent(node.id)}`)} className="tap inline-flex items-center rounded-md bg-ink px-3 text-sm font-medium text-canvas no-underline hover:no-underline">
           Open on the graph
         </Link>
-        <Link to={`${base}/trace`} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
+        <Link to={to(`${base}/trace`)} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
           Follow a recorded flow
         </Link>
-        <Link to={`${base}/history?component=${encodeURIComponent(node.id)}`} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
+        <Link to={to(`${base}/history?component=${encodeURIComponent(node.id)}`)} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
           History
         </Link>
         {askHref(base, comp?.paths ?? []) ? (
-          <Link to={askHref(base, comp?.paths ?? [])!} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
+          <Link to={to(askHref(base, comp?.paths ?? [])!)} className="tap inline-flex items-center rounded-md border border-line-strong px-3 text-sm text-ink no-underline">
             Ask
           </Link>
         ) : null}

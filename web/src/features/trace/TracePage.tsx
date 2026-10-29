@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type RouteItem } from "../../api/client";
 import { useCapability } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { Button, ErrorState, Loading, PageHeader } from "../../ui/States";
 import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
+import { decodeSubject, withAt } from "../subject/subject";
 import { TraceView } from "./TraceView";
 import { UserFlow } from "./UserFlow";
 
@@ -17,6 +18,13 @@ export function TracePage() {
   const [f, setF] = useState(from);
   const [t, setT] = useState(to);
   const ids = { f: useId(), t: useId() };
+  const at = sp.get("at");
+  useEffect(() => {
+    if (from) return;
+    const s = decodeSubject(at);
+    if (s?.kind === "symbol") setF(s.id);
+    else if (s?.kind === "route" && s.handler) setF(s.handler);
+  }, [at, from]);
   const cap = useCapability("trace");
   const q = useQuery({ queryKey: ["trace", repoId, sha, from, to], queryFn: () => api.trace(repoId, sha, from, to || undefined), enabled: !!from });
   const claim = sp.get("claim");
@@ -32,6 +40,7 @@ export function TracePage() {
     const n = new URLSearchParams();
     if (f.trim()) n.set("from", f.trim());
     if (t.trim()) n.set("to", t.trim());
+    if (at) n.set("at", at);
     setSp(n);
   };
   return (
@@ -86,7 +95,7 @@ function RecordedStarts({ repoId, sha }: { repoId: string; sha: string }) {
       <ul className="mt-3 border-t border-white/10">
         {shown.map((r) => (
           <li key={routeKey(r)}>
-            <Link to={`${base}/trace?from=${encodeURIComponent(r.handler_symbol!)}`} className="flex min-h-11 items-center gap-3 border-b border-white/8 py-2 text-ink no-underline hover:no-underline">
+            <Link to={withAt(`${base}/trace?from=${encodeURIComponent(r.handler_symbol!)}`, { kind: "route", method: r.method, path: r.path, handler: r.handler_symbol! })} className="flex min-h-11 items-center gap-3 border-b border-white/8 py-2 text-ink no-underline hover:no-underline">
               <span className="w-14 shrink-0 font-mono text-[12px] text-verified">{r.method}</span>
               <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{r.path || "(path not recorded)"}</span>
               <span className="shrink-0 text-[12px] text-muted">Trace</span>

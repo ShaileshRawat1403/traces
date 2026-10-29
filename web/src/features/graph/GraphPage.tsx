@@ -12,6 +12,8 @@ import { EvidenceDrawer } from "../evidence/EvidenceDrawer";
 import { GraphCanvas, RecordedLinks } from "./GraphCanvas";
 import { CODE_LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
+import { withAt } from "../subject/subject";
+import { useSubject } from "../subject/useSubject";
 import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
@@ -162,6 +164,8 @@ function SelectionPanel({
   onClear: () => void;
 }) {
   const node = data.nodes.find((n) => n.id === selected) ?? componentNode(selected, components);
+  const { subject } = useSubject();
+  const to = (href: string) => withAt(href, subject);
   if (!node) return null;
   const { edges } = drawableEdges(data);
   const mine = edges.filter((e) => e.source === selected || e.target === selected);
@@ -198,11 +202,11 @@ function SelectionPanel({
         <Button onClick={onClear}>Clear selection</Button>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-        <Link to={node.entity === "component" ? `${base}/trace` : `${base}/trace?from=${encodeURIComponent(node.id)}`}>Follow a recorded flow</Link>
-        <Link to={node.entity === "component" ? `${base}/history?component=${encodeURIComponent(node.id)}` : node.file ? `${base}/history?path=${encodeURIComponent(node.file)}` : `${base}/history`}>History</Link>
-        {node.file ? <Link to={`${base}/source?path=${encodeURIComponent(node.file)}`}>Open source</Link> : null}
+        <Link to={node.entity === "component" ? to(`${base}/trace`) : to(`${base}/trace?from=${encodeURIComponent(node.id)}`)}>Follow a recorded flow</Link>
+        <Link to={node.entity === "component" ? to(`${base}/history?component=${encodeURIComponent(node.id)}`) : node.file ? to(`${base}/history?path=${encodeURIComponent(node.file)}`) : to(`${base}/history`)}>History</Link>
+        {node.file ? <Link to={to(`${base}/source?path=${encodeURIComponent(node.file)}`)}>Open source</Link> : null}
         {askHref(base, node.entity === "symbol" ? [node.id, node.label] : [node.file ?? "", node.label]) ? (
-          <Link to={askHref(base, node.entity === "symbol" ? [node.id, node.label] : [node.file ?? "", node.label])!}>Ask</Link>
+          <Link to={to(askHref(base, node.entity === "symbol" ? [node.id, node.label] : [node.file ?? "", node.label])!)}>Ask</Link>
         ) : null}
       </div>
       <h3 className="mt-3 text-sm font-semibold">Relationships shown ({mine.length})</h3>
@@ -386,10 +390,19 @@ export default function GraphPage() {
     const incident = drawableEdges(graph.data).edges.some((e) => e.source === selected || e.target === selected);
     if (!incident) setSelected(null);
   }, [graph.data, selected]);
+  const { setSubject } = useSubject();
   const choose = useCallback((id: string | null) => {
     picked.current = true;
     setSelected(id);
-  }, []);
+    if (!id) {
+      setSubject(null);
+      return;
+    }
+    const comp = components.find((c) => c.id === id);
+    if (comp || id.startsWith("component::")) setSubject({ kind: "component", id, label: comp?.name ?? id });
+    else if (id.startsWith("file::")) setSubject({ kind: "file", path: id.slice("file::".length) });
+    else if (id.includes("::")) setSubject({ kind: "symbol", id, label: id.split("::").pop() || id });
+  }, [components, setSubject]);
 
   const setState = (s: GraphState) => setSp(writeGraphState(s, sp));
   const setParam = (k: string, v: string | null) =>

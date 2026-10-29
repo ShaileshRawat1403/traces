@@ -21,10 +21,11 @@ describe("graph URL state and query", () => {
   });
   it("round-trips through the URL, keeps view and claim, and distinguishes an empty status selection", () => {
     const s = { focus: "a.ts::A", depth: 3, layer: ["frontend", "api"], rel: ["renders"], status: [] as never[], q: "task", limit: 300 };
-    const keep = new URLSearchParams("view=list&claim=c_1&junk=1");
+    const keep = new URLSearchParams("view=list&claim=c_1&at=component%0Ax&junk=1");
     const sp = writeGraphState(s, keep);
     expect(sp.get("view")).toBe("list");
     expect(sp.get("claim")).toBe("c_1");
+    expect(sp.get("at")).toBe("component\nx");
     expect(sp.has("junk")).toBe(false);
     expect(readGraphState(sp)).toEqual(s);
     const q = new URLSearchParams(graphQuery(s).slice(1));

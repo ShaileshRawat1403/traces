@@ -1,9 +1,11 @@
-import { useMutation } from "@tanstack/react-query";
-import { useId, useState, type FormEvent } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../api/client";
-import { useHead, useRepo, useSnapshots } from "../../api/queries";
+import { keys, useHead, useRepo, useSnapshots } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
+import { isTerminal, stepViews } from "../jobs/phases";
+import { useJob } from "../jobs/useJob";
 import { Button, Empty, ErrorState, Loading, PageHeader } from "../../ui/States";
 
 function HeadStatus({ repoId }: { repoId: string }) {
@@ -34,6 +36,55 @@ function CompareNewest({ repoId, snaps }: { repoId: string; snaps: { sha: string
   );
 }
 
+function jobStoreKey(repoId: string) {
+  return `traces-index-job:${repoId}`;
+}
+
+function IndexRun({ repoId, jobId }: { repoId: string; jobId: string }) {
+  const qc = useQueryClient();
+  const q = useJob(jobId);
+  const job = q.data?.job;
+  useEffect(() => {
+    if (job && isTerminal(job)) void qc.invalidateQueries({ queryKey: keys.snapshots(repoId) });
+  }, [job, qc, repoId]);
+  if (q.isPending) return <p className="mt-3 text-sm text-muted">Reading the index job.</p>;
+  if (q.isError || !job) return <ErrorState error={q.error} what="Index job" />;
+  const steps = stepViews(job);
+  const current = steps.find((s) => s.state === "active") ?? steps.find((s) => s.state === "failed");
+  const [idRepo, sha] = (job.snapshot_id ?? "").split("@");
+  const done = job.state === "succeeded" && idRepo && sha;
+  return (
+    <div className="mt-4" aria-live="polite">
+      <p className="text-sm font-medium">{done ? "Indexing finished" : job.state === "failed" ? "Indexing failed" : job.state === "cancelled" ? "Indexing cancelled" : `Indexing: ${current?.title ?? job.phase}`}</p>
+      <ol className="mt-2 flex gap-1" aria-label="Index steps">
+        {steps.map((s) => (
+          <li key={s.phase} className="min-w-0 flex-1">
+            <span
+              className={`block h-1.5 rounded-full ${s.state === "done" ? "bg-verified" : s.state === "active" ? "bg-ink" : s.state === "failed" ? "bg-rejected" : "bg-white/10"}`}
+            />
+            <span className="sr-only">
+              {s.title}, {s.state}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-[13px] text-muted">{current?.help ?? (done ? "The snapshot is pinned to this commit. Opening it does not re-run the repository." : job.message ?? "")}</p>
+      {job.error ? (
+        <p className="mt-2 text-sm text-rejected" role="alert">
+          {job.error.code}: {job.error.message}
+        </p>
+      ) : null}
+      {done ? (
+        <p className="mt-3">
+          <Link to={snapshotBase(idRepo, sha)} className="tap inline-flex items-center rounded-md bg-ink px-3 text-sm font-medium text-canvas no-underline hover:no-underline">
+            Open the snapshot
+          </Link>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function OpenJob() {
   const nav = useNavigate();
   const [id, setId] = useState("");
@@ -59,12 +110,25 @@ function OpenJob() {
 
 export function RepoPage() {
   const { repoId = "" } = useParams();
-  const nav = useNavigate();
   const repo = useRepo(repoId);
   const snaps = useSnapshots(repoId);
+  const [jobId, setJobId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(jobStoreKey(repoId));
+    } catch {
+      return null;
+    }
+  });
   const start = useMutation({
     mutationFn: () => api.startIndex(repoId, { reindex: false }),
-    onSuccess: (job) => nav(`/jobs/${encodeURIComponent(job.id)}`),
+    onSuccess: (job) => {
+      try {
+        sessionStorage.setItem(jobStoreKey(repoId), job.id);
+      } catch {
+        /* the progress still shows for this visit */
+      }
+      setJobId(job.id);
+    },
   });
 
   return (
@@ -141,6 +205,7 @@ export function RepoPage() {
               {start.isPending ? "Starting" : "Index latest commit"}
             </Button>
           </div>
+          {jobId ? <IndexRun repoId={repoId} jobId={jobId} /> : null}
           {start.isError ? (
             <div className="mt-3">
               <ErrorState error={start.error} what="Indexing" />

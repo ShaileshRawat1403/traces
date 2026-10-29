@@ -16,20 +16,26 @@ export function BarChart({ title, bars, unit, max }: { title: string; bars: read
   const cap = useId();
   const top = max ?? Math.max(0, ...bars.map((b) => b.value ?? 0));
   const shown = bars.filter((b) => b.value !== null);
-  const row = 22;
   return (
-    <figure className="rounded-lg border border-line bg-surface p-3" aria-labelledby={cap} data-testid="bar-chart">
+    <figure className="min-w-0 max-w-full overflow-hidden rounded-lg border border-line bg-surface p-3" aria-labelledby={cap} data-testid="bar-chart">
       <figcaption id={cap} className="text-sm font-semibold">
         {title}
       </figcaption>
       {shown.length > 0 && top > 0 ? (
-        <svg className="mt-2 w-full" viewBox={`0 0 100 ${shown.length * row}`} preserveAspectRatio="none" height={shown.length * row} aria-hidden="true" focusable="false">
-          {shown.map((b, i) => (
-            <rect key={b.id} x={0} y={i * row + 4} height={row - 8} width={Math.max(0.5, ((b.value ?? 0) / top) * 100)} className="fill-accent" rx={1} />
+        <ul className="mt-3 flex min-w-0 flex-col gap-2" aria-hidden="true">
+          {shown.map((b) => (
+            <li key={b.id} className="min-w-0">
+              <span className="block max-w-full truncate font-mono text-xs text-ink">{b.label}</span>
+              <span className="mt-1 block h-2 overflow-hidden rounded-full bg-white/10">
+                <span className="block h-2 rounded-full bg-observed" style={{ width: `${Math.max(4, ((b.value ?? 0) / top) * 100)}%` }} />
+              </span>
+              <span className="mt-1 block break-words text-xs text-ink-2">{b.display}</span>
+            </li>
           ))}
-        </svg>
+        </ul>
       ) : null}
-      <table className="mt-2 w-full text-left text-sm">
+      <div className="relative h-0 overflow-hidden">
+      <table className="sr-only">
         <caption className="sr-only">{title}, as a table</caption>
         <thead className="text-xs text-muted">
           <tr>
@@ -52,6 +58,7 @@ export function BarChart({ title, bars, unit, max }: { title: string; bars: read
           ))}
         </tbody>
       </table>
+      </div>
     </figure>
   );
 }

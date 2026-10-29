@@ -69,7 +69,7 @@ describe("history renderers", () => {
       />,
     );
     const fig = screen.getByRole("figure", { name: "Degree" });
-    expect(fig.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(fig.querySelector("[aria-hidden='true']")).toBeTruthy();
     const rows = within(fig).getAllByRole("row");
     expect(rows[1]!.textContent).toContain("18 of 19 commits");
     expect(rows[2]!.textContent).toContain("not reported");

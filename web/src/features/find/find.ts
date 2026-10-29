@@ -1,4 +1,5 @@
 import { recordedQuestion } from "../ask/recordedQuestion";
+import { withAt } from "../subject/subject";
 
 export interface FindComponent {
   id: string;
@@ -48,7 +49,7 @@ export function findInSnapshot(query: string, components: readonly FindComponent
   for (const c of components) {
     const rank = score(c.name, q);
     if (rank !== null) {
-      push(rank, { id: `component:${c.id}`, kind: "component", title: c.name, detail: c.layer, href: `${base}/graph?focus=${encodeURIComponent(c.id)}` });
+      push(rank, { id: `component:${c.id}`, kind: "component", title: c.name, detail: c.layer, href: withAt(`${base}/graph?focus=${encodeURIComponent(c.id)}`, { kind: "component", id: c.id, label: c.name }) });
     }
   }
 
@@ -59,7 +60,7 @@ export function findInSnapshot(query: string, components: readonly FindComponent
       const rank = score(p, q);
       if (rank === null) continue;
       files.add(p);
-      push(rank + 0.2, { id: `file:${p}`, kind: "file", title: p, detail: "file", href: `${base}/source?path=${encodeURIComponent(p)}` });
+      push(rank + 0.2, { id: `file:${p}`, kind: "file", title: p, detail: "file", href: withAt(`${base}/source?path=${encodeURIComponent(p)}`, { kind: "file", path: p }) });
     }
   }
 
@@ -74,7 +75,7 @@ export function findInSnapshot(query: string, components: readonly FindComponent
         kind: "route",
         title: r.method === "UNKNOWN" ? r.path || "(path not recorded)" : label,
         detail: question ? "ask" : "route",
-        href: question ? `${base}/ask?q=${encodeURIComponent(question)}` : `${base}/routes?q=${encodeURIComponent(r.path)}`,
+        href: withAt(question ? `${base}/ask?q=${encodeURIComponent(question)}` : `${base}/routes?q=${encodeURIComponent(r.path)}`, { kind: "route", method: r.method, path: r.path, handler: r.handler_symbol ?? "" }),
       });
     }
     if (r.handler_symbol && !handlers.has(r.handler_symbol)) {
@@ -87,7 +88,10 @@ export function findInSnapshot(query: string, components: readonly FindComponent
           kind: "handler",
           title: r.handler_symbol,
           detail: "handler",
-          href: question ? `${base}/ask?q=${encodeURIComponent(question)}` : `${base}/trace?from=${encodeURIComponent(r.handler_symbol)}`,
+          href: withAt(
+            question ? `${base}/ask?q=${encodeURIComponent(question)}` : `${base}/trace?from=${encodeURIComponent(r.handler_symbol)}`,
+            { kind: "symbol", id: r.handler_symbol, label: r.handler_symbol.split("::").pop() || r.handler_symbol },
+          ),
         });
       }
     }

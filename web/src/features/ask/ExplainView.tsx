@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { ExplainResponse } from "../../api/client";
 import { StandingChip, factStanding } from "../../ui/Facts";
 import { StatusChip } from "../../ui/StatusChip";
+import { withAt } from "../subject/subject";
 
 function Meter({ label, n, total, cls }: { label: string; n: number; total: number; cls: string }) {
   const pct = total === 0 ? 0 : Math.round((n / total) * 100);
@@ -63,20 +64,51 @@ function Cites({ ids, base, citations }: { ids: readonly string[]; base: string;
   );
 }
 
+function citedInOrder(r: ExplainResponse): string[] {
+  const files: string[] = [];
+  const seen = new Set<string>();
+  const add = (file: string | null | undefined) => {
+    if (!file || seen.has(file)) return;
+    seen.add(file);
+    files.push(file);
+  };
+  for (const fact of r.answer) {
+    for (const id of fact.claim_ids ?? []) add(r.citations.find((c) => c.claim_id === id)?.file);
+  }
+  if (files.length === 0) for (const c of r.citations) add(c.file);
+  return files;
+}
+
 function CitedFiles({ r, base }: { r: ExplainResponse; base: string }) {
-  const files = [...new Set(r.citations.map((c) => c.file).filter((f): f is string => !!f))];
+  const files = citedInOrder(r);
   if (files.length === 0) return null;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1" aria-label="Cited files on the graph">
-      <span className="mr-1 text-xs text-muted">In the architecture</span>
-      {files.slice(0, 8).map((file) => {
-        const name = file.split("/").pop() || file;
-        return (
-          <Link key={file} to={`${base}/graph?q=${encodeURIComponent(name)}`} className="tap-sm inline-flex max-w-full items-center truncate rounded-md border border-line bg-canvas px-2 font-mono text-xs text-ink no-underline">
-            {name}
-          </Link>
-        );
-      })}
+    <div className="mt-4">
+      <h3 className="text-sm font-medium">Files this answer cites</h3>
+      <p className="mt-1 text-xs text-muted">In the order the answer uses them. The line is that order, not a call, and not a relationship the extractor did not record.</p>
+      <ol className="mt-2" aria-label="Cited files on the graph">
+        {files.slice(0, 8).map((file, i) => {
+          const name = file.split("/").pop() || file;
+          return (
+            <li key={file} className="flex gap-3">
+              <span className="flex w-3 flex-col items-center" aria-hidden="true">
+                <span className={`w-px flex-1 ${i === 0 ? "bg-transparent" : "bg-verified"}`} />
+                <span className="h-2 w-2 shrink-0 rounded-full bg-verified" />
+                <span className={`w-px flex-1 ${i === Math.min(files.length, 8) - 1 ? "bg-transparent" : "bg-verified"}`} />
+              </span>
+              <Link
+                to={withAt(`${base}/graph?q=${encodeURIComponent(name)}`, { kind: "file", path: file })}
+                className="flex min-h-11 min-w-0 flex-1 items-center py-1 font-mono text-sm text-ink no-underline hover:no-underline"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate">{name}</span>
+                  <span className="block truncate text-xs text-muted">{file}</span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

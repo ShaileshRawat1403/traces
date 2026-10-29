@@ -62,7 +62,7 @@ export function readGraphState(sp: URLSearchParams): GraphState {
 
 export function writeGraphState(s: GraphState, keep?: URLSearchParams): URLSearchParams {
   const n = new URLSearchParams();
-  for (const k of ["view", "claim"]) {
+  for (const k of ["view", "claim", "at"]) {
     const v = keep?.get(k);
     if (v) n.set(k, v);
   }
