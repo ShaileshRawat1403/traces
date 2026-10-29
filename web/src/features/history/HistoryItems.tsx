@@ -52,21 +52,24 @@ export function HistoryItem({ item, x, onEvidence, children, eyebrow }: { item: 
   const note = historyNote(item.class, item.status);
   const who = (item.from_symbol ?? "").replace(/^(file|component|commit|dep|repo)::/, "");
   return (
-    <li className="flex flex-col gap-1 pb-3" data-testid="history-item" data-class={item.class}>
-      {eyebrow}
-      <span className="flex flex-wrap items-center gap-2">
-        <StatusChip status={item.status} label={item.label} flags={item.flags} qualifier={item.qualifier} context={item.status === "rejected" ? "reviewer" : "default"} />
-        {item.kind ? <span className="text-xs text-muted">{item.kind.replace(/_/g, " ")}</span> : null}
-        {who ? <span className="history-pill">{who}</span> : null}
-      </span>
+    <li className="flex flex-col gap-1 pb-4" data-testid="history-item" data-class={item.class}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {eyebrow ?? (who ? <p className="truncate font-mono text-[13px] text-ink">{who}</p> : null)}
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            <StatusChip status={item.status} label={item.label} flags={item.flags} qualifier={item.qualifier} context={item.status === "rejected" ? "reviewer" : "default"} />
+            {item.kind ? <span className="text-xs text-muted">{item.kind.replace(/_/g, " ")}</span> : null}
+          </span>
+        </div>
+        <Button className="shrink-0" onClick={() => onEvidence(item.claim_id)}>
+          Open evidence
+        </Button>
+      </div>
       <p className="break-words text-sm text-ink-2">{item.statement}</p>
       {note ? <p className="text-xs font-medium text-ink-2">{note}</p> : null}
       <Commits x={x} />
       <ReviewState x={x} />
       {children}
-      <Button className="mt-1 self-start" onClick={() => onEvidence(item.claim_id)}>
-        Open evidence
-      </Button>
     </li>
   );
 }

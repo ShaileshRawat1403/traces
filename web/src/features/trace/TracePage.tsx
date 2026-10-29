@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import { api } from "../../api/client";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { api, type RouteItem } from "../../api/client";
 import { useCapability } from "../../api/queries";
 import { snapshotBase } from "../../app/nav";
 import { Button, ErrorState, Loading, PageHeader } from "../../ui/States";
@@ -43,6 +43,7 @@ export function TracePage() {
         </p>
       ) : null}
       {from ? null : <UserFlow repoId={repoId} sha={sha} onEvidence={setClaim} />}
+      {from ? null : <RecordedStarts repoId={repoId} sha={sha} />}
       <form onSubmit={submit} className="mb-4 grid gap-3 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <div className="flex flex-col">
           <label htmlFor={ids.f} className="text-sm font-medium">
@@ -70,4 +71,38 @@ export function TracePage() {
       <EvidenceDrawer repoId={repoId} sha={sha} claimId={claim} onClose={() => setClaim(null)} />
     </>
   );
+}
+
+function RecordedStarts({ repoId, sha }: { repoId: string; sha: string }) {
+  const routes = useQuery({ queryKey: ["view", "routes", repoId, sha], queryFn: () => api.routes(repoId, sha) });
+  const base = snapshotBase(repoId, sha);
+  const starts = (routes.data ?? []).filter((r) => r.handler_symbol && r.method !== "UNKNOWN" && r.method !== "USE");
+  if (!starts.length) return null;
+  const shown = starts.slice(0, 12);
+  return (
+    <section className="mb-5" aria-label="Recorded routes you can trace">
+      <h2 className="text-sm font-medium tracking-[-0.02em]">Start from a recorded route</h2>
+      <p className="mt-1 max-w-2xl text-[13px] text-muted">Each row is a route this snapshot stored. Tracing follows that handler. It does not fill in steps that were not recorded.</p>
+      <ul className="mt-3 border-t border-white/10">
+        {shown.map((r) => (
+          <li key={routeKey(r)}>
+            <Link to={`${base}/trace?from=${encodeURIComponent(r.handler_symbol!)}`} className="flex min-h-11 items-center gap-3 border-b border-white/8 py-2 text-ink no-underline hover:no-underline">
+              <span className="w-14 shrink-0 font-mono text-[12px] text-verified">{r.method}</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{r.path || "(path not recorded)"}</span>
+              <span className="shrink-0 text-[12px] text-muted">Trace</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {starts.length > shown.length ? (
+        <p className="mt-2 text-xs text-muted">
+          {starts.length - shown.length} more routes are on the <Link to={`${base}/routes`}>routes page</Link>.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function routeKey(r: RouteItem) {
+  return `${r.claim_id ?? r.path}-${r.method}-${r.handler_symbol ?? ""}`;
 }

@@ -205,6 +205,18 @@ export function cochangeText(i: ClaimSummary, x: HistoryExtras | undefined): str
   return i.qualifier ?? "count not reported";
 }
 
+function Together({ x }: { x: HistoryExtras | undefined }) {
+  const support = metric(x, "support");
+  const union = metric(x, "union_commits");
+  if (support === null || union === null || union <= 0) return null;
+  const pct = Math.max(0, Math.min(100, (support / union) * 100));
+  return (
+    <span className="mt-1 block h-1.5 max-w-xs overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+      <span className="block h-1.5 rounded-full bg-observed" style={{ width: `${pct}%` }} />
+    </span>
+  );
+}
+
 function Cochange({ repoId, sha, onEvidence }: PanelProps) {
   const [sp, set] = useParam();
   const level = sp.get("level") === "component" ? "component" : "file";
@@ -263,6 +275,7 @@ function Cochange({ repoId, sha, onEvidence }: PanelProps) {
                       <p className="text-xs" data-testid="cochange-text">
                         {cochangeText(i, recs.get(i.claim_id))}. History pattern.
                       </p>
+                      <Together x={recs.get(i.claim_id)} />
                     </HistoryItem>
                   );
                 })}
