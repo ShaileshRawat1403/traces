@@ -1,0 +1,106 @@
+"""Hook points between the index worker / API and the history module.
+
+The history module's own contract is docs/contracts/history.md (Traces History seat, its own PR); that document
+is authoritative for history's public API. This file pins only what other seats call or inject, so the worker and
+API can be written against it before history lands. The History seat may move these names into its package as long
+as the signatures below keep working (CONTRACTS.md section 6).
+
+H1  index worker -> history:  HistoryRunner.run(repo=HistoryRepoRef(clone path, sha), config=..., budget=..., ...)
+H2  evidence -> history:      ComponentMap (traces.evidence.types) passed as `components`
+H3  history -> index worker:  select_milestones(...) returns SHAs; the worker runs the evidence pipeline at each
+                              and passes the resulting EvidenceSets back as `evidence_sets`
+H4  API/ingest -> history:    PrContextProvider (cached PR JSON); history never touches the network or tokens
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Protocol
+
+from traces.evidence.types import ComponentMap, EvidenceRecord, EvidenceSet, Sha
+
+if TYPE_CHECKING:  # annotations only; avoids an import cycle with the history package
+    from traces.history.config import HistoryConfig
+    from traces.history.runner import RunBudget
+
+
+@dataclass(frozen=True)
+class HistoryRepoRef:
+    path: Path      # local clone or bare mirror with full history (made by traces.ingest.fetch)
+    repo: str       # "owner/name"
+    sha: Sha        # pinned analysis commit
+
+
+@dataclass(frozen=True)
+class CachedComment:
+    id: int
+    body: str
+    path: str | None
+    commit_id: Sha | None
+
+
+@dataclass(frozen=True)
+class CachedPr:
+    number: int
+    merge_commit_sha: Sha | None
+    body: str | None
+    review_comments: Sequence[CachedComment]
+    source_artifact: str     # cache path, relative to TRACES_CACHE_DIR
+    sha256: str              # of the cached JSON artifact
+    fetched_at: str
+
+
+class PrContextProvider(Protocol):
+    """Implemented by the API/ingest layer (GitHub client, token, cache, rate limits); injected into history."""
+    def get(self, pr_number: int) -> CachedPr | None: ...
+
+    def artifact_bytes(self, pr_number: int) -> bytes | None:
+        """Optional (Architect1, 2026-10-21): the exact bytes of the cached JSON artifact for `pr_number`, whose
+        sha256 is CachedPr.sha256, so history can verify it and quote_match against it. Default None means "not
+        offered": that PR's records stay unvalidated with the reason. Providers that subclass this Protocol inherit
+        the default; structural providers without the method are accepted at runtime (history looks it up with
+        getattr), so existing providers keep working unchanged."""
+        return None
+
+
+@dataclass(frozen=True)
+class Milestone:
+    sha: Sha
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HistoryResult:
+    records: Sequence[EvidenceRecord]   # traces-evidence/0.4, evidence_scope history|documented, sorted by claim_id
+    report: Mapping[str, Any]
+
+
+class HistoryRunner(Protocol):
+    """Hook H1. `config` and `budget` default to the runner's own (set at construction); a `config` passed here
+    must be the same one used for select_milestones, or the evidence_sets keys will not match (E_EVIDENCE_SET).
+    `max_milestones` may be lower than the runner's cap, never higher (E_CONFIG)."""
+
+    def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
+                          components: ComponentMap | None = None,
+                          config: HistoryConfig | None = None) -> Sequence[Milestone]: ...
+
+    def run(self, repo: HistoryRepoRef, *, config: HistoryConfig | None = None, budget: RunBudget | None = None,
+            components: ComponentMap | None = None,
+            evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
+            pr_provider: PrContextProvider | None = None, cache_dir: Path | None = None) -> HistoryResult: ...
+
+
+class NotImplementedHistory:
+    """Placeholder until the History seat merges; every call fails explicitly (no fake data)."""
+
+    def select_milestones(self, repo: HistoryRepoRef, *, max_milestones: int = 8,
+                          components: ComponentMap | None = None,
+                          config: HistoryConfig | None = None) -> Sequence[Milestone]:
+        raise NotImplementedError("history: not implemented (owner: Traces History, see docs/contracts/history.md)")
+
+    def run(self, repo: HistoryRepoRef, *, config: HistoryConfig | None = None, budget: RunBudget | None = None,
+            components: ComponentMap | None = None,
+            evidence_sets: Mapping[Sha, EvidenceSet] | None = None,
+            pr_provider: PrContextProvider | None = None, cache_dir: Path | None = None) -> HistoryResult:
+        raise NotImplementedError("history: not implemented (owner: Traces History, see docs/contracts/history.md)")

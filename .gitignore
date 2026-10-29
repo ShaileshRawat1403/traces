@@ -174,3 +174,22 @@ research/**/out/evidence.jsonl
 research/**/out/rule_findings.json
 research/**/step1/logs/
 research/**/review/audit/ct_rerun/
+
+# Traces local data and caches (never committed)
+.traces-data/
+.cache/
+toolchain/node_modules/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+.env
+.env.*

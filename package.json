@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "Repo-level Node scripts (the TypeScript validators and the isolation probe) are CommonJS. web/ has its own package.json and stays ESM. Without this file, a parent package.json with type module would make those scripts fail to load."
+}
