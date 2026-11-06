@@ -351,6 +351,59 @@
     "title": "Component",
     "type": "object"
    },
+   "ComponentLink": {
+    "additionalProperties": false,
+    "description": "A count of stored relationships between two components. Not a claim and not a new relationship.",
+    "properties": {
+     "count": {
+      "description": "stored static relationships from source to target after the status filter and before the page limit",
+      "title": "Count",
+      "type": "integer"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "relationship_kind when every counted relationship has that kind; null when the kinds differ",
+      "title": "Kind"
+     },
+     "source": {
+      "description": "component id",
+      "title": "Source",
+      "type": "string"
+     },
+     "status": {
+      "description": "weakest status among the counted relationships",
+      "enum": [
+       "verified",
+       "observed",
+       "unvalidated",
+       "missing_location",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "target": {
+      "description": "component id",
+      "title": "Target",
+      "type": "string"
+     }
+    },
+    "required": [
+     "source",
+     "target",
+     "count",
+     "status"
+    ],
+    "title": "ComponentLink",
+    "type": "object"
+   },
    "ErrorBody": {
     "additionalProperties": false,
     "properties": {
@@ -670,6 +723,14 @@
    "GraphResponse": {
     "additionalProperties": false,
     "properties": {
+     "component_links": {
+      "description": "Counts of stored relationships between different components, for the statuses in this request, before the page limit. Not claims. Empty when the graph is focused, because that picture is symbols.",
+      "items": {
+       "$ref": "#/components/schemas/ComponentLink"
+      },
+      "title": "Component Links",
+      "type": "array"
+     },
      "edges": {
       "items": {
        "$ref": "#/components/schemas/GraphEdge"

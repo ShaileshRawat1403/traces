@@ -148,12 +148,34 @@ def test_graph_hides_rejected_and_history(client):
     assert _id(3) not in ids  # rejected shortcut is not architecture
     assert _id(5) not in ids  # co-change is not a code edge
     assert g["hidden_counts"].get("rejected") == 1
+    assert g["component_links"] == []  # a.py and b.py are the same component; c.py is not a component
     focused = http.get(f"{BASE}/graph", params={"focus": "a.py::foo", "depth": 1, "status": ["verified"]}).json()
     assert {e["id"] for e in focused["edges"]} == {_id(1)}
+    assert focused["component_links"] == []
     assert any(n["id"] == "component::pkg" for n in focused["nodes"])
     by_component = http.get(f"{BASE}/graph", params={"focus": "component::pkg", "depth": 1, "status": ["verified"]}).json()
     assert _id(1) in {e["id"] for e in by_component["edges"]}
+    assert by_component["component_links"] == []
     assert any(n["id"] == "component::pkg" for n in by_component["nodes"])
+
+
+def test_component_links_count_the_snapshot_not_the_page():
+    from traces.evidence.views import _component_links
+
+    edges = []
+    for i in range(5):
+        edges.append({
+            "status": "verified", "relationship_kind": "contains",
+            "from": {"file": "a.py"}, "to": {"file": "a.py"},
+        })
+    edges.append({"status": "unvalidated", "relationship_kind": "calls", "from": {"file": "web/App.tsx"}, "to": {"file": "api/main.py"}})
+    edges.append({"status": "verified", "relationship_kind": "calls", "from": {"file": "web/App.tsx"}, "to": {"file": "api/main.py"}})
+    edges.append({"status": "rejected", "relationship_kind": "calls", "from": {"file": "web/App.tsx"}, "to": {"file": "api/main.py"}})
+    edges.append({"status": "observed", "relationship_kind": "imports", "from": {"file": "web/App.tsx"}, "to": {"file": "api/main.py"}})
+    file_comp = {"a.py": "component::pkg", "web/App.tsx": "component::web", "api/main.py": "component::api"}
+    assert _component_links(edges, file_comp) == [{
+        "source": "component::web", "target": "component::api", "count": 3, "status": "unvalidated", "kind": None,
+    }]
 
 
 def test_trace_uses_library_hop_and_not_the_rejected_shortcut(client):

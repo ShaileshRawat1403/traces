@@ -398,6 +398,41 @@ def _component_of_files(comps: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+def _component_links(edges: list[dict[str, Any]], file_comp: dict[str, str]) -> list[dict[str, Any]]:
+    """Count stored relationships between different components. Rejected rows are not lines. Same-component rows stay out.
+    The weakest status colors the count. This is not a claim."""
+    buckets: dict[tuple[str, str], dict[str, Any]] = {}
+    for rec in edges:
+        if rec.get("status") == "rejected":
+            continue
+        src_file = (rec.get("from") or {}).get("file")
+        dst_file = (rec.get("to") or {}).get("file")
+        src = file_comp.get(src_file) if isinstance(src_file, str) else None
+        dst = file_comp.get(dst_file) if isinstance(dst_file, str) else None
+        if not src or not dst or src == dst:
+            continue
+        row = buckets.get((src, dst))
+        if row is None:
+            row = {"source": src, "target": dst, "count": 0, "status": rec.get("status"), "kinds": {}}
+            buckets[(src, dst)] = row
+        row["count"] += 1
+        kind = rec.get("relationship_kind") or ""
+        row["kinds"][kind] = row["kinds"].get(kind, 0) + 1
+        if _rank_status(rec.get("status")) > _rank_status(row["status"]):
+            row["status"] = rec.get("status")
+    links = []
+    for row in sorted(buckets.values(), key=lambda r: (r["source"], r["target"])):
+        kinds = row["kinds"]
+        links.append({
+            "source": row["source"],
+            "target": row["target"],
+            "count": row["count"],
+            "status": row["status"],
+            "kind": next(iter(kinds)) if len(kinds) == 1 else None,
+        })
+    return links
+
+
 def _entity(ep: dict[str, Any] | None) -> str:
     e = (ep or {}).get("entity") or "symbol"
     return e if e in ENTITIES else "symbol"
@@ -560,8 +595,11 @@ def graph_view(st: Store, snapshot_id: str, *, focus: str | None = None, depth: 
         nodes.append({"id": c["id"], "label": c["name"], "entity": "component", "layer": c["layer"], "file": None, "degree": 0})
     for node in nodes:
         node["degree"] = int(deg.get(str(node["id"]), 0))
+    # Opening-map counts use every status-matched edge, before focus and before the page limit.
+    links = [] if focus else _component_links(edges_all, file_comp)
     return {"snapshot_id": snapshot_id, "nodes": nodes, "edges": edges, "hidden_counts": dict(hidden),
-            "truncated": truncated, "truncated_counts": dict(truncated_counts), "limit": limit}
+            "truncated": truncated, "truncated_counts": dict(truncated_counts), "limit": limit,
+            "component_links": links}
 
 
 def _resolve(query: str, nodes: set[str]) -> str | None:

@@ -44,13 +44,13 @@ test.describe("graph", () => {
     await page.screenshot({ path: `${SHOTS}/${info.project.name}-live.png`, fullPage: true });
   });
 
-  test("contract-shape: components first, keyboard expansion, no rejected, inferred off by default", async ({ page }, info) => {
+  test("contract-shape: components first, keyboard expansion, no rejected, every drawable status on", async ({ page }, info) => {
     const requests: URL[] = [];
     await routeContract(page, requests);
     await page.goto(`${base(snap)}/graph`);
     await expect(page.getByTestId("graph-summary")).toContainText("2 nodes, 1 relationships");
     const first = requests[0]!;
-    expect(first.searchParams.getAll("status")).toEqual(["verified", "observed"]);
+    expect(first.searchParams.getAll("status")).toEqual(["verified", "observed", "unvalidated", "missing_location"]);
     expect(first.searchParams.has("include_rejected")).toBe(false);
     expect(first.searchParams.has("focus")).toBe(false);
     await expectAccessible(page);

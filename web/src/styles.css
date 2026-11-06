@@ -386,6 +386,15 @@
   gap: 0.4rem;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  accent-color: var(--color-ink);
+}
+
 .history-pill {
   max-width: 100%;
   overflow-wrap: anywhere;

@@ -165,7 +165,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
     return ids;
   }, [edges, selected]);
 
-  const [linkScope, setLinkScope] = useState<"near" | "all">("near");
+  const [linkScope, setLinkScope] = useState<"near" | "all">("all");
   const multiLayer = useMemo(() => new Set(nodes.map((n) => n.data.layer).filter(Boolean)).size > 1, [nodes]);
   const neighboring = useCallback(
     (e: { data: ElementData }) => {
@@ -186,17 +186,24 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
   const userScaled = useRef(false);
   const fit = useCallback(() => {
     const el = stageRef.current;
-    if (!el || el.clientWidth < 40) return 1;
-    const top = el.getBoundingClientRect().top;
-    const visible = Math.max(240, window.innerHeight - Math.max(top, 0) - 12);
-    const z = Math.min(1.15, (el.clientWidth - 8) / frame.w, visible / frame.h);
-    return Math.max(0.42, z);
-  }, [frame.w, frame.h]);
+    if (!el || el.clientWidth < 40 || frame.w < 40) return 1;
+    // Fill the preview width. A 1.15 cap left the diagram as a small cluster in a dark field.
+    const z = (el.clientWidth - 16) / frame.w;
+    return Math.min(2.4, Math.max(0.85, z));
+  }, [frame.w]);
 
   useEffect(() => {
     userScaled.current = false;
     setScale(fit());
   }, [fit]);
+
+  useEffect(() => {
+    if (layout !== "map" || userScaled.current) return;
+    const el = stageRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    if (top > 96) window.scrollTo({ top: window.scrollY + top - 72, behavior: "instant" });
+  }, [layout, scale, nodes.length]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -366,7 +373,7 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
                 onClick={() => onSelect(n.data.id)}
                 onDoubleClick={() => onExpand(n.data.id)}
               >
-                <rect width={box.w} height={box.h} rx="10" fill={on ? "#171d28" : "#10141c"} stroke={on ? "#eef1f6" : "rgba(255,255,255,0.14)"} strokeWidth={on ? 1.5 : 1} />
+                <rect width={box.w} height={box.h} rx="10" fill={on ? "#243044" : "#1a2230"} stroke={on ? "#eef1f6" : "rgba(238,241,246,0.38)"} strokeWidth={on ? 1.5 : 1} />
                 <rect x="0" y="8" width="3" height={box.h - 16} rx="1.5" fill={layerColor(n.data.layer)} />
                 <text x={14} y={l2 ? 22 : 30} textAnchor="start" fill="#f4f7fb" fontSize="14" fontFamily={SANS} fontWeight={500}>
                   {l1}
@@ -406,7 +413,7 @@ export function RecordedLinks({
   const ranked = [...rolls].sort((a, b) => linkRank(b.data.label) - linkRank(a.data.label) || a.data.id.localeCompare(b.data.id)).slice(0, 6);
   const max = Math.max(1, ...ranked.map((e) => linkRank(e.data.label)));
   if (ranked.length === 0) {
-    return <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">No relationship on this page connects two components. That is not proof that nothing connects.</p>;
+    return <p className="rounded-lg border border-dashed border-line-strong p-3 text-sm text-ink-2">No stored relationship connects two components for the statuses that are on. That is not proof that nothing connects.</p>;
   }
   return (
     <div aria-label="Strongest recorded links">

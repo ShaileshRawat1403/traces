@@ -17,8 +17,8 @@ export function drawableEdges(data: Pick<GraphResponse, "edges">) {
 
 export const STATUS_FILTERS = ["verified", "observed", "unvalidated", "missing_location"] as const;
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
-/** Unvalidated and missing_location (both "Inferred") are off by default; rejected is never requested. */
-export const DEFAULT_STATUS: readonly StatusFilter[] = ["verified", "observed"];
+/** Every drawable status is on. Rejected is never requested and never drawn. */
+export const DEFAULT_STATUS: readonly StatusFilter[] = [...STATUS_FILTERS];
 export { LAYERS } from "../layers";
 
 export interface GraphState {
@@ -166,6 +166,7 @@ export function openingMap(components: readonly { id: string; name: string; laye
  * Rejected edges are already dropped by drawableEdges. Same-component edges stay off this map;
  * they appear when the component is expanded. The line uses the weakest status in the pair,
  * so a mix is not drawn as verified. Counts are from this graph page, which may be truncated.
+ * The opening map prefers `component_links` from the API, which counts the snapshot before the page limit.
  */
 export function componentRollup(data: GraphResponse, components: readonly Component[]): { data: ElementData }[] {
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
@@ -213,11 +214,40 @@ export function componentRollup(data: GraphResponse, components: readonly Compon
     });
 }
 
-/** Opening picture: stored components in layer bands, with page-level relationship counts between them. */
+type ComponentLink = NonNullable<GraphResponse["component_links"]>[number];
+
+/** Opening picture: stored components, with snapshot-level counts between them when the API sent them. */
+export function componentLinkElements(links: readonly ComponentLink[]): { data: ElementData }[] {
+  return links.map((row) => {
+    const rank = row.status === "unvalidated" || row.status === "missing_location" ? 2 : row.status === "observed" ? 1 : 0;
+    const tone = rank === 2 ? "inferred" : rank === 1 ? "observed" : "verified";
+    const line = rank === 2 ? "dashed" : rank === 1 ? "thin" : "solid";
+    const kind = row.kind ? `${row.count} ${row.kind.replaceAll("_", " ")}` : String(row.count);
+    return {
+      data: {
+        id: `rollup::${row.source}::${row.target}`,
+        label: kind,
+        source: row.source,
+        target: row.target,
+        entity: "rollup",
+        tone,
+        line,
+        weight: Math.min(6, 1.6 + Math.log2(Math.max(1, row.count))),
+      },
+    };
+  });
+}
+
+/** Unfocused map lines. Prefer the snapshot counts. Fall back to this page when an older response has no field. */
+export function mapRollup(data: GraphResponse, components: readonly Component[], focused = false): { data: ElementData }[] {
+  if (!focused && data.component_links) return componentLinkElements(data.component_links);
+  return componentRollup(data, components);
+}
+
 export function openingDiagram(components: readonly Component[], data: GraphResponse): { data: ElementData }[] {
   if (components.length === 0) return openingMap([], toElements(data, []));
   const nodes = components.map((c) => ({ data: { id: c.id, label: c.name, entity: "component", layer: c.layer } }));
-  return [...nodes, ...componentRollup(data, components)];
+  return [...nodes, ...mapRollup(data, components)];
 }
 
 const COL_W = 220;

@@ -1,8 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense, useState } from "react";
-import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
-import { makeQueryClient } from "./api/queries";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { makeQueryClient, useRepos } from "./api/queries";
 import { AppShell } from "./app/AppShell";
+import { installPreviewBridge, previewBasename } from "./app/previewBridge";
 import { SnapshotLayout } from "./app/SnapshotLayout";
 import { AskPage } from "./features/ask/AskPage";
 import { ClaimsPage } from "./features/claims/ClaimsPage";
@@ -67,11 +68,29 @@ export function AppRoutes() {
   );
 }
 
+function PreviewBridge() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const repos = useRepos();
+  useEffect(() => installPreviewBridge((path) => navigate(path)), [navigate]);
+  useEffect(() => {
+    if (window.parent === window) return;
+    if (location.pathname.includes("/graph")) return;
+    const repo = repos.data?.length === 1 ? repos.data[0] : undefined;
+    const sha = repo?.latest_discovered_sha;
+    if (!repo || !sha) return;
+    navigate(`/r/${encodeURIComponent(repo.id)}/s/${sha}/graph`, { replace: true });
+  }, [repos.data, location.pathname, navigate]);
+  return null;
+}
+
 export function App() {
   const [qc] = useState(makeQueryClient);
+  const basename = previewBasename() || undefined;
   return (
     <QueryClientProvider client={qc}>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
+        <PreviewBridge />
         <AppRoutes />
       </BrowserRouter>
     </QueryClientProvider>

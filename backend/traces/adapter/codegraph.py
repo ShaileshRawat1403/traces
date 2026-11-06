@@ -43,7 +43,8 @@ RESOLVER = {  # metadata.resolvedBy -> (normalized, class)  (EVIDENCE_SCHEMA sec
     "fuzzy": ("codegraph:fuzzy", "analyzer_inference"),
     "file-path": ("codegraph:resolved-file-path", "statically_derived"),
 }
-SYNTH = {"jsx-render": "codegraph:synthesized:jsx-render", "tanstack-link": "codegraph:synthesized:tanstack-link"}
+SYNTH = {"jsx-render": "codegraph:synthesized:jsx-render", "tanstack-link": "codegraph:synthesized:tanstack-link",
+         "interface-impl": "codegraph:synthesized:interface-impl"}
 COLUMNS = {
     "nodes": ["id", "kind", "name", "qualified_name", "file_path", "language", "start_line", "end_line", "start_column", "end_column", "decorators"],
     "edges": ["id", "source", "target", "kind", "metadata", "line", "col", "provenance"],
@@ -52,7 +53,7 @@ COLUMNS = {
     "project_metadata": ["key", "value"],
     "schema_versions": ["version"],
 }
-REL_KINDS = {"contains", "imports", "calls", "references", "instantiates", "extends", "navigates"}
+REL_KINDS = {"contains", "imports", "calls", "references", "instantiates", "extends", "implements", "navigates"}
 
 
 def map_edge(row, md):

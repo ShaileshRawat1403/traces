@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { COMPONENT_IDS, componentsSample, graphComponentsSample, graphSymbolsSample } from "../../testing/samples";
-import { componentForFile, componentRollup, columnLayout, countsFor, depthLayout, drawableEdges, fileRollup, graphQuery, nextGraphLimit, nextInDirection, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState } from "./graphModel";
+import { componentForFile, componentRollup, columnLayout, countsFor, depthLayout, drawableEdges, fileRollup, graphQuery, mapRollup, nextGraphLimit, nextInDirection, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState } from "./graphModel";
 
 describe("graph URL state and query", () => {
-  it("defaults to verified and observed, depth 1, no focus", () => {
+  it("defaults to every drawable status, depth 1, no focus", () => {
     const s = readGraphState(new URLSearchParams());
-    expect(s.status).toEqual(["verified", "observed"]);
+    expect(s.status).toEqual(["verified", "observed", "unvalidated", "missing_location"]);
     expect(s.depth).toBe(1);
     expect(s.focus).toBeNull();
     const q = new URLSearchParams(graphQuery(s).slice(1));
-    expect(q.getAll("status")).toEqual(["verified", "observed"]);
+    expect(q.getAll("status")).toEqual(["verified", "observed", "unvalidated", "missing_location"]);
     expect(q.has("focus")).toBe(false);
     expect(q.has("depth")).toBe(false);
     expect(q.has("include_rejected")).toBe(false);
@@ -88,6 +88,17 @@ describe("compound grouping", () => {
     expect(edges).toHaveLength(1);
     expect(edges[0]!.data.line).toBe("thin");
     expect(edges[0]!.data.label).toBe("1 calls");
+  });
+  it("draws snapshot component links instead of the truncated page", () => {
+    const data = {
+      ...graphSymbolsSample,
+      component_links: [{ source: COMPONENT_IDS.api, target: COMPONENT_IDS.web, count: 40, status: "verified" as const, kind: "calls" }],
+    };
+    const roll = openingDiagram(componentsSample, data).find((e) => String(e.data.id).startsWith("rollup::"));
+    expect(roll?.data.label).toBe("40 calls");
+    expect(roll?.data.line).toBe("solid");
+    expect(mapRollup(data, componentsSample)).toHaveLength(1);
+    expect(mapRollup(data, componentsSample, true).some((e) => e.data.label !== "40 calls")).toBe(true);
   });
   it("draws every stored component on the opening diagram", () => {
     const els = openingDiagram(componentsSample, graphSymbolsSample);

@@ -235,6 +235,16 @@ class GraphEdge(Strict):
     injected: bool | None = Field(None, description="true for an injected negative control, never a statement about the repository; always sent")
 
 
+class ComponentLink(Strict):
+    """A count of stored relationships between two components. Not a claim and not a new relationship."""
+
+    source: str = Field(description="component id")
+    target: str = Field(description="component id")
+    count: int = Field(description="stored static relationships from source to target after the status filter and before the page limit")
+    status: Status = Field(description="weakest status among the counted relationships")
+    kind: str | None = Field(None, description="relationship_kind when every counted relationship has that kind; null when the kinds differ")
+
+
 class GraphResponse(Strict):
     snapshot_id: str
     nodes: list[GraphNode]
@@ -244,6 +254,11 @@ class GraphResponse(Strict):
     truncated: bool
     truncated_counts: dict[str, int] | None = Field(None, description="edges matched but cut by `limit`, by status (empty when not truncated)")
     limit: int
+    component_links: list[ComponentLink] = Field(
+        default_factory=list,
+        description="Counts of stored relationships between different components, for the statuses in this request, before the page limit. "
+                    "Not claims. Empty when the graph is focused, because that picture is symbols.",
+    )
 
 
 class SourceView(Strict):

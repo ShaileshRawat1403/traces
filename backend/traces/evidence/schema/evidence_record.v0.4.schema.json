@@ -70,6 +70,7 @@
       "references",
       "instantiates",
       "extends",
+      "implements",
       "navigates",
       "binds_handler",
       "implements_operation",

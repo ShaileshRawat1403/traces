@@ -684,6 +684,38 @@ export interface components {
              */
             rule: string;
         };
+        /**
+         * ComponentLink
+         * @description A count of stored relationships between two components. Not a claim and not a new relationship.
+         */
+        ComponentLink: {
+            /**
+             * Count
+             * @description stored static relationships from source to target after the status filter and before the page limit
+             */
+            count: number;
+            /**
+             * Kind
+             * @description relationship_kind when every counted relationship has that kind; null when the kinds differ
+             */
+            kind?: string | null;
+            /**
+             * Source
+             * @description component id
+             */
+            source: string;
+            /**
+             * Status
+             * @description weakest status among the counted relationships
+             * @enum {string}
+             */
+            status: "verified" | "observed" | "unvalidated" | "missing_location" | "rejected";
+            /**
+             * Target
+             * @description component id
+             */
+            target: string;
+        };
         /** ErrorBody */
         ErrorBody: {
             /**
@@ -822,6 +854,11 @@ export interface components {
         };
         /** GraphResponse */
         GraphResponse: {
+            /**
+             * Component Links
+             * @description Counts of stored relationships between different components, for the statuses in this request, before the page limit. Not claims. Empty when the graph is focused, because that picture is symbols.
+             */
+            component_links?: components["schemas"]["ComponentLink"][];
             /** Edges */
             edges: components["schemas"]["GraphEdge"][];
             /**

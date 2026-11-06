@@ -1,5 +1,6 @@
 // Typed API client. Types come from docs/contracts/openapi.json via `npm run gen:api` (src/api/schema.d.ts).
 import type { components } from "./schema";
+import { previewBasename } from "../app/previewBridge";
 
 export type Schemas = components["schemas"];
 export type Repo = Schemas["Repo"];
@@ -41,7 +42,7 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE = "/api/v1";
+export const API_BASE = `${previewBasename()}/api/v1`;
 
 async function parseError(res: Response): Promise<ApiError> {
   let err: ErrorBody = { code: "http_error", message: `HTTP ${res.status}` };

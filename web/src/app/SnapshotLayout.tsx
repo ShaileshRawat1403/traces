@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useParams, useSearchParams } from "react-router-dom";
-import { ApiError } from "../api/client";
+import { API_BASE, ApiError } from "../api/client";
 import { useCapability, useSnapshot } from "../api/queries";
 import { LookingBar } from "../features/subject/LookingBar";
 import { SnapshotFind } from "../features/find/SnapshotFind";
@@ -157,8 +157,13 @@ export function SnapshotLayout() {
         </Link>
         <ShaChip sha={sha} />
         {snap.data ? <span className="text-muted">Snapshot {snap.data.state}</span> : null}
+        {snap.data?.unisolated ? (
+          <span className="text-inferred">
+            Unisolated index. The extractor ran without a proven network namespace. No model was used. This snapshot is not acceptance evidence.
+          </span>
+        ) : null}
         <CopyViewLink />
-        <a href={`/api/v1/repos/${encodeURIComponent(repoId)}/snapshots/${encodeURIComponent(sha)}/export`} className="inline-flex min-h-8 items-center text-muted">
+        <a href={`${API_BASE}/repos/${encodeURIComponent(repoId)}/snapshots/${encodeURIComponent(sha)}/export`} className="inline-flex min-h-8 items-center text-muted">
           Download evidence
           <span className="sr-only"> as one JSONL record per line for this snapshot</span>
         </a>

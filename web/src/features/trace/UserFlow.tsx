@@ -272,9 +272,8 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
         {steps.map((s, i) => (
           <li key={s.key} data-flow={s.tone}>
             <button type="button" aria-pressed={i === index} onClick={() => setPicked(i)} className="flow-stop">
-              <span className="text-xs text-muted">{i + 1}</span>
-              <span className="block truncate font-semibold">{short(s.hop.to_symbol)}</span>
-              <span className="block truncate text-xs text-ink-2">{s.hop.kind.replaceAll("_", " ")}</span>
+              <span className="text-xs text-muted">Step {i + 1}</span>
+              <span className="block text-sm font-medium leading-snug">{flowLine(s.hop.kind, short(s.hop.from_symbol), short(s.hop.to_symbol))}</span>
             </button>
           </li>
         ))}

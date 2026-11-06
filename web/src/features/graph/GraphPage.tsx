@@ -14,7 +14,7 @@ import { CODE_LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
 import { withAt } from "../subject/subject";
 import { useSubject } from "../subject/useSubject";
-import { LAYERS, STATUS_FILTERS, canvasElements, componentRollup, countsFor, drawableEdges, fileRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
+import { LAYERS, STATUS_FILTERS, canvasElements, countsFor, drawableEdges, fileRollup, graphQuery, mapRollup, nextGraphLimit, openingDiagram, readGraphState, symbolsInFile, toElements, writeGraphState, type ElementData, type GraphState, type StatusFilter } from "./graphModel";
 
 const STATUS_TEXT: Record<StatusFilter, string> = {
   verified: "Verified",
@@ -24,6 +24,43 @@ const STATUS_TEXT: Record<StatusFilter, string> = {
 };
 
 const coreLayer = (layer: string | undefined) => isLayer(layer) && CODE_LAYERS[layer];
+
+const STRIP = [
+  { status: "verified", label: "Verified", dot: "bg-verified" },
+  { status: "observed", label: "Observed", dot: "bg-observed" },
+  { status: "unvalidated", label: "Inferred", dot: "bg-inferred" },
+  { status: "missing_location", label: "Inferred, no location", dot: "bg-inferred" },
+  { status: "rejected", label: "Rejected", dot: "bg-rejected" },
+] as const;
+
+function statusTotals(data: GraphResponse): Record<string, number> {
+  const totals: Record<string, number> = {};
+  const add = (status: string, n: number) => {
+    if (n > 0) totals[status] = (totals[status] ?? 0) + n;
+  };
+  for (const [status, n] of Object.entries(data.hidden_counts)) add(status, n);
+  for (const edge of data.edges) add(edge.status, 1);
+  for (const [status, n] of Object.entries(data.truncated_counts ?? {})) add(status, n);
+  return totals;
+}
+
+function StatusStrip({ totals, on }: { totals: Record<string, number>; on: readonly string[] }) {
+  return (
+    <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-2" aria-label="Evidence status counts">
+      {STRIP.map((row) => {
+        const n = totals[row.status] ?? 0;
+        const included = on.includes(row.status);
+        return (
+          <li key={row.status} className={`flex items-center gap-2 text-sm ${included ? "text-ink" : "text-muted"}`}>
+            <span className={`h-2 w-2 shrink-0 rounded-full ${row.dot} ${included ? "" : "opacity-35"}`} aria-hidden="true" />
+            <span className="font-mono tabular-nums">{n.toLocaleString("en-US")}</span>
+            <span>{included ? row.label : `${row.label}, hidden`}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function Legend() {
   return (
@@ -76,7 +113,7 @@ function Filters({ state: urlState, onChange: commit }: { state: GraphState; onC
               {STATUS_TEXT[s]}
             </label>
           ))}
-          <p className="mt-1 text-xs text-muted">Inferred relationships are off by default. Rejected claims are never requested.</p>
+          <p className="mt-1 text-xs text-muted">Every stored status is on except rejected. Rejected claims are never requested.</p>
         </fieldset>
         <fieldset>
           <legend className="mb-1 text-sm font-semibold">Layer</legend>
@@ -169,7 +206,7 @@ function SelectionPanel({
   if (!node) return null;
   const { edges } = drawableEdges(data);
   const mine = edges.filter((e) => e.source === selected || e.target === selected);
-  const rolls = node.entity === "component" ? componentRollup(data, components).filter((e) => e.data.source === selected || e.data.target === selected) : [];
+  const rolls = node.entity === "component" ? mapRollup(data, components, !!state.focus).filter((e) => e.data.source === selected || e.data.target === selected) : [];
   const byKind = new Map<string, number>();
   for (const e of mine) byKind.set(e.kind, (byKind.get(e.kind) ?? 0) + 1);
   const focused = state.focus === selected;
@@ -324,7 +361,7 @@ export default function GraphPage() {
   const [openedFile, setOpenedFile] = useState<string | null>(null);
   const [narrow, setNarrow] = useState(false);
   const [layerPick, setLayerPick] = useState<string | null>(null);
-  const [scope, setScope] = useState<"core" | "all">("core");
+  const [scope, setScope] = useState<"core" | "all">("all");
   const searchId = useId();
   const query = graphQuery(state);
   const graph = useQuery({ queryKey: ["graph", repoId, sha, query], queryFn: () => api.graph(repoId, sha, query) });
@@ -347,8 +384,7 @@ export default function GraphPage() {
   const useFiles = drawn.some((e) => e.data.entity === "file");
   const mapNodes = drawn.filter((e) => !e.data.source);
   const layersOnMap = LAYERS.filter((l) => mapNodes.some((n) => n.data.layer === l));
-  const defaultLayer = narrow && !state.focus && mapNodes.length > 8 ? (layersOnMap.includes("frontend") ? "frontend" : (layersOnMap[0] ?? null)) : null;
-  const effectiveLayer = !state.focus ? (layerPick === "all" ? null : (layerPick ?? defaultLayer)) : null;
+  const effectiveLayer = !state.focus && layerPick && layerPick !== "all" ? layerPick : null;
   const coreOn = !state.focus && !narrow && !effectiveLayer && scope === "core" && mapNodes.length > 12 && mapNodes.some((n) => coreLayer(n.data.layer));
   const shown = useMemo(() => {
     const allow = (layer: string | undefined) => {
@@ -440,7 +476,7 @@ export default function GraphPage() {
   return (
     <>
       <div className="mb-2 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-        <h1 className="text-sm font-medium tracking-[-0.02em] text-ink-2">Architecture</h1>
+        <h1 className="text-sm font-medium tracking-[-0.02em] text-ink-2">Architecture graph</h1>
         <form onSubmit={submitSearch} role="search" className="flex min-w-0 flex-1 gap-2">
             <label htmlFor={searchId} className="sr-only">
               Search nodes
@@ -473,6 +509,7 @@ export default function GraphPage() {
         <ErrorState error={graph.error} what="The architecture graph" />
       ) : (
         <>
+          <StatusStrip totals={statusTotals(graph.data)} on={state.status} />
           <div className="flex flex-col gap-4">
             <div className="min-w-0">
               {graph.data.nodes.length === 0 ? (
@@ -587,7 +624,7 @@ export default function GraphPage() {
                 )
               ) : null}
               {!state.focus ? (
-                <p className="text-xs text-ink-2">A curve beside a column is a relationship inside that layer. A line between columns crosses layers. Thickness is how many relationships this page recorded. The color is the weakest status in the pair. Select a component to read every link that touches it, including ones that skip a column. A missing line is not proof that nothing connects.</p>
+                <p className="text-xs text-ink-2">A line between two components counts stored relationships for the statuses that are on. It is not a new claim. The color is the weakest status in that count. Same-component relationships stay off this map. A missing line is not proof that nothing connects.</p>
               ) : (
                 <p className="text-xs text-muted">{useFiles ? "Files first. Select a file to emphasize the lines recorded from it. Enter opens its symbols. A line is a count, not a new claim." : "Select a symbol to label its lines. List shows every relationship."}</p>
               )}
@@ -597,7 +634,7 @@ export default function GraphPage() {
                 <SelectionPanel data={graph.data} components={components} selected={selected} state={state} base={snapshotBase(repoId, sha)} onState={setState} onEvidence={openEvidence} onClear={() => choose(null)} />
               ) : !state.focus ? (
                 <RecordedLinks
-                  rolls={componentRollup(graph.data, components).filter((e) => {
+                  rolls={mapRollup(graph.data, components, !!state.focus).filter((e) => {
                     const ids = new Set(pictured.filter((n) => !n.data.source).map((n) => n.data.id));
                     return !!e.data.source && !!e.data.target && ids.has(e.data.source) && ids.has(e.data.target);
                   })}

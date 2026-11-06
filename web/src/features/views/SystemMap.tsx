@@ -5,7 +5,7 @@ import { api, type Component } from "../../api/client";
 import { snapshotBase } from "../../app/nav";
 import { Button } from "../../ui/States";
 import { GraphCanvas, RecordedLinks } from "../graph/GraphCanvas";
-import { componentRollup, graphQuery, nextGraphLimit, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
+import { graphQuery, mapRollup, nextGraphLimit, openingDiagram, readGraphState, type ElementData } from "../graph/graphModel";
 import { CODE_LAYERS, LAYERS, isLayer, layerColor } from "../layers";
 import { askHref } from "../ask/recordedQuestion";
 import { useSubject } from "../subject/useSubject";
@@ -26,7 +26,7 @@ export function SystemMap() {
   useEffect(() => {
     if (subjectId) setSelected(subjectId);
   }, [subjectId]);
-  const [scope, setScope] = useState<"core" | "all">("core");
+  const [scope, setScope] = useState<"core" | "all">("all");
   const [narrow, setNarrow] = useState(false);
   const [layerPick, setLayerPick] = useState<string | null>(null);
   useEffect(() => {
@@ -52,8 +52,7 @@ export function SystemMap() {
   const many = nodes.length > 12 && nodes.some((n) => core(n.data.layer));
   const layersOnMap = LAYERS.filter((l) => nodes.some((n) => n.data.layer === l));
   const phoneList = narrow && nodes.length > 8;
-  const defaultLayer = phoneList ? (layersOnMap.includes("frontend") ? "frontend" : (layersOnMap[0] ?? null)) : null;
-  const effectiveLayer = phoneList ? (layerPick === "all" ? null : (layerPick ?? defaultLayer)) : null;
+  const effectiveLayer = phoneList && layerPick && layerPick !== "all" ? layerPick : null;
   const coreOn = many && scope === "core" && !phoneList;
   const shown = useMemo(() => {
     const allow = (layer: string | undefined) => {
@@ -68,7 +67,7 @@ export function SystemMap() {
   if (comps.isPending || graph.isPending) return <p className="mb-3 text-sm text-muted">Loading the architecture.</p>;
   if (!nodes.length) return null;
   const selectedNode = shown.find((n) => n.data.id === selected);
-  const allRolls = graph.data ? componentRollup(graph.data, components) : [];
+  const allRolls = graph.data ? mapRollup(graph.data, components) : [];
   const rolls = selected ? allRolls.filter((e) => e.data.source === selected || e.data.target === selected) : [];
 
   return (
@@ -78,6 +77,9 @@ export function SystemMap() {
           {phoneList ? (
             <div className="mb-2 max-w-full overflow-x-auto">
               <div role="group" aria-label="Layer in view" className="seg">
+              <button type="button" aria-pressed={effectiveLayer === null} onClick={() => setLayerPick("all")}>
+                All layers
+              </button>
               {layersOnMap.map((l) => (
                 <button key={l} type="button" aria-pressed={effectiveLayer === l} onClick={() => setLayerPick(l)} className="capitalize">
                   {l}
@@ -122,7 +124,7 @@ export function SystemMap() {
                                 return `${e.data.label} ${dir} ${other}`;
                               })
                               .join(" · ")
-                          : "No line on this page leaves this component."}
+                          : "No stored relationship leaves this component for the statuses that are on."}
                       </span>
                       </span>
                     </button>
@@ -151,7 +153,7 @@ export function SystemMap() {
           )}
           {graph.data?.truncated ? (
             <div className="mt-2 flex flex-col items-start gap-2">
-              <p className="text-xs text-ink-2">This page of relationships is truncated at {graph.data.limit}. Counts use only that page.</p>
+              <p className="text-xs text-ink-2">The symbol list on this page stops at {graph.data.limit}. Lines between components count the whole snapshot for the statuses that are on. A line is a count, not a new claim.</p>
               {nextGraphLimit(limit) ? (
                 <Button onClick={() => setLimit(nextGraphLimit(limit)!)}>Show more recorded relationships</Button>
               ) : (
@@ -165,7 +167,24 @@ export function SystemMap() {
         ) : (
           <RecordedLinks rolls={allRolls} nameOf={(id) => components.find((c) => c.id === id)?.name ?? id ?? ""} onPick={pick} />
         )}
+        <LayerLegend layers={[...new Set(components.map((c) => c.layer).filter((l) => typeof l === "string"))]} />
       </div>
+    </section>
+  );
+}
+
+function LayerLegend({ layers }: { layers: readonly string[] }) {
+  if (layers.length === 0) return null;
+  return (
+    <section className="mt-4 border-t border-white/10 pt-3" aria-label="Components by layer">
+      <p className="text-xs text-muted">Every layer the snapshot stored. The names are the API's, not a guess.</p>
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        {layers.map((l) => (
+          <li key={l}>
+            <h3 className="text-sm font-medium text-ink">{l}</h3>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -211,7 +230,7 @@ function MapInspector({
           })}
         </ul>
       ) : (
-        <p className="mt-2 text-sm text-ink-2">No relationship on this page leaves this component. That is not proof that nothing connects.</p>
+        <p className="mt-2 text-sm text-ink-2">No stored relationship leaves this component for the statuses that are on. That is not proof that nothing connects.</p>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
         <Link to={to(`${base}/graph?focus=${encodeURIComponent(node.id)}`)} className="tap inline-flex items-center rounded-md bg-ink px-3 text-sm font-medium text-canvas no-underline hover:no-underline">
