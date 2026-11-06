@@ -5,9 +5,9 @@
 name: ci
 on:
   push:
-    branches: [build/traces-v1, "ws/**"]
+    branches: [main, build/traces-v1, "ws/**"]
   pull_request:
-    branches: [build/traces-v1, main]
+    branches: [main, build/traces-v1]
   workflow_dispatch:
     inputs:
       e2e:
