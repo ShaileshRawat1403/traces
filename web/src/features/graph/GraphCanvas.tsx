@@ -201,8 +201,11 @@ export function GraphCanvas({ elements, layout, selected, onSelect, onExpand, on
     if (layout !== "map" || userScaled.current) return;
     const el = stageRef.current;
     if (!el) return;
-    const top = el.getBoundingClientRect().top;
-    if (top > 96) window.scrollTo({ top: window.scrollY + top - 72, behavior: "instant" });
+    // Keep the zoom controls on screen. Scrolling the canvas alone clips them under the viewport edge.
+    const toolbar = el.parentElement?.querySelector('[aria-label="Graph view controls"]');
+    const target = toolbar instanceof HTMLElement ? toolbar : el;
+    const top = target.getBoundingClientRect().top;
+    if (top > 96) window.scrollTo({ top: window.scrollY + top - 16, behavior: "instant" });
   }, [layout, scale, nodes.length]);
 
   useEffect(() => {

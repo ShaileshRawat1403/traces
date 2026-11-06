@@ -69,7 +69,10 @@ async function noSideways(p) {
   await step('360 touch: trace, tap Open evidence on step 1, drawer shows the source file', async () => {
     await phone.goto(W + F + '/trace', { waitUntil: 'networkidle' });
     await see(phone, ['STEP 1. Items shows AddItem.']);
-    await phone.getByText('Open evidence').first().tap();
+    const step1 = phone.getByRole('button', { name: /STEP 1\./ });
+    await step1.tap();
+    await phone.waitForFunction(() => [...document.querySelectorAll('button')].some((el) => (el.textContent || '').includes('STEP 1.') && el.getAttribute('aria-pressed') === 'true'));
+    await phone.getByRole('button', { name: 'Open evidence' }).first().tap();
     await see(phone, ['frontend/src/routes/_layout/items.tsx']);
     await axe(phone);
   });
