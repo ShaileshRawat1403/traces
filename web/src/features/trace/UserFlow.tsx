@@ -87,7 +87,7 @@ function Step({
         <code className="block break-all text-sm font-semibold">{short(to)}</code>
       </div>
       <p className="flow-span text-sm">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Step {index}. </span>
+        <span className="text-xs font-semibold tracking-wide text-muted">STEP {index}. </span>
         {flowLine(kind, short(from), short(to))}
       </p>
       {tone === "gap" ? (
@@ -272,7 +272,7 @@ export function UserFlow({ repoId, sha, onEvidence }: { repoId: string; sha: str
         {steps.map((s, i) => (
           <li key={s.key} data-flow={s.tone}>
             <button type="button" aria-pressed={i === index} onClick={() => setPicked(i)} className="flow-stop">
-              <span className="text-xs text-muted">Step {i + 1}</span>
+              <span className="text-xs text-muted">STEP {i + 1}. </span>
               <span className="block text-sm font-medium leading-snug">{flowLine(s.hop.kind, short(s.hop.from_symbol), short(s.hop.to_symbol))}</span>
             </button>
           </li>

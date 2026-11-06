@@ -163,7 +163,7 @@ def test_component_links_count_the_snapshot_not_the_page():
     from traces.evidence.views import _component_links
 
     edges = []
-    for i in range(5):
+    for _ in range(5):
         edges.append({
             "status": "verified", "relationship_kind": "contains",
             "from": {"file": "a.py"}, "to": {"file": "a.py"},
